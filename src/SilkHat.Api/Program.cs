@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using SilkHat.Analysis.Abstractions;
+using SilkHat.Analysis.Services;
 using SilkHat.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +11,8 @@ builder.Services.AddSwaggerGen();
 
 var connectionString = builder.Configuration.GetConnectionString("SilkHat") ?? "Data Source=./silkhat.db";
 builder.Services.AddDbContext<SilkHatDbContext>(options => options.UseSqlite(connectionString));
+builder.Services.AddSingleton<LoadedRepositoryStore>();
+builder.Services.AddSingleton<IRepoCommandProcessor, RepoCommandProcessor>();
 
 var app = builder.Build();
 
