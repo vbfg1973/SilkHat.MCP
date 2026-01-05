@@ -7,6 +7,7 @@ Health:
 
 Repository configs:
 - GET  /api/repositories
+- GET  /api/repositories/loaded
 - GET  /api/repositories/{id}
 - POST /api/repositories
 - PUT  /api/repositories/{id}
@@ -16,6 +17,7 @@ Groups:
 - GET  /api/repository-groups/{id}
 - POST /api/repository-groups
 - PUT  /api/repository-groups/{id}
+- POST /api/repository-groups/{id}/load
 
 Repo load (streaming):
 - POST /api/repositories/{id}/load   (NDJSON stream RepoEvent)
@@ -34,6 +36,9 @@ Git:
 - GET /api/repositories/{id}/git/tree?...filters...
 - GET /api/repositories/{id}/git/files/{path}/history
 - GET /api/repositories/{id}/git/files/{path}/cochanges
+
+Discovery:
+- GET /api/repositories/available
 
 Requirements:
 - Swagger enabled

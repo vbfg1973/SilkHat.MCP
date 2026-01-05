@@ -33,6 +33,7 @@
                     <MudTh>Name</MudTh>
                     <MudTh>Description</MudTh>
                     <MudTh></MudTh>
+                    <MudTh></MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Name">@context.Name</MudTd>
@@ -40,6 +41,83 @@
                     <MudTd>
                         <MudButton Variant="Variant.Text" OnClick="@(() => StartGroupEdit(context))">Edit</MudButton>
                     </MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => StartGroupLoadAsync(context))" Disabled="_groupLoadBusy">
+                            Load
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+            <MudDivider Class="my-4" />
+            <MudText Typo="Typo.subtitle1">Group Load Results</MudText>
+            @if (_groupLoadBusy)
+            {
+                <MudProgressLinear Indeterminate="true" Class="mt-2" />
+            }
+            @if (!string.IsNullOrWhiteSpace(_groupLoadError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-2">@_groupLoadError</MudAlert>
+            }
+            <MudList T="RepositoryLoadResultModel" Dense="true">
+                @foreach (var result in _groupLoadResults)
+                {
+                    <MudListItem T="RepositoryLoadResultModel">
+                        <MudText Typo="Typo.body2">
+                            @($"{result.Name} | {(result.Loaded ? "Loaded" : "Not Loaded")} | {result.Message}")
+                        </MudText>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudText Typo="Typo.h4" Class="mb-4">Available Repositories</MudText>
+<MudPaper Elevation="1" Class="pa-4 mb-6">
+    <MudGrid>
+        <MudItem xs="12" md="5">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Add to Group</MudText>
+            <MudSelect T="string" Label="Repository" @bind-Value="_availableSelectedPath">
+                <MudSelectItem T="string" Value="@(string.Empty)">Select a repository</MudSelectItem>
+                @foreach (var repo in _availableRepositories)
+                {
+                    <MudSelectItem T="string" Value="@(repo.FullPath)">
+                        @($"{repo.Name} ({repo.RelativePath})")
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="Guid?" Label="Group" @bind-Value="_availableGroupId">
+                <MudSelectItem T="Guid?" Value="@(default(Guid?))">Select a group</MudSelectItem>
+                @foreach (var group in _groups)
+                {
+                    <MudSelectItem T="Guid?" Value="@(group.Id)">@group.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddAvailableRepositoryAsync" Disabled="_availableBusy">
+                    Add
+                </MudButton>
+            </MudStack>
+            @if (!string.IsNullOrWhiteSpace(_availableMessage))
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-3">@_availableMessage</MudAlert>
+            }
+            @if (!string.IsNullOrWhiteSpace(_availableError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@_availableError</MudAlert>
+            }
+        </MudItem>
+        <MudItem xs="12" md="7">
+            <MudTable Items="_availableRepositories" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Relative Path</MudTh>
+                    <MudTh>Git</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Relative Path">@context.RelativePath</MudTd>
+                    <MudTd DataLabel="Git">@((context.IsGitRepository) ? "Yes" : "No")</MudTd>
                 </RowTemplate>
             </MudTable>
         </MudItem>
@@ -128,6 +206,7 @@
 @code {
     private readonly List<RepositoryGroupModel> _groups = new();
     private readonly List<RepositoryConfigModel> _configs = new();
+    private readonly List<AvailableRepositoryModel> _availableRepositories = new();
 
     private Guid? _editingGroupId;
     private string _groupName = string.Empty;
@@ -135,6 +214,9 @@
     private bool _groupBusy;
     private string? _groupMessage;
     private string? _groupError;
+    private readonly List<RepositoryLoadResultModel> _groupLoadResults = new();
+    private bool _groupLoadBusy;
+    private string? _groupLoadError;
 
     private Guid? _editingConfigId;
     private string _configName = string.Empty;
@@ -144,6 +226,11 @@
     private bool _configBusy;
     private string? _configMessage;
     private string? _configError;
+    private string? _availableSelectedPath;
+    private Guid? _availableGroupId;
+    private bool _availableBusy;
+    private string? _availableMessage;
+    private string? _availableError;
 
     private readonly List<RepoEventModel> _loadEvents = new();
     private bool _loadBusy;
@@ -167,11 +254,15 @@
 
             _configs.Clear();
             _configs.AddRange(await Api.GetRepositoryConfigsAsync());
+
+            _availableRepositories.Clear();
+            _availableRepositories.AddRange(await Api.GetAvailableRepositoriesAsync());
         }
         catch (Exception ex)
         {
             _groupError = $"Failed to load data: {ex.Message}";
             _configError = _groupError;
+            _availableError = _groupError;
         }
     }
 
@@ -230,6 +321,29 @@
         _groupDescription = null;
         _groupMessage = null;
         _groupError = null;
+    }
+
+    private async Task StartGroupLoadAsync(RepositoryGroupModel group)
+    {
+        _groupLoadBusy = true;
+        _groupLoadError = null;
+        _groupLoadResults.Clear();
+        StateHasChanged();
+
+        try
+        {
+            var result = await Api.LoadRepositoryGroupAsync(group.Id);
+            _groupLoadResults.AddRange(result.Repositories);
+        }
+        catch (Exception ex)
+        {
+            _groupLoadError = ex.Message;
+        }
+        finally
+        {
+            _groupLoadBusy = false;
+            StateHasChanged();
+        }
     }
 
     private async Task SaveConfigAsync()
@@ -304,6 +418,59 @@
         _configGroupId = null;
         _configMessage = null;
         _configError = null;
+    }
+
+    private async Task AddAvailableRepositoryAsync()
+    {
+        _availableMessage = null;
+        _availableError = null;
+
+        if (string.IsNullOrWhiteSpace(_availableSelectedPath))
+        {
+            _availableError = "Select a repository to add.";
+            return;
+        }
+
+        if (!_availableGroupId.HasValue)
+        {
+            _availableError = "Select a group to add the repository.";
+            return;
+        }
+
+        var selected = _availableRepositories.FirstOrDefault(repo => repo.FullPath == _availableSelectedPath);
+        if (selected is null)
+        {
+            _availableError = "Selected repository not found.";
+            return;
+        }
+
+        if (!selected.IsGitRepository)
+        {
+            _availableError = "Selected repository is not a git repository.";
+            return;
+        }
+
+        _availableBusy = true;
+        try
+        {
+            await Api.CreateRepositoryConfigAsync(new CreateRepositoryConfigRequest(
+                selected.Name,
+                selected.FullPath,
+                null,
+                _availableGroupId));
+            _availableMessage = "Repository added to group.";
+            _availableSelectedPath = null;
+            _availableGroupId = null;
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _availableError = ex.Message;
+        }
+        finally
+        {
+            _availableBusy = false;
+        }
     }
 
     private string GetGroupName(Guid? groupId)

@@ -25,7 +25,7 @@ public sealed class IdeTests
 
         var configId = Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d");
         var handler = new FakeHttpMessageHandler();
-        handler.AddJsonResponse("api/repositories", $@"[
+        handler.AddJsonResponse("api/repositories/loaded", $@"[
   {{
     ""id"": ""{configId}"",
     ""name"": ""Repo One"",

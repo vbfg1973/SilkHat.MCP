@@ -46,6 +46,16 @@ public sealed class HomeTests
   }
 ]
 """);
+        handler.AddJsonResponse("api/repositories/available", """
+[
+  {
+    "name": "Repo One",
+    "relativePath": "Repo One",
+    "fullPath": "/repos/repo-one",
+    "isGitRepository": true
+  }
+]
+""");
 
         context.Services.AddScoped(_ => new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
         context.Services.AddScoped<RepositoryApiClient>();

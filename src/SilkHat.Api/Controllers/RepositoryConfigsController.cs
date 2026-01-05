@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SilkHat.Api.Extensions;
+using SilkHat.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
+using System.Linq;
 
 namespace SilkHat.Api.Controllers;
 
@@ -11,10 +13,17 @@ namespace SilkHat.Api.Controllers;
 public sealed class RepositoryConfigsController : ApiControllerBase
 {
     private readonly SilkHatDbContext _dbContext;
+    private readonly ILoadedRepositoryStore _store;
+    private readonly IRepositoryDiscoveryService _discovery;
 
-    public RepositoryConfigsController(SilkHatDbContext dbContext)
+    public RepositoryConfigsController(
+        SilkHatDbContext dbContext,
+        ILoadedRepositoryStore store,
+        IRepositoryDiscoveryService discovery)
     {
         _dbContext = dbContext;
+        _store = store;
+        _discovery = discovery;
     }
 
     [HttpGet]
@@ -22,6 +31,20 @@ public sealed class RepositoryConfigsController : ApiControllerBase
     {
         var configs = await _dbContext.RepositoryConfigs
             .AsNoTracking()
+            .OrderBy(config => config.Name)
+            .Select(config => config.ToDto())
+            .ToListAsync(cancellationToken);
+
+        return Ok(configs);
+    }
+
+    [HttpGet("loaded")]
+    public async Task<ActionResult<IReadOnlyList<RepositoryConfigDto>>> GetLoaded(CancellationToken cancellationToken)
+    {
+        var loadedIds = _store.GetAll().Select(repo => repo.ConfigId).ToHashSet();
+        var configs = await _dbContext.RepositoryConfigs
+            .AsNoTracking()
+            .Where(config => loadedIds.Contains(config.Id))
             .OrderBy(config => config.Name)
             .Select(config => config.ToDto())
             .ToListAsync(cancellationToken);
@@ -59,6 +82,16 @@ public sealed class RepositoryConfigsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", "RootPath is required.", "Validation");
         }
 
+        if (!RepositoryInputNormalization.TryNormalizeRootPath(request.RootPath, out var normalizedPath, out var error))
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", error ?? "RootPath is invalid.", "Validation");
+        }
+
+        if (!_discovery.TryValidateRepositoryPath(normalizedPath, out var validationError))
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", validationError ?? "RootPath is invalid.", "Validation");
+        }
+
         if (request.GroupId.HasValue)
         {
             var groupExists = await _dbContext.RepositoryGroups
@@ -67,11 +100,6 @@ public sealed class RepositoryConfigsController : ApiControllerBase
             {
                 return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", "GroupId does not match an existing group.", "Validation");
             }
-        }
-
-        if (!RepositoryInputNormalization.TryNormalizeRootPath(request.RootPath, out var normalizedPath, out var error))
-        {
-            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", error ?? "RootPath is invalid.", "Validation");
         }
 
         var config = new RepositoryConfig
@@ -111,6 +139,16 @@ public sealed class RepositoryConfigsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", "RootPath is required.", "Validation");
         }
 
+        if (!RepositoryInputNormalization.TryNormalizeRootPath(request.RootPath, out var normalizedPath, out var error))
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", error ?? "RootPath is invalid.", "Validation");
+        }
+
+        if (!_discovery.TryValidateRepositoryPath(normalizedPath, out var validationError))
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", validationError ?? "RootPath is invalid.", "Validation");
+        }
+
         if (request.GroupId.HasValue)
         {
             var groupExists = await _dbContext.RepositoryGroups
@@ -119,11 +157,6 @@ public sealed class RepositoryConfigsController : ApiControllerBase
             {
                 return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", "GroupId does not match an existing group.", "Validation");
             }
-        }
-
-        if (!RepositoryInputNormalization.TryNormalizeRootPath(request.RootPath, out var normalizedPath, out var error))
-        {
-            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", error ?? "RootPath is invalid.", "Validation");
         }
 
         config.Name = request.Name.Trim();

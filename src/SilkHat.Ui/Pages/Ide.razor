@@ -107,7 +107,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        _configs.AddRange(await Api.GetRepositoryConfigsAsync());
+        _configs.AddRange(await Api.GetLoadedRepositoryConfigsAsync());
     }
 
     private async Task OnRepositoryChanged(Guid? configId)

@@ -42,4 +42,21 @@ public sealed class LoadedRepositoryStoreTests
 
         Assert.Same(first, second);
     }
+
+    [Fact]
+    public void GetAll_ReturnsLoadedRepositories()
+    {
+        var store = new LoadedRepositoryStore();
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+
+        store.SetLoaded(first, "/repo/one");
+        store.SetLoaded(second, "/repo/two");
+
+        var loaded = store.GetAll();
+
+        Assert.Equal(2, loaded.Count);
+        Assert.Contains(loaded, repo => repo.ConfigId == first);
+        Assert.Contains(loaded, repo => repo.ConfigId == second);
+    }
 }

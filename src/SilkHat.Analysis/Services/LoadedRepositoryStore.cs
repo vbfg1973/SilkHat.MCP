@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Models;
 
@@ -12,6 +13,11 @@ public sealed class LoadedRepositoryStore : ILoadedRepositoryStore
     public LoadedRepository? Get(Guid configId)
     {
         return _loadedRepositories.TryGetValue(configId, out var repo) ? repo : null;
+    }
+
+    public IReadOnlyCollection<LoadedRepository> GetAll()
+    {
+        return _loadedRepositories.Values.ToList();
     }
 
     public void SetLoaded(Guid configId, string rootPath)
