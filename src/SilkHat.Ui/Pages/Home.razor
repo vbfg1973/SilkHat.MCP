@@ -1,44 +1,287 @@
 ﻿@page "/"
-@inject HttpClient Http
+@inject RepositoryApiClient Api
 
 <PageTitle>Dashboard</PageTitle>
 
-<MudText Typo="Typo.h4" Class="mb-4">Repository Health</MudText>
+<MudText Typo="Typo.h4" Class="mb-4">Repository Groups</MudText>
+<MudPaper Elevation="1" Class="pa-4 mb-6">
+    <MudGrid>
+        <MudItem xs="12" md="5">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">@(_editingGroupId is null ? "Create Group" : "Edit Group")</MudText>
+            <MudTextField T="string" Label="Name" Required="true" @bind-Value="_groupName" />
+            <MudTextField T="string" Label="Description" @bind-Value="_groupDescription" Lines="3" />
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveGroupAsync" Disabled="_groupBusy">
+                    Save
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="ClearGroupForm" Disabled="_groupBusy">
+                    Clear
+                </MudButton>
+            </MudStack>
+            @if (!string.IsNullOrWhiteSpace(_groupMessage))
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-3">@_groupMessage</MudAlert>
+            }
+            @if (!string.IsNullOrWhiteSpace(_groupError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@_groupError</MudAlert>
+            }
+        </MudItem>
+        <MudItem xs="12" md="7">
+            <MudTable Items="_groups" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Description</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Description">@context.Description</MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => StartGroupEdit(context))">Edit</MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
 
+<MudText Typo="Typo.h4" Class="mb-4">Repository Configs</MudText>
 <MudPaper Elevation="1" Class="pa-4">
-    <MudText Typo="Typo.subtitle1">API Status</MudText>
-    @if (_loading)
-    {
-        <MudProgressLinear Indeterminate="true" Class="mt-2" />
-    }
-    else if (!string.IsNullOrWhiteSpace(_error))
-    {
-        <MudAlert Severity="Severity.Error" Class="mt-2">@_error</MudAlert>
-    }
-    else
-    {
-        <MudAlert Severity="Severity.Success" Class="mt-2">Health: @_health</MudAlert>
-    }
+    <MudGrid>
+        <MudItem xs="12" md="5">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">@(_editingConfigId is null ? "Create Config" : "Edit Config")</MudText>
+            <MudTextField T="string" Label="Name" Required="true" @bind-Value="_configName" />
+            <MudTextField T="string" Label="Root Path" Required="true" @bind-Value="_configRootPath" />
+            <MudTextField T="string" Label="Description" @bind-Value="_configDescription" Lines="3" />
+            <MudSelect T="Guid?" Label="Group" @bind-Value="_configGroupId">
+                <MudSelectItem Value="@(default(Guid?))">None</MudSelectItem>
+                @foreach (var group in _groups)
+                {
+                    <MudSelectItem Value="@(group.Id)">@group.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveConfigAsync" Disabled="_configBusy">
+                    Save
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="ClearConfigForm" Disabled="_configBusy">
+                    Clear
+                </MudButton>
+            </MudStack>
+            @if (!string.IsNullOrWhiteSpace(_configMessage))
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-3">@_configMessage</MudAlert>
+            }
+            @if (!string.IsNullOrWhiteSpace(_configError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@_configError</MudAlert>
+            }
+        </MudItem>
+        <MudItem xs="12" md="7">
+            <MudTable Items="_configs" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Root Path</MudTh>
+                    <MudTh>Group</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Root Path">@context.RootPath</MudTd>
+                    <MudTd DataLabel="Group">@GetGroupName(context.GroupId)</MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => StartConfigEdit(context))">Edit</MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudItem>
+    </MudGrid>
 </MudPaper>
 
 @code {
-    private bool _loading = true;
-    private string? _health;
-    private string? _error;
+    private readonly List<RepositoryGroupModel> _groups = new();
+    private readonly List<RepositoryConfigModel> _configs = new();
+
+    private Guid? _editingGroupId;
+    private string _groupName = string.Empty;
+    private string? _groupDescription;
+    private bool _groupBusy;
+    private string? _groupMessage;
+    private string? _groupError;
+
+    private Guid? _editingConfigId;
+    private string _configName = string.Empty;
+    private string _configRootPath = string.Empty;
+    private string? _configDescription;
+    private Guid? _configGroupId;
+    private bool _configBusy;
+    private string? _configMessage;
+    private string? _configError;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _groupError = null;
+        _configError = null;
+
         try
         {
-            _health = await Http.GetStringAsync("api/health");
+            _groups.Clear();
+            _groups.AddRange(await Api.GetRepositoryGroupsAsync());
+
+            _configs.Clear();
+            _configs.AddRange(await Api.GetRepositoryConfigsAsync());
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _groupError = $"Failed to load data: {ex.Message}";
+            _configError = _groupError;
+        }
+    }
+
+    private async Task SaveGroupAsync()
+    {
+        _groupMessage = null;
+        _groupError = null;
+
+        if (string.IsNullOrWhiteSpace(_groupName))
+        {
+            _groupError = "Group name is required.";
+            return;
+        }
+
+        _groupBusy = true;
+        try
+        {
+            if (_editingGroupId is null)
+            {
+                await Api.CreateRepositoryGroupAsync(new CreateRepositoryGroupRequest(_groupName, _groupDescription));
+                _groupMessage = "Group created.";
+            }
+            else
+            {
+                await Api.UpdateRepositoryGroupAsync(_editingGroupId.Value,
+                    new UpdateRepositoryGroupRequest(_groupName, _groupDescription));
+                _groupMessage = "Group updated.";
+            }
+
+            ClearGroupForm();
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _groupError = ex.Message;
         }
         finally
         {
-            _loading = false;
+            _groupBusy = false;
         }
+    }
+
+    private void StartGroupEdit(RepositoryGroupModel group)
+    {
+        _editingGroupId = group.Id;
+        _groupName = group.Name;
+        _groupDescription = group.Description;
+        _groupMessage = null;
+        _groupError = null;
+    }
+
+    private void ClearGroupForm()
+    {
+        _editingGroupId = null;
+        _groupName = string.Empty;
+        _groupDescription = null;
+        _groupMessage = null;
+        _groupError = null;
+    }
+
+    private async Task SaveConfigAsync()
+    {
+        _configMessage = null;
+        _configError = null;
+
+        if (string.IsNullOrWhiteSpace(_configName))
+        {
+            _configError = "Config name is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_configRootPath))
+        {
+            _configError = "Root path is required.";
+            return;
+        }
+
+        _configBusy = true;
+        try
+        {
+            if (_editingConfigId is null)
+            {
+                await Api.CreateRepositoryConfigAsync(new CreateRepositoryConfigRequest(
+                    _configName,
+                    _configRootPath,
+                    _configDescription,
+                    _configGroupId));
+                _configMessage = "Config created.";
+            }
+            else
+            {
+                await Api.UpdateRepositoryConfigAsync(_editingConfigId.Value, new UpdateRepositoryConfigRequest(
+                    _configName,
+                    _configRootPath,
+                    _configDescription,
+                    _configGroupId));
+                _configMessage = "Config updated.";
+            }
+
+            ClearConfigForm();
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _configError = ex.Message;
+        }
+        finally
+        {
+            _configBusy = false;
+        }
+    }
+
+    private void StartConfigEdit(RepositoryConfigModel config)
+    {
+        _editingConfigId = config.Id;
+        _configName = config.Name;
+        _configRootPath = config.RootPath;
+        _configDescription = config.Description;
+        _configGroupId = config.GroupId;
+        _configMessage = null;
+        _configError = null;
+    }
+
+    private void ClearConfigForm()
+    {
+        _editingConfigId = null;
+        _configName = string.Empty;
+        _configRootPath = string.Empty;
+        _configDescription = null;
+        _configGroupId = null;
+        _configMessage = null;
+        _configError = null;
+    }
+
+    private string GetGroupName(Guid? groupId)
+    {
+        if (!groupId.HasValue)
+        {
+            return "None";
+        }
+
+        return _groups.FirstOrDefault(group => group.Id == groupId.Value)?.Name ?? "Unknown";
     }
 }
