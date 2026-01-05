@@ -1,4 +1,6 @@
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Runtime.CompilerServices;
 using SilkHat.Ui.Models;
 
 namespace SilkHat.Ui.Services;
@@ -6,6 +8,7 @@ namespace SilkHat.Ui.Services;
 public sealed class RepositoryApiClient
 {
     private readonly HttpClient _httpClient;
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public RepositoryApiClient(HttpClient httpClient)
     {
@@ -54,5 +57,45 @@ public sealed class RepositoryApiClient
         var response = await _httpClient.PutAsJsonAsync($"api/repositories/{id}", request, cancellationToken);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<RepositoryConfigModel>(cancellationToken: cancellationToken))!;
+    }
+
+    public async IAsyncEnumerable<RepoEventModel> LoadRepositoryAsync(
+        Guid id,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"api/repositories/{id}/load");
+        using var response = await _httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await foreach (var evt in ReadNdjsonAsync<RepoEventModel>(stream, cancellationToken))
+        {
+            yield return evt;
+        }
+    }
+
+    private static async IAsyncEnumerable<T> ReadNdjsonAsync<T>(
+        Stream stream,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        using var reader = new StreamReader(stream);
+        while (!reader.EndOfStream)
+        {
+            var line = await reader.ReadLineAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var item = JsonSerializer.Deserialize<T>(line, JsonOptions);
+            if (item is not null)
+            {
+                yield return item;
+            }
+        }
     }
 }

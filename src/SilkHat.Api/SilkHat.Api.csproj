@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SilkHat.Infrastructure\SilkHat.Infrastructure.csproj" />
     <ProjectReference Include="..\SilkHat.Core\SilkHat.Core.csproj" />
+    <ProjectReference Include="..\SilkHat.Analysis\SilkHat.Analysis.csproj" />
   </ItemGroup>
 
 </Project>

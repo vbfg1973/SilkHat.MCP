@@ -85,6 +85,7 @@
                     <MudTh>Root Path</MudTh>
                     <MudTh>Group</MudTh>
                     <MudTh></MudTh>
+                    <MudTh></MudTh>
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Name">@context.Name</MudTd>
@@ -93,8 +94,33 @@
                     <MudTd>
                         <MudButton Variant="Variant.Text" OnClick="@(() => StartConfigEdit(context))">Edit</MudButton>
                     </MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => StartLoadAsync(context))" Disabled="_loadBusy">
+                            Load
+                        </MudButton>
+                    </MudTd>
                 </RowTemplate>
             </MudTable>
+            <MudDivider Class="my-4" />
+            <MudText Typo="Typo.subtitle1">Load Progress</MudText>
+            @if (_loadBusy)
+            {
+                <MudProgressLinear Indeterminate="true" Class="mt-2" />
+            }
+            @if (!string.IsNullOrWhiteSpace(_loadError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-2">@_loadError</MudAlert>
+            }
+            <MudList T="RepoEventModel" Dense="true">
+                @foreach (var evt in _loadEvents)
+                {
+                    <MudListItem T="RepoEventModel">
+                        <MudText Typo="Typo.body2">
+                            @($"{evt.Kind} | {evt.Stage} | {evt.Message} ({evt.Percent:0.#}%)")
+                        </MudText>
+                    </MudListItem>
+                }
+            </MudList>
         </MudItem>
     </MudGrid>
 </MudPaper>
@@ -118,6 +144,11 @@
     private bool _configBusy;
     private string? _configMessage;
     private string? _configError;
+
+    private readonly List<RepoEventModel> _loadEvents = new();
+    private bool _loadBusy;
+    private string? _loadError;
+    private CancellationTokenSource? _loadCts;
 
     protected override async Task OnInitializedAsync()
     {
@@ -283,5 +314,33 @@
         }
 
         return _groups.FirstOrDefault(group => group.Id == groupId.Value)?.Name ?? "Unknown";
+    }
+
+    private async Task StartLoadAsync(RepositoryConfigModel config)
+    {
+        _loadCts?.Cancel();
+        _loadCts = new CancellationTokenSource();
+        _loadEvents.Clear();
+        _loadError = null;
+        _loadBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            await foreach (var evt in Api.LoadRepositoryAsync(config.Id, _loadCts.Token))
+            {
+                _loadEvents.Add(evt);
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+        finally
+        {
+            _loadBusy = false;
+            StateHasChanged();
+        }
     }
 }
