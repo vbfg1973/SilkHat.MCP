@@ -45,6 +45,22 @@ public sealed class RepositoryApiClient
                ?? new List<RepositoryConfigModel>();
     }
 
+    public async Task<IReadOnlyList<RepositoryConfigModel>> GetLoadedRepositoryConfigsAsync(CancellationToken cancellationToken = default)
+    {
+        return await _httpClient.GetFromJsonAsync<List<RepositoryConfigModel>>(
+                   "api/repositories/loaded",
+                   cancellationToken)
+               ?? new List<RepositoryConfigModel>();
+    }
+
+    public async Task<IReadOnlyList<AvailableRepositoryModel>> GetAvailableRepositoriesAsync(CancellationToken cancellationToken = default)
+    {
+        return await _httpClient.GetFromJsonAsync<List<AvailableRepositoryModel>>(
+                   "api/repositories/available",
+                   cancellationToken)
+               ?? new List<AvailableRepositoryModel>();
+    }
+
     public async Task<RepositoryConfigModel> CreateRepositoryConfigAsync(CreateRepositoryConfigRequest request, CancellationToken cancellationToken = default)
     {
         var response = await _httpClient.PostAsJsonAsync("api/repositories", request, cancellationToken);
@@ -57,6 +73,13 @@ public sealed class RepositoryApiClient
         var response = await _httpClient.PutAsJsonAsync($"api/repositories/{id}", request, cancellationToken);
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<RepositoryConfigModel>(cancellationToken: cancellationToken))!;
+    }
+
+    public async Task<RepositoryGroupLoadResultModel> LoadRepositoryGroupAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsync($"api/repository-groups/{id}/load", null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<RepositoryGroupLoadResultModel>(cancellationToken: cancellationToken))!;
     }
 
     public async Task<IReadOnlyList<CodeProjectDto>> GetCodeProjectsAsync(Guid repositoryId, string? name = null, CancellationToken cancellationToken = default)

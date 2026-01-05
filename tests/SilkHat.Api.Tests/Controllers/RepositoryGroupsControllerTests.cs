@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Moq;
+using SilkHat.Analysis.Abstractions;
+using SilkHat.Analysis.Models;
 using SilkHat.Api.Controllers;
 using SilkHat.Api.Tests.TestHelpers;
+using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure.Entities;
 
@@ -14,7 +18,11 @@ public sealed class RepositoryGroupsControllerTests
     {
         var interceptor = new SaveChangesCounterInterceptor();
         await using var dbContext = DbContextTestFactory.CreateInMemory(interceptor);
-        var controller = new RepositoryGroupsController(dbContext)
+        var store = new Mock<ILoadedRepositoryStore>();
+        var codeStore = new Mock<ICodeWorkspaceStore>();
+        var processor = new Mock<IRepoCommandProcessor>();
+        var loader = new Mock<ICodeWorkspaceLoader>();
+        var controller = new RepositoryGroupsController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -43,7 +51,11 @@ public sealed class RepositoryGroupsControllerTests
         dbContext.RepositoryGroups.Add(group);
         await dbContext.SaveChangesAsync();
 
-        var controller = new RepositoryGroupsController(dbContext)
+        var store = new Mock<ILoadedRepositoryStore>();
+        var codeStore = new Mock<ICodeWorkspaceStore>();
+        var processor = new Mock<IRepoCommandProcessor>();
+        var loader = new Mock<ICodeWorkspaceLoader>();
+        var controller = new RepositoryGroupsController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -62,7 +74,11 @@ public sealed class RepositoryGroupsControllerTests
     public async Task GetById_ReturnsProblem_WhenMissing()
     {
         await using var dbContext = DbContextTestFactory.CreateInMemory();
-        var controller = new RepositoryGroupsController(dbContext)
+        var store = new Mock<ILoadedRepositoryStore>();
+        var codeStore = new Mock<ICodeWorkspaceStore>();
+        var processor = new Mock<IRepoCommandProcessor>();
+        var loader = new Mock<ICodeWorkspaceLoader>();
+        var controller = new RepositoryGroupsController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -71,5 +87,48 @@ public sealed class RepositoryGroupsControllerTests
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status404NotFound, problem.StatusCode);
+    }
+
+    [Fact]
+    public async Task LoadGroup_LoadsAllConfigs()
+    {
+        await using var dbContext = DbContextTestFactory.CreateInMemory();
+        var group = new RepositoryGroup
+        {
+            Id = Guid.NewGuid(),
+            Name = "Group",
+            RepositoryConfigs =
+            [
+                new RepositoryConfig { Id = Guid.NewGuid(), Name = "Repo A", RootPath = "/tmp/a" },
+                new RepositoryConfig { Id = Guid.NewGuid(), Name = "Repo B", RootPath = "/tmp/b" }
+            ]
+        };
+        dbContext.RepositoryGroups.Add(group);
+        await dbContext.SaveChangesAsync();
+
+        var store = new Mock<ILoadedRepositoryStore>();
+        var codeStore = new Mock<ICodeWorkspaceStore>();
+        var processor = new Mock<IRepoCommandProcessor>();
+        var loader = new Mock<ICodeWorkspaceLoader>();
+        processor.Setup(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()))
+            .Returns(StreamEvents());
+
+        var controller = new RepositoryGroupsController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
+        {
+            ControllerContext = ControllerTestFactory.CreateContext()
+        };
+
+        var result = await controller.LoadGroup(group.Id, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var dto = Assert.IsType<RepositoryGroupLoadResultDto>(ok.Value);
+        Assert.Equal(2, dto.Repositories.Count);
+        processor.Verify(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    private static async IAsyncEnumerable<RepoEventDto> StreamEvents()
+    {
+        yield return new RepoEventDto(RepoEventKind.Completed, "load", "ok", 100, null, null, new RepoEventSummaryDto("Loaded."));
+        await Task.CompletedTask;
     }
 }

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Services;
+using SilkHat.Analysis.Models;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Services;
 using SilkHat.Git.Analysis.Abstractions;
@@ -19,6 +20,11 @@ builder.Services.AddSingleton<ILoadedRepositoryStore, LoadedRepositoryStore>();
 builder.Services.AddSingleton<IRepoCommandProcessor, RepoCommandProcessor>();
 builder.Services.AddSingleton<ICodeWorkspaceStore, CodeWorkspaceStore>();
 builder.Services.AddSingleton<ICodeWorkspaceLoader, CodeWorkspaceLoader>();
+builder.Services.Configure<RepositoryDiscoveryOptions>(options =>
+{
+    options.RepoRoot = builder.Configuration["REPO_ROOT"];
+});
+builder.Services.AddSingleton<IRepositoryDiscoveryService, RepositoryDiscoveryService>();
 builder.Services.AddSingleton<IGitCommandRunner, GitCommandRunner>();
 builder.Services.AddSingleton<IGitRepositoryCacheStore, GitRepositoryCacheStore>();
 builder.Services.AddSingleton<IGitCli, GitCli>();

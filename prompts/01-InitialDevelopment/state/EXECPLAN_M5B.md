@@ -10,29 +10,33 @@ This milestone enables fast discovery of repositories from a configured root pat
 
 ## Progress
 
-- [ ] Add `REPO_ROOT` configuration to Docker compose and mount `/repos` volume for the API container.
-- [ ] Implement fast repository discovery under `REPO_ROOT` with git repository verification.
-- [ ] Add API endpoints to list available repositories and associate them to groups.
-- [ ] Support loading multiple repositories at once from repository groups.
-- [ ] Restrict IDE screens to loaded repositories only.
-- [ ] Add controller/service/UI tests for discovery, validation, and group loads.
-- [ ] Run `dotnet test` and verify all non-infrastructure tests pass.
-- [ ] Run `docker compose up --build` and confirm API + UI run in Docker.
-- [ ] Write Milestone Commit Notes for M5b and update milestone state files.
+- [x] (2026-01-06 13:30Z) Add `REPO_ROOT` configuration to Docker compose and mount `/repos` volume for the API container.
+- [x] (2026-01-06 13:30Z) Implement fast repository discovery under `REPO_ROOT` with git repository verification.
+- [x] (2026-01-06 13:30Z) Add API endpoints to list available repositories and associate them to groups.
+- [x] (2026-01-06 13:30Z) Support loading multiple repositories at once from repository groups.
+- [x] (2026-01-06 13:30Z) Restrict IDE screens to loaded repositories only.
+- [x] (2026-01-06 13:30Z) Add controller/service/UI tests for discovery, validation, and group loads.
+- [x] (2026-01-06 13:38Z) Run `dotnet test` and verify all non-infrastructure tests pass.
+- [x] (2026-01-06 13:45Z) Run `docker compose up --build` and confirm API + UI run in Docker.
+- [x] (2026-01-06 13:52Z) Write Milestone Commit Notes for M5b and update milestone state files.
 
 ## Surprises & Discoveries
 
-None yet.
+- Observation: Docker bind-mounting `./repos` failed until the directory existed with writable permissions.
+  Evidence: `error while creating mount source path '/home/vbfg/RiderProjects/SilkHat.MCP/repos': chown ... permission denied` until `mkdir -p repos`.
 
 ## Decision Log
 
 - Decision: Use `REPO_ROOT` and a mounted `/repos` volume to scope repository discovery.
   Rationale: Ensures predictable, fast repository listing and avoids scanning arbitrary filesystem paths.
   Date/Author: 2026-01-05 / Codex
+- Decision: Validate repository paths against `REPO_ROOT` for all config create/update operations.
+  Rationale: The milestone requires repositories of interest to live under the configured root and be verifiable git repositories.
+  Date/Author: 2026-01-06 / Codex
 
 ## Outcomes & Retrospective
 
-To be completed at milestone end.
+Repository discovery and group loads are implemented, with API and UI support for listing available repositories, validating git roots under `REPO_ROOT`, loading repository groups in bulk, and restricting IDE selection to loaded repositories. Tests and Docker validation are complete.
 
 ## Context and Orientation
 
@@ -74,3 +78,5 @@ Add a repository discovery service under `src/SilkHat.Analysis` or `src/SilkHat.
 Add unit tests for discovery and git validation (temporary directories and `.git` markers). Add controller tests for the new discovery endpoints and group load behavior. Add UI tests for repository lists and load gating. Run `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1 dotnet test -m:1 /nr:false /p:BuildInParallel=false /p:UseSharedCompilation=false`.
 
 Plan update (2026-01-05 16:16Z): Created M5b ExecPlan for repository discovery and group loading.
+Plan update (2026-01-06 13:45Z): Recorded implementation, validation results, and Docker verification for M5b.
+Plan update (2026-01-06 13:52Z): Recorded milestone commit notes completion.

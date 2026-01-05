@@ -7,8 +7,10 @@ services:
       - "18080:8080"
     environment:
       - ConnectionStrings__SilkHat=Data Source=/data/silkhat.db
+      - REPO_ROOT=/repos
     volumes:
       - silkhat-data:/data
+      - ./repos:/repos
   ui:
     build:
       context: .
