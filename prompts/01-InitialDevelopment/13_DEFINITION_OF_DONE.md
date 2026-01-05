@@ -10,6 +10,7 @@ For each milestone:
 - Controller endpoints have tests that validate dependency calls and response correctness.
 - Services have unit tests that validate dependency calls, expected responses, and edge cases.
 - Services have integration tests that validate real behavior.
+- UI components have bUnit tests that validate rendering and key interactions/service calls.
 - All tests that do not rely on infrastructure pass.
 
 Final DoD (M6):

@@ -55,10 +55,10 @@
             <MudTextField T="string" Label="Root Path" Required="true" @bind-Value="_configRootPath" />
             <MudTextField T="string" Label="Description" @bind-Value="_configDescription" Lines="3" />
             <MudSelect T="Guid?" Label="Group" @bind-Value="_configGroupId">
-                <MudSelectItem Value="@(default(Guid?))">None</MudSelectItem>
+                <MudSelectItem T="Guid?" Value="@(default(Guid?))">None</MudSelectItem>
                 @foreach (var group in _groups)
                 {
-                    <MudSelectItem Value="@(group.Id)">@group.Name</MudSelectItem>
+                    <MudSelectItem T="Guid?" Value="@(group.Id)">@group.Name</MudSelectItem>
                 }
             </MudSelect>
             <MudStack Row="true" Class="mt-3" Spacing="2">
