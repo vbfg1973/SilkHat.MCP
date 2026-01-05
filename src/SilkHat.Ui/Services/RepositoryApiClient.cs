@@ -110,7 +110,7 @@ public sealed class RepositoryApiClient
         string path,
         CancellationToken cancellationToken = default)
     {
-        var url = $"api/repositories/{repositoryId}/git/files/history/{Uri.EscapeDataString(path)}";
+        var url = $"api/repositories/{repositoryId}/git/files/{Uri.EscapeDataString(path)}/history";
         return (await _httpClient.GetFromJsonAsync<GitFileHistoryModel>(url, cancellationToken))!;
     }
 
@@ -119,7 +119,7 @@ public sealed class RepositoryApiClient
         string path,
         CancellationToken cancellationToken = default)
     {
-        var url = $"api/repositories/{repositoryId}/git/files/cochanges/{Uri.EscapeDataString(path)}";
+        var url = $"api/repositories/{repositoryId}/git/files/{Uri.EscapeDataString(path)}/cochanges";
         return (await _httpClient.GetFromJsonAsync<GitCoChangeStatsModel>(url, cancellationToken))!;
     }
 

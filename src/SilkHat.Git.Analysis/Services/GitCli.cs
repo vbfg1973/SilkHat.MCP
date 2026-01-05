@@ -120,8 +120,9 @@ public sealed class GitCli : IGitCli
 
         var cache = _cacheStore.GetOrCreate(configId);
         var entries = ParseHistory(result.StandardOutput, normalizedKey, cache);
+        var enrichedEntries = await PopulateHistoryMetricsAsync(repoRoot, entries, cancellationToken);
 
-        return new GitFileHistoryDto(NormalizePath(normalizedKey), entries);
+        return new GitFileHistoryDto(NormalizePath(normalizedKey), enrichedEntries);
     }
 
     public async Task<GitCoChangeStatsDto> CoChangeStatsAsync(
@@ -160,7 +161,7 @@ public sealed class GitCli : IGitCli
             .Select(kvp => new GitCoChangeEntryDto(NormalizePath(kvp.Key), kvp.Value))
             .ToList();
 
-        return new GitCoChangeStatsDto(NormalizePath(targetKey), results);
+        return new GitCoChangeStatsDto(NormalizePath(targetKey), history.Entries.Count, results);
     }
 
     private async Task<GitPathChangeDto?> GetLastChangeAsync(
@@ -288,6 +289,137 @@ public sealed class GitCli : IGitCli
         }
     }
 
+    private async Task<IReadOnlyList<GitFileHistoryEntryDto>> PopulateHistoryMetricsAsync(
+        string repoRoot,
+        IReadOnlyList<GitFileHistoryEntryDto> entries,
+        CancellationToken cancellationToken)
+    {
+        if (entries.Count == 0)
+        {
+            return entries;
+        }
+
+        var enriched = new List<GitFileHistoryEntryDto>(entries.Count);
+        foreach (var entry in entries)
+        {
+            if (entry.Changes.Count == 0)
+            {
+                enriched.Add(entry);
+                continue;
+            }
+
+            var changes = new List<GitFileChangeDto>(entry.Changes.Count);
+            foreach (var change in entry.Changes)
+            {
+                var pathKey = NormalizePathKey(change.Path);
+                var (additions, deletions) = await GetNumStatAsync(repoRoot, entry.CommitSha, pathKey, cancellationToken);
+
+                var linesBefore = change.ChangeKind == GitChangeKind.Add
+                    ? 0
+                    : await GetFileLineCountAsync(repoRoot, $"{entry.CommitSha}^", pathKey, cancellationToken);
+
+                var linesAfter = change.ChangeKind == GitChangeKind.Delete
+                    ? 0
+                    : await GetFileLineCountAsync(repoRoot, entry.CommitSha, pathKey, cancellationToken);
+
+                changes.Add(change with
+                {
+                    Additions = additions,
+                    Deletions = deletions,
+                    LinesBefore = linesBefore,
+                    LinesAfter = linesAfter
+                });
+            }
+
+            enriched.Add(entry with { Changes = changes });
+        }
+
+        return enriched;
+    }
+
+    private async Task<(int? additions, int? deletions)> GetNumStatAsync(
+        string repoRoot,
+        string commitSha,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var result = await _runner.ExecuteAsync(
+            repoRoot,
+            new[] { "show", "--numstat", "--format=", commitSha, "--", path },
+            cancellationToken);
+
+        if (result.ExitCode != 0)
+        {
+            return (null, null);
+        }
+
+        foreach (var line in result.StandardOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = line.Split('\t');
+            if (parts.Length < 3)
+            {
+                continue;
+            }
+
+            return (ParseNullableInt(parts[0]), ParseNullableInt(parts[1]));
+        }
+
+        return (null, null);
+    }
+
+    private async Task<int> GetFileLineCountAsync(
+        string repoRoot,
+        string commitSpec,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var result = await _runner.ExecuteAsync(
+            repoRoot,
+            new[] { "show", $"{commitSpec}:{path}" },
+            cancellationToken);
+
+        if (result.ExitCode != 0)
+        {
+            return 0;
+        }
+
+        return CountLines(result.StandardOutput);
+    }
+
+    private static int? ParseNullableInt(string value)
+    {
+        if (value == "-" || string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return int.TryParse(value, out var parsed) ? parsed : null;
+    }
+
+    private static int CountLines(string content)
+    {
+        if (string.IsNullOrEmpty(content))
+        {
+            return 0;
+        }
+
+        var count = 1;
+        for (var i = 0; i < content.Length; i++)
+        {
+            if (content[i] == '\n')
+            {
+                count++;
+            }
+        }
+
+        if (content.EndsWith('\n'))
+        {
+            count--;
+        }
+
+        return count;
+    }
+
     private sealed class GitHistoryBuilder
     {
         private readonly string _commitSha;
@@ -325,6 +457,7 @@ public sealed class GitCli : IGitCli
             }
 
             var status = parts[0];
+            var changeKind = ParseChangeKind(status);
             var paths = new List<string>();
 
             if (status.StartsWith("R", StringComparison.OrdinalIgnoreCase) && parts.Length >= 3)
@@ -343,7 +476,7 @@ public sealed class GitCli : IGitCli
                 _commitFiles.Add(normalized);
                 if (IsTargetPath(normalized, targetPath))
                 {
-                    _changes.Add(new GitFileChangeDto(NormalizePath(normalized), status, null, null));
+                    _changes.Add(new GitFileChangeDto(NormalizePath(normalized), status, changeKind, null, null, 0, 0));
                 }
             }
 
@@ -359,6 +492,24 @@ public sealed class GitCli : IGitCli
         private static bool IsTargetPath(string candidate, string targetPath)
         {
             return string.Equals(candidate, targetPath, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static GitChangeKind ParseChangeKind(string status)
+        {
+            if (string.IsNullOrWhiteSpace(status))
+            {
+                return GitChangeKind.Unknown;
+            }
+
+            return char.ToUpperInvariant(status[0]) switch
+            {
+                'A' => GitChangeKind.Add,
+                'M' => GitChangeKind.Modify,
+                'D' => GitChangeKind.Delete,
+                'R' => GitChangeKind.Rename,
+                'C' => GitChangeKind.Copy,
+                _ => GitChangeKind.Unknown
+            };
         }
     }
 }

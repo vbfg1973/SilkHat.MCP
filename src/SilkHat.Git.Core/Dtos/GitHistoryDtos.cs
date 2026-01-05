@@ -1,10 +1,23 @@
 namespace SilkHat.Git.Core.Dtos;
 
+public enum GitChangeKind
+{
+    Unknown = 0,
+    Add = 1,
+    Modify = 2,
+    Delete = 3,
+    Rename = 4,
+    Copy = 5
+}
+
 public sealed record GitFileChangeDto(
     string Path,
     string Status,
+    GitChangeKind ChangeKind,
     int? Additions,
-    int? Deletions);
+    int? Deletions,
+    int LinesBefore,
+    int LinesAfter);
 
 public sealed record GitFileHistoryEntryDto(
     string CommitSha,
@@ -23,4 +36,5 @@ public sealed record GitCoChangeEntryDto(
 
 public sealed record GitCoChangeStatsDto(
     string Path,
+    int TotalChangeCount,
     IReadOnlyList<GitCoChangeEntryDto> Entries);
