@@ -17,7 +17,7 @@ public sealed class GitFilesController : ApiControllerBase
         _gitCli = gitCli;
     }
 
-    [HttpGet("history/{*path}")]
+    [HttpGet("{path}/history")]
     public async Task<ActionResult<GitFileHistoryDto>> GetHistory(
         Guid id,
         string path,
@@ -31,7 +31,8 @@ public sealed class GitFilesController : ApiControllerBase
 
         try
         {
-            var history = await _gitCli.FileHistoryAsync(id, repo.RootPath, path, cancellationToken);
+            var decodedPath = path.Contains('%') ? Uri.UnescapeDataString(path) : path;
+            var history = await _gitCli.FileHistoryAsync(id, repo.RootPath, decodedPath, cancellationToken);
             return Ok(history);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -40,7 +41,7 @@ public sealed class GitFilesController : ApiControllerBase
         }
     }
 
-    [HttpGet("cochanges/{*path}")]
+    [HttpGet("{path}/cochanges")]
     public async Task<ActionResult<GitCoChangeStatsDto>> GetCoChanges(
         Guid id,
         string path,
@@ -54,7 +55,8 @@ public sealed class GitFilesController : ApiControllerBase
 
         try
         {
-            var stats = await _gitCli.CoChangeStatsAsync(id, repo.RootPath, path, cancellationToken);
+            var decodedPath = path.Contains('%') ? Uri.UnescapeDataString(path) : path;
+            var stats = await _gitCli.CoChangeStatsAsync(id, repo.RootPath, decodedPath, cancellationToken);
             return Ok(stats);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

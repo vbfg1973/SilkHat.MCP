@@ -63,6 +63,18 @@ Each milestone must end with:
   - co-change stats
 - UI: file explorer uses git tree + shows file history panel (right pane)
 
+## M5a: Git History/Co-change Enhancements + Route Fixes
+- Extend git DTOs to capture total change counts and line deltas per file change.
+- Update co-change stats to include total change count for the target file.
+- Update file history change records to include before/after line counts and a categorical change kind.
+- Adjust git file history/co-change routes to `/git/files/{path}/history` and `/git/files/{path}/cochanges` with URI-encoded paths.
+
+## M5b: Repository Root Discovery + Group Loads
+- Add REPO_ROOT environment variable in docker compose and mount it at `/repos` in the API container.
+- List repository folders quickly from REPO_ROOT and only allow adding repositories that are verified as git repos.
+- Load multiple repositories at once via repository groups.
+- Restrict IDE screens to loaded repositories only.
+
 ## M6: Hardening + Docs + Scripts
 - Scripts: build/test/run + docker convenience scripts
 - Docs: architecture overview, API notes, troubleshooting

@@ -6,6 +6,16 @@ public enum GitTreeEntryType
     Directory = 1
 }
 
+public enum GitChangeKind
+{
+    Unknown = 0,
+    Add = 1,
+    Modify = 2,
+    Delete = 3,
+    Rename = 4,
+    Copy = 5
+}
+
 public sealed record GitPathChangeModel(
     string CommitSha,
     string Author,
@@ -20,8 +30,11 @@ public sealed record GitTreeEntryModel(
 public sealed record GitFileChangeModel(
     string Path,
     string Status,
+    GitChangeKind ChangeKind,
     int? Additions,
-    int? Deletions);
+    int? Deletions,
+    int LinesBefore,
+    int LinesAfter);
 
 public sealed record GitFileHistoryEntryModel(
     string CommitSha,
@@ -40,4 +53,5 @@ public sealed record GitCoChangeEntryModel(
 
 public sealed record GitCoChangeStatsModel(
     string Path,
+    int TotalChangeCount,
     IReadOnlyList<GitCoChangeEntryModel> Entries);

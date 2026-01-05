@@ -71,6 +71,7 @@ public sealed class GitFilesControllerTests
         gitCli.Setup(c => c.CoChangeStatsAsync(configId, "/repo", "src/Program.cs", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new GitCoChangeStatsDto(
                 "./src/Program.cs",
+                1,
                 new List<GitCoChangeEntryDto>
                 {
                     new("./src/Other.cs", 2)

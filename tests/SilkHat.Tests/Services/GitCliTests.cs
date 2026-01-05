@@ -34,10 +34,15 @@ public sealed class GitCliTests
         var runner = new FakeGitCommandRunner();
         runner.Add("log --date=iso-strict --pretty=format:COMMIT|%H|%ad|%an|%s --name-status -- src/Program.cs", """
 COMMIT|sha1|2024-01-01T00:00:00Z|alice|Init
-M	src/Program.cs
+A	src/Program.cs
 COMMIT|sha2|2024-01-02T00:00:00Z|bob|Update
 M	src/Program.cs
 """);
+        runner.Add("show --numstat --format= sha1 -- src/Program.cs", "2\t0\tsrc/Program.cs");
+        runner.Add("show --numstat --format= sha2 -- src/Program.cs", "1\t0\tsrc/Program.cs");
+        runner.Add("show sha1:src/Program.cs", "line1\nline2\n");
+        runner.Add("show sha2^:src/Program.cs", "line1\nline2\n");
+        runner.Add("show sha2:src/Program.cs", "line1\nline2\nline3\n");
 
         var cacheStore = new GitRepositoryCacheStore();
         var cli = new GitCli(runner, cacheStore);
@@ -47,6 +52,12 @@ M	src/Program.cs
         Assert.Equal("./src/Program.cs", history.Path);
         Assert.Equal(2, history.Entries.Count);
         Assert.Equal("sha1", history.Entries[0].CommitSha);
+        Assert.Equal(GitChangeKind.Add, history.Entries[0].Changes[0].ChangeKind);
+        Assert.Equal(0, history.Entries[0].Changes[0].LinesBefore);
+        Assert.Equal(2, history.Entries[0].Changes[0].LinesAfter);
+        Assert.Equal(GitChangeKind.Modify, history.Entries[1].Changes[0].ChangeKind);
+        Assert.Equal(2, history.Entries[1].Changes[0].LinesBefore);
+        Assert.Equal(3, history.Entries[1].Changes[0].LinesAfter);
     }
 
     [Fact]
@@ -59,12 +70,16 @@ M	src/Program.cs
 M	src/Other.cs
 M	src/Other.cs
 """);
+        runner.Add("show --numstat --format= sha1 -- src/Program.cs", "1\t1\tsrc/Program.cs");
+        runner.Add("show sha1^:src/Program.cs", "line1\n");
+        runner.Add("show sha1:src/Program.cs", "line1\nline2\n");
 
         var cacheStore = new GitRepositoryCacheStore();
         var cli = new GitCli(runner, cacheStore);
 
         var stats = await cli.CoChangeStatsAsync(Guid.NewGuid(), "/repo", "src/Program.cs", CancellationToken.None);
 
+        Assert.Equal(1, stats.TotalChangeCount);
         Assert.Single(stats.Entries);
         Assert.Equal("./src/Other.cs", stats.Entries[0].Path);
         Assert.Equal(1, stats.Entries[0].Count);
