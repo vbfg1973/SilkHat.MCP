@@ -1,0 +1,54 @@
+# Milestones (Hard Gates)
+
+Each milestone must end with:
+- API runs in Docker
+- UI runs in Docker (nginx serving published WASM)
+- dotnet test passes
+- A Milestone Commit Notes message is produced
+- State files updated
+
+## M1: Skeleton + Dockerized Hello World
+- Create solution + project skeleton under /src and /tests
+- API: minimal endpoint /health
+- UI: MudBlazor template with theme toggle + calls /health
+- docker-compose: api + ui containers working
+- Swagger enabled
+- Minimal README in /docs
+
+## M2: Persistence for Repository Configs + Groups
+- EF Core SQLite in SilkHat.Infrastructure
+- CRUD for RepositoryConfig and RepositoryGroup via API
+- UI: basic dashboard to list/create/edit configs and groups
+- Persisted DB file via docker volume
+
+## M3: Command/Channel Streaming + Repository Load Orchestration
+- Implement command processor per repository
+- Implement streaming NDJSON endpoint for /load
+- LoadedRepository runtime model created (workspace placeholder ok if not compiling yet)
+- UI: show load progress stream
+
+## M4: Code Loading with Buildalyzer + Roslyn In-Memory Host
+- Load default solutions, build workspace, create compilations
+- Endpoints:
+  - list projects (filter by name)
+  - project references / referenced-by
+  - namespaces prefix search
+  - named types list + filtering
+  - symbol lookup by SymbolKey with expected kind
+- UI: IDE-like view scaffold: left tree, center tabs file viewer (simple text ok), right placeholder
+
+## M5: Git via Process: Tree Listing + File History + Co-change
+- Implement git query layer using Process
+- Endpoints:
+  - tree listing with filters (name/type/changedAfter/author)
+  - file history
+  - co-change stats
+- UI: file explorer uses git tree + shows file history panel (right pane)
+
+## M6: Hardening + Docs + Scripts
+- Scripts: build/test/run + docker convenience scripts
+- Docs: architecture overview, API notes, troubleshooting
+- Performance pass: caching indices per LoadedRepository
+- Ensure all tests stable
+
+At the end of each milestone, STOP and emit Milestone Commit Notes.
