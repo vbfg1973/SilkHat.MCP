@@ -10,7 +10,7 @@ services:
       - REPO_ROOT=/repos
     volumes:
       - silkhat-data:/data
-      - ./repos:/repos
+      - ${REPO_ROOT:?Set REPO_ROOT to a host path}:/repos
   ui:
     build:
       context: .

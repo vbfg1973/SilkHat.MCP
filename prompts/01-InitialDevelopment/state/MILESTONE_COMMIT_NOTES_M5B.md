@@ -5,7 +5,7 @@ Summary:
 - Enforced repository path validation under REPO_ROOT for config create/update and exposed loaded-only repository listings for the IDE.
 - Added repository group load endpoint and UI support for group loads and available repo browsing.
 - Added unit/controller/UI tests for discovery, validation, loaded filtering, and group load behavior.
-- Added REPO_ROOT and /repos volume mapping to docker compose (create ./repos on host).
+- Docker compose now uses an externally provided REPO_ROOT host path for the /repos bind mount.
 
 Key files:
 - src/SilkHat.Analysis/Services/RepositoryDiscoveryService.cs
@@ -27,10 +27,10 @@ Key files:
 - tests/SilkHat.Ui.Tests/Pages/IdeTests.cs
 
 Notes:
-- Ensure the host `./repos` directory exists for the docker bind mount.
+- Set REPO_ROOT to a host path before running compose; it is bind-mounted to /repos in the API container.
 
 Tests:
 - DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1 dotnet test -m:1 /nr:false /p:BuildInParallel=false /p:UseSharedCompilation=false
 
 Docker:
-- docker compose up --build -d
+- REPO_ROOT=/path/to/repos docker compose up --build -d

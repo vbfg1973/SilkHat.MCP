@@ -5,7 +5,8 @@
 - ASP.NET Core
 - Expose 8080 (internal), publish to host 5000 (example)
 - Include health endpoint and swagger
-- Set REPO_ROOT to `/repos` and mount a host folder to `/repos`.
+- Set REPO_ROOT to `/repos` inside the container.
+- Bind-mount an external host path using `${REPO_ROOT}` into `/repos` (no copy).
 
 2) UI container
 - Build WASM in build stage

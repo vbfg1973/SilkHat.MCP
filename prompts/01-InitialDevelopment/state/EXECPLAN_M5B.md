@@ -22,8 +22,8 @@ This milestone enables fast discovery of repositories from a configured root pat
 
 ## Surprises & Discoveries
 
-- Observation: Docker bind-mounting `./repos` failed until the directory existed with writable permissions.
-  Evidence: `error while creating mount source path '/home/vbfg/RiderProjects/SilkHat.MCP/repos': chown ... permission denied` until `mkdir -p repos`.
+- Observation: Docker bind-mounting requires the host path to exist and be provided via `${REPO_ROOT}`.
+  Evidence: bind mount failed until the host path existed and `REPO_ROOT` was set for compose evaluation.
 
 ## Decision Log
 
@@ -80,3 +80,5 @@ Add unit tests for discovery and git validation (temporary directories and `.git
 Plan update (2026-01-05 16:16Z): Created M5b ExecPlan for repository discovery and group loading.
 Plan update (2026-01-06 13:45Z): Recorded implementation, validation results, and Docker verification for M5b.
 Plan update (2026-01-06 13:52Z): Recorded milestone commit notes completion.
+Plan update (2026-01-06 14:05Z): Updated Docker compose guidance to use external REPO_ROOT bind mount.
+Plan update (2026-01-06 14:15Z): Re-validated tests and Docker with external REPO_ROOT and refreshed milestone notes.

@@ -75,6 +75,12 @@ Each milestone must end with:
 - Load multiple repositories at once via repository groups.
 - Restrict IDE screens to loaded repositories only.
 
+## M5c: Repository Group Loader UI Overhaul
+- Replace existing repository config/group UI with a new component focused on repository groups and load orchestration.
+- Create repository groups and add repositories from the available list, selecting solution files to load per repository.
+- Edit existing groups: add/remove repositories and enable/disable individual solutions for loading.
+- Loading a repository group destroys existing workspaces and reloads fresh compilations for all enabled solutions in the group.
+
 ## M6: Hardening + Docs + Scripts
 - Scripts: build/test/run + docker convenience scripts
 - Docs: architecture overview, API notes, troubleshooting
