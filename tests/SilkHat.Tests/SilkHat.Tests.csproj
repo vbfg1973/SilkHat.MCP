@@ -23,6 +23,8 @@
     <ProjectReference Include="..\..\src\SilkHat.Analysis\SilkHat.Analysis.csproj" />
     <ProjectReference Include="..\..\src\SilkHat.Code.Analysis\SilkHat.Code.Analysis.csproj" />
     <ProjectReference Include="..\..\src\SilkHat.Code.Core\SilkHat.Code.Core.csproj" />
+    <ProjectReference Include="..\..\src\SilkHat.Git.Analysis\SilkHat.Git.Analysis.csproj" />
+    <ProjectReference Include="..\..\src\SilkHat.Git.Core\SilkHat.Git.Core.csproj" />
   </ItemGroup>
 
 </Project>

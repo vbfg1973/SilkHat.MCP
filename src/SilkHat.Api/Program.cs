@@ -3,6 +3,8 @@ using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Services;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Services;
+using SilkHat.Git.Analysis.Abstractions;
+using SilkHat.Git.Analysis.Services;
 using SilkHat.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +19,9 @@ builder.Services.AddSingleton<ILoadedRepositoryStore, LoadedRepositoryStore>();
 builder.Services.AddSingleton<IRepoCommandProcessor, RepoCommandProcessor>();
 builder.Services.AddSingleton<ICodeWorkspaceStore, CodeWorkspaceStore>();
 builder.Services.AddSingleton<ICodeWorkspaceLoader, CodeWorkspaceLoader>();
+builder.Services.AddSingleton<IGitCommandRunner, GitCommandRunner>();
+builder.Services.AddSingleton<IGitRepositoryCacheStore, GitRepositoryCacheStore>();
+builder.Services.AddSingleton<IGitCli, GitCli>();
 
 var app = builder.Build();
 

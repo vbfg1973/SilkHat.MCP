@@ -5,6 +5,7 @@ using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Commands;
 using SilkHat.Analysis.Models;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 
@@ -18,6 +19,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
     private readonly SilkHatDbContext _dbContext;
     private readonly ILoadedRepositoryStore _store;
     private readonly ICodeWorkspaceStore _codeStore;
+    private readonly IGitRepositoryCacheStore _gitCacheStore;
     private readonly IRepoCommandProcessor _processor;
     private readonly ICodeWorkspaceLoader _workspaceLoader;
 
@@ -25,12 +27,14 @@ public sealed class RepositoryLoadController : ApiControllerBase
         SilkHatDbContext dbContext,
         ILoadedRepositoryStore store,
         ICodeWorkspaceStore codeStore,
+        IGitRepositoryCacheStore gitCacheStore,
         IRepoCommandProcessor processor,
         ICodeWorkspaceLoader workspaceLoader)
     {
         _dbContext = dbContext;
         _store = store;
         _codeStore = codeStore;
+        _gitCacheStore = gitCacheStore;
         _processor = processor;
         _workspaceLoader = workspaceLoader;
     }
@@ -78,6 +82,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
 
         var unloaded = _store.Unload(id);
         _codeStore.Remove(id);
+        _gitCacheStore.Remove(id);
         var message = unloaded ? "Repository unloaded." : "Repository was not loaded.";
 
         return Ok(new RepoEventDto(

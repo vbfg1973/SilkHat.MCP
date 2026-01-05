@@ -7,6 +7,8 @@ COPY src/SilkHat.Analysis/SilkHat.Analysis.csproj src/SilkHat.Analysis/
 COPY src/SilkHat.Code.Analysis/SilkHat.Code.Analysis.csproj src/SilkHat.Code.Analysis/
 COPY src/SilkHat.Code.Core/SilkHat.Code.Core.csproj src/SilkHat.Code.Core/
 COPY src/SilkHat.Core/SilkHat.Core.csproj src/SilkHat.Core/
+COPY src/SilkHat.Git.Analysis/SilkHat.Git.Analysis.csproj src/SilkHat.Git.Analysis/
+COPY src/SilkHat.Git.Core/SilkHat.Git.Core.csproj src/SilkHat.Git.Core/
 COPY src/SilkHat.Infrastructure/SilkHat.Infrastructure.csproj src/SilkHat.Infrastructure/
 RUN dotnet restore src/SilkHat.Api/SilkHat.Api.csproj
 

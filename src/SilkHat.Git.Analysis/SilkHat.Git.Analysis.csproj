@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SilkHat.Git.Core\SilkHat.Git.Core.csproj" />
+  </ItemGroup>
+
 </Project>

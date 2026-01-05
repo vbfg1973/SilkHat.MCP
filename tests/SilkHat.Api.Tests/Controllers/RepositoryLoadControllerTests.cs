@@ -7,6 +7,7 @@ using SilkHat.Api.Controllers;
 using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
+using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Infrastructure.Entities;
 
 namespace SilkHat.Api.Tests.Controllers;
@@ -21,8 +22,9 @@ public sealed class RepositoryLoadControllerTests
         var codeStore = new Mock<ICodeWorkspaceStore>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
+        var gitCache = new Mock<IGitRepositoryCacheStore>();
 
-        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
+        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -51,11 +53,12 @@ public sealed class RepositoryLoadControllerTests
         var codeStore = new Mock<ICodeWorkspaceStore>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
+        var gitCache = new Mock<IGitRepositoryCacheStore>();
 
         processor.Setup(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()))
             .Returns(StreamEvents());
 
-        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
+        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -84,8 +87,9 @@ public sealed class RepositoryLoadControllerTests
         var codeStore = new Mock<ICodeWorkspaceStore>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
+        var gitCache = new Mock<IGitRepositoryCacheStore>();
 
-        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
+        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -97,6 +101,7 @@ public sealed class RepositoryLoadControllerTests
         Assert.Equal(RepoEventKind.Completed, dto.Kind);
         store.Verify(s => s.Unload(config.Id), Times.Once);
         codeStore.Verify(s => s.Remove(config.Id), Times.Once);
+        gitCache.Verify(s => s.Remove(config.Id), Times.Once);
     }
 
     private static async IAsyncEnumerable<RepoEventDto> StreamEvents()
