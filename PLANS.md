@@ -60,6 +60,7 @@ Each milestone must be independently verifiable and incrementally implement the 
  
 * ExecPlans are living documents. As you make key design decisions, update the plan to record both the decision and the thinking behind it. Record all decisions in the `Decision Log` section.
 * ExecPlans must contain and maintain a `Progress` section, a `Surprises & Discoveries` section, a `Decision Log`, and an `Outcomes & Retrospective` section. These are not optional.
+* ExecPlans must include a `Test Plan` section describing the testing strategy for the milestone.
 * When you discover optimizer behavior, performance tradeoffs, unexpected bugs, or inverse/unapply semantics that shaped your approach, capture those observations in the `Surprises & Discoveries` section with short evidence snippets (test output is ideal).
 * If you change course mid-implementation, document why in the `Decision Log` and reflect the implications in `Progress`. Plans are guides for the next contributor as much as checklists for you.
 * At completion of a major task or the full plan, write an `Outcomes & Retrospective` entry summarizing what was achieved, what remains, and lessons learned.
@@ -137,14 +138,18 @@ If steps can be repeated safely, say so. If a step is risky, provide a safe retr
 Include the most important transcripts, diffs, or snippets as indented examples. Keep them concise and focused on what proves success.
  
 ## Interfaces and Dependencies
- 
+
 Be prescriptive. Name the libraries, modules, and services to use and why. Specify the types, traits/interfaces, and function signatures that must exist at the end of the milestone. Prefer stable names and paths such as `crate::module::function` or `package.submodule.Interface`. E.g.:
- 
+
 In crates/foo/planner.rs, define:
- 
+
     pub trait Planner {
         fn plan(&self, observed: &Observed) -> Vec<Action>;
     }
+
+## Test Plan
+
+Describe the tests to add or update for this milestone, including where they should live, how they should mock dependencies, and which commands to run. Call out any integration tests and how they avoid external infrastructure.
 ```
  
 If you follow the guidance above, a single, stateless agent -- or a human novice -- can read your ExecPlan from top to bottom and produce a working, observable result. That is the bar: SELF-CONTAINED, SELF-SUFFICIENT, NOVICE-GUIDING, OUTCOME-FOCUSED.

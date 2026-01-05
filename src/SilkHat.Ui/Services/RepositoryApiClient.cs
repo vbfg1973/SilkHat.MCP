@@ -69,6 +69,60 @@ public sealed class RepositoryApiClient
                ?? new List<CodeProjectDto>();
     }
 
+    public async Task<IReadOnlyList<GitTreeEntryModel>> GetGitTreeAsync(
+        Guid repositoryId,
+        string? name = null,
+        GitTreeEntryType? type = null,
+        DateTimeOffset? changedAfter = null,
+        string? author = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            query.Add($"name={Uri.EscapeDataString(name)}");
+        }
+
+        if (type.HasValue)
+        {
+            query.Add($"type={Uri.EscapeDataString(type.Value.ToString())}");
+        }
+
+        if (changedAfter.HasValue)
+        {
+            query.Add($"changedAfter={Uri.EscapeDataString(changedAfter.Value.ToString("o"))}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(author))
+        {
+            query.Add($"author={Uri.EscapeDataString(author)}");
+        }
+
+        var queryString = query.Count > 0 ? "?" + string.Join("&", query) : string.Empty;
+        var url = $"api/repositories/{repositoryId}/git/tree{queryString}";
+
+        return await _httpClient.GetFromJsonAsync<List<GitTreeEntryModel>>(url, cancellationToken)
+               ?? new List<GitTreeEntryModel>();
+    }
+
+    public async Task<GitFileHistoryModel> GetGitFileHistoryAsync(
+        Guid repositoryId,
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/{repositoryId}/git/files/history/{Uri.EscapeDataString(path)}";
+        return (await _httpClient.GetFromJsonAsync<GitFileHistoryModel>(url, cancellationToken))!;
+    }
+
+    public async Task<GitCoChangeStatsModel> GetGitCoChangesAsync(
+        Guid repositoryId,
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/{repositoryId}/git/files/cochanges/{Uri.EscapeDataString(path)}";
+        return (await _httpClient.GetFromJsonAsync<GitCoChangeStatsModel>(url, cancellationToken))!;
+    }
+
     public async IAsyncEnumerable<RepoEventModel> LoadRepositoryAsync(
         Guid id,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)

@@ -32,8 +32,8 @@ Code:
 
 Git:
 - GET /api/repositories/{id}/git/tree?...filters...
-- GET /api/repositories/{id}/git/files/{*path}/history
-- GET /api/repositories/{id}/git/files/{*path}/cochanges
+- GET /api/repositories/{id}/git/files/history/{*path}
+- GET /api/repositories/{id}/git/files/cochanges/{*path}
 
 Requirements:
 - Swagger enabled

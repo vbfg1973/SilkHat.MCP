@@ -10,10 +10,10 @@
                Label="Repository Config"
                Value="_selectedConfigId"
                ValueChanged="OnRepositoryChanged">
-        <MudSelectItem Value="@(default(Guid?))">Select a repository</MudSelectItem>
+        <MudSelectItem T="Guid?" Value="@(default(Guid?))">Select a repository</MudSelectItem>
         @foreach (var config in _configs)
         {
-            <MudSelectItem Value="@config.Id">@config.Name</MudSelectItem>
+            <MudSelectItem T="Guid?" Value="@config.Id">@config.Name</MudSelectItem>
         }
     </MudSelect>
     @if (!string.IsNullOrWhiteSpace(_projectError))
@@ -25,12 +25,26 @@
 <MudGrid>
     <MudItem xs="12" md="3">
         <MudPaper Elevation="1" Class="pa-3">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Projects</MudText>
-            <MudList T="CodeProjectDto" Dense="true">
-                @foreach (var project in _projects)
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Repository Tree</MudText>
+            @if (!string.IsNullOrWhiteSpace(_treeError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-2">@_treeError</MudAlert>
+            }
+            <MudList T="GitTreeEntryModel" Dense="true">
+                @foreach (var entry in _treeEntries)
                 {
-                    <MudListItem T="CodeProjectDto">
-                        <MudText Typo="Typo.body2">@project.Name</MudText>
+                    <MudListItem T="GitTreeEntryModel" OnClick="@(() => OnTreeEntrySelected(entry))">
+                        <MudText Typo="Typo.body2">
+                            @if (entry.Type == GitTreeEntryType.Directory)
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Folder" Class="me-1" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Icons.Material.Filled.Description" Class="me-1" />
+                            }
+                            @entry.Path
+                        </MudText>
                     </MudListItem>
                 }
             </MudList>
@@ -49,10 +63,32 @@
     </MudItem>
     <MudItem xs="12" md="3">
         <MudPaper Elevation="1" Class="pa-3">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">Context Panel</MudText>
-            <MudText Typo="Typo.body2">
-                Placeholder for file history, symbol info, and diagnostics.
-            </MudText>
+            <MudText Typo="Typo.subtitle1" Class="mb-2">File History</MudText>
+            @if (_historyBusy)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mb-2" />
+            }
+            @if (!string.IsNullOrWhiteSpace(_historyError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-2">@_historyError</MudAlert>
+            }
+            @if (!string.IsNullOrWhiteSpace(_selectedPath))
+            {
+                <MudText Typo="Typo.caption" Class="mb-2">@_selectedPath</MudText>
+            }
+            <MudList T="GitFileHistoryEntryModel" Dense="true">
+                @foreach (var entry in _historyEntries)
+                {
+                    <MudListItem T="GitFileHistoryEntryModel">
+                        <MudText Typo="Typo.body2">
+                            @entry.CommitSha[..Math.Min(7, entry.CommitSha.Length)] - @entry.Message
+                        </MudText>
+                        <MudText Typo="Typo.caption">
+                            @entry.Author | @entry.CommitDateUtc.ToLocalTime().ToString("g")
+                        </MudText>
+                    </MudListItem>
+                }
+            </MudList>
         </MudPaper>
     </MudItem>
 </MudGrid>
@@ -60,8 +96,14 @@
 @code {
     private readonly List<RepositoryConfigModel> _configs = new();
     private readonly List<CodeProjectDto> _projects = new();
+    private readonly List<GitTreeEntryModel> _treeEntries = new();
+    private readonly List<GitFileHistoryEntryModel> _historyEntries = new();
     private Guid? _selectedConfigId;
     private string? _projectError;
+    private string? _treeError;
+    private string? _historyError;
+    private bool _historyBusy;
+    private string? _selectedPath;
 
     protected override async Task OnInitializedAsync()
     {
@@ -72,7 +114,12 @@
     {
         _selectedConfigId = configId;
         _projects.Clear();
+        _treeEntries.Clear();
+        _historyEntries.Clear();
         _projectError = null;
+        _treeError = null;
+        _historyError = null;
+        _selectedPath = null;
         if (!configId.HasValue)
         {
             return;
@@ -86,6 +133,42 @@
         catch (Exception ex)
         {
             _projectError = ex.Message;
+        }
+
+        try
+        {
+            var tree = await Api.GetGitTreeAsync(configId.Value);
+            _treeEntries.AddRange(tree.OrderBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase));
+        }
+        catch (Exception ex)
+        {
+            _treeError = ex.Message;
+        }
+    }
+
+    private async Task OnTreeEntrySelected(GitTreeEntryModel entry)
+    {
+        if (entry.Type != GitTreeEntryType.File || !_selectedConfigId.HasValue)
+        {
+            return;
+        }
+
+        _historyBusy = true;
+        _historyError = null;
+        _historyEntries.Clear();
+        _selectedPath = entry.Path;
+        try
+        {
+            var history = await Api.GetGitFileHistoryAsync(_selectedConfigId.Value, entry.Path);
+            _historyEntries.AddRange(history.Entries);
+        }
+        catch (Exception ex)
+        {
+            _historyError = ex.Message;
+        }
+        finally
+        {
+            _historyBusy = false;
         }
     }
 }
