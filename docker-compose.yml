@@ -1,0 +1,15 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/SilkHat.Api/Dockerfile
+    ports:
+      - "5000:8080"
+  ui:
+    build:
+      context: .
+      dockerfile: src/SilkHat.Ui/Dockerfile
+    depends_on:
+      - api
+    ports:
+      - "5001:80"
