@@ -59,6 +59,16 @@ public sealed class RepositoryApiClient
         return (await response.Content.ReadFromJsonAsync<RepositoryConfigModel>(cancellationToken: cancellationToken))!;
     }
 
+    public async Task<IReadOnlyList<CodeProjectDto>> GetCodeProjectsAsync(Guid repositoryId, string? name = null, CancellationToken cancellationToken = default)
+    {
+        var url = string.IsNullOrWhiteSpace(name)
+            ? $"api/repositories/{repositoryId}/code/projects"
+            : $"api/repositories/{repositoryId}/code/projects?name={Uri.EscapeDataString(name)}";
+
+        return await _httpClient.GetFromJsonAsync<List<CodeProjectDto>>(url, cancellationToken)
+               ?? new List<CodeProjectDto>();
+    }
+
     public async IAsyncEnumerable<RepoEventModel> LoadRepositoryAsync(
         Guid id,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)

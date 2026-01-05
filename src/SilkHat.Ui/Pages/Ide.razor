@@ -1,0 +1,91 @@
+@page "/ide"
+@inject RepositoryApiClient Api
+
+<PageTitle>IDE</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">IDE View</MudText>
+
+<MudPaper Elevation="1" Class="pa-4 mb-4">
+    <MudSelect T="Guid?"
+               Label="Repository Config"
+               Value="_selectedConfigId"
+               ValueChanged="OnRepositoryChanged">
+        <MudSelectItem Value="@(default(Guid?))">Select a repository</MudSelectItem>
+        @foreach (var config in _configs)
+        {
+            <MudSelectItem Value="@config.Id">@config.Name</MudSelectItem>
+        }
+    </MudSelect>
+    @if (!string.IsNullOrWhiteSpace(_projectError))
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-3">@_projectError</MudAlert>
+    }
+</MudPaper>
+
+<MudGrid>
+    <MudItem xs="12" md="3">
+        <MudPaper Elevation="1" Class="pa-3">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Projects</MudText>
+            <MudList T="CodeProjectDto" Dense="true">
+                @foreach (var project in _projects)
+                {
+                    <MudListItem T="CodeProjectDto">
+                        <MudText Typo="Typo.body2">@project.Name</MudText>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <MudPaper Elevation="1" Class="pa-3">
+            <MudTabs Rounded="true" Elevation="0">
+                <MudTabPanel Text="Welcome">
+                    <MudText Typo="Typo.body2">
+                        Select a repository and use this area for file tabs. Syntax highlighting and file viewing will follow.
+                    </MudText>
+                </MudTabPanel>
+            </MudTabs>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="3">
+        <MudPaper Elevation="1" Class="pa-3">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Context Panel</MudText>
+            <MudText Typo="Typo.body2">
+                Placeholder for file history, symbol info, and diagnostics.
+            </MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private readonly List<RepositoryConfigModel> _configs = new();
+    private readonly List<CodeProjectDto> _projects = new();
+    private Guid? _selectedConfigId;
+    private string? _projectError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _configs.AddRange(await Api.GetRepositoryConfigsAsync());
+    }
+
+    private async Task OnRepositoryChanged(Guid? configId)
+    {
+        _selectedConfigId = configId;
+        _projects.Clear();
+        _projectError = null;
+        if (!configId.HasValue)
+        {
+            return;
+        }
+
+        try
+        {
+            var projects = await Api.GetCodeProjectsAsync(configId.Value);
+            _projects.AddRange(projects);
+        }
+        catch (Exception ex)
+        {
+            _projectError = ex.Message;
+        }
+    }
+}

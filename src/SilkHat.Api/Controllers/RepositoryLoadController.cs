@@ -5,6 +5,8 @@ using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Commands;
 using SilkHat.Analysis.Models;
 using SilkHat.Analysis.Services;
+using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Services;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 
@@ -17,16 +19,22 @@ public sealed class RepositoryLoadController : ApiControllerBase
 
     private readonly SilkHatDbContext _dbContext;
     private readonly LoadedRepositoryStore _store;
+    private readonly CodeWorkspaceStore _codeStore;
     private readonly IRepoCommandProcessor _processor;
+    private readonly ICodeWorkspaceLoader _workspaceLoader;
 
     public RepositoryLoadController(
         SilkHatDbContext dbContext,
         LoadedRepositoryStore store,
-        IRepoCommandProcessor processor)
+        CodeWorkspaceStore codeStore,
+        IRepoCommandProcessor processor,
+        ICodeWorkspaceLoader workspaceLoader)
     {
         _dbContext = dbContext;
         _store = store;
+        _codeStore = codeStore;
         _processor = processor;
+        _workspaceLoader = workspaceLoader;
     }
 
     [HttpPost("{id:guid}/load")]
@@ -45,7 +53,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
         Response.StatusCode = StatusCodes.Status200OK;
         Response.ContentType = "application/x-ndjson";
 
-        var context = new RepoCommandContext(config.Id, config.RootPath, _store);
+        var context = new RepoCommandContext(config.Id, config.RootPath, _store, _codeStore, _workspaceLoader);
         var command = new LoadRepositoryCommand();
 
         await foreach (var evt in _processor.ExecuteAsync(command, context, cancellationToken))
@@ -71,6 +79,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
         }
 
         var unloaded = _store.Unload(id);
+        _codeStore.Remove(id);
         var message = unloaded ? "Repository unloaded." : "Repository was not loaded.";
 
         return Ok(new RepoEventDto(

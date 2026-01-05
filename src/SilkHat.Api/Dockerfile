@@ -4,6 +4,8 @@ WORKDIR /src
 COPY SilkHat.sln ./
 COPY src/SilkHat.Api/SilkHat.Api.csproj src/SilkHat.Api/
 COPY src/SilkHat.Analysis/SilkHat.Analysis.csproj src/SilkHat.Analysis/
+COPY src/SilkHat.Code.Analysis/SilkHat.Code.Analysis.csproj src/SilkHat.Code.Analysis/
+COPY src/SilkHat.Code.Core/SilkHat.Code.Core.csproj src/SilkHat.Code.Core/
 COPY src/SilkHat.Core/SilkHat.Core.csproj src/SilkHat.Core/
 COPY src/SilkHat.Infrastructure/SilkHat.Infrastructure.csproj src/SilkHat.Infrastructure/
 RUN dotnet restore src/SilkHat.Api/SilkHat.Api.csproj

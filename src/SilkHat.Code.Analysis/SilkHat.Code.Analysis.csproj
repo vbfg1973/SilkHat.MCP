@@ -6,4 +6,14 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Buildalyzer" Version="8.0.0" />
+    <PackageReference Include="Buildalyzer.Workspaces" Version="8.0.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.10.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SilkHat.Code.Core\SilkHat.Code.Core.csproj" />
+  </ItemGroup>
+
 </Project>
