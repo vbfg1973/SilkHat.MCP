@@ -45,6 +45,18 @@ public sealed class LoadRepositoryCommand : IRepoCommand
 
         await Task.Delay(200, cancellationToken);
 
+        yield return new RepoEventDto(
+            RepoEventKind.Progress,
+            "code-analysis",
+            "Loading solutions and building code index.",
+            75,
+            null,
+            null,
+            null);
+
+        var workspace = await context.CodeWorkspaceLoader.LoadAsync(context.RootPath, cancellationToken);
+        context.CodeWorkspaceStore.Set(context.ConfigId, workspace);
+
         context.Store.SetLoaded(context.ConfigId, context.RootPath);
 
         yield return new RepoEventDto(

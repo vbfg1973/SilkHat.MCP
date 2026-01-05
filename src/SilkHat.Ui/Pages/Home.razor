@@ -116,7 +116,7 @@
                 {
                     <MudListItem T="RepoEventModel">
                         <MudText Typo="Typo.body2">
-                            @($"{evt.Kind} | {evt.Stage} | {evt.Message} ({evt.Percent:0.#}%)")
+                            @($"{evt.Kind} | {evt.Stage} | {evt.Message} ({FormatPercent(evt.Percent)})")
                         </MudText>
                     </MudListItem>
                 }
@@ -314,6 +314,11 @@
         }
 
         return _groups.FirstOrDefault(group => group.Id == groupId.Value)?.Name ?? "Unknown";
+    }
+
+    private static string FormatPercent(double? value)
+    {
+        return value.HasValue ? $"{value.Value:0.#}%" : "-";
     }
 
     private async Task StartLoadAsync(RepositoryConfigModel config)

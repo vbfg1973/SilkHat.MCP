@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SilkHat.Core\SilkHat.Core.csproj" />
+    <ProjectReference Include="..\SilkHat.Code.Analysis\SilkHat.Code.Analysis.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
