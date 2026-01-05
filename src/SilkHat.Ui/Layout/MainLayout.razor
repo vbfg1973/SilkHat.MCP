@@ -1,28 +1,28 @@
 ﻿@inherits LayoutComponentBase
 @inject ThemeService ThemeService
 
-<MudThemeProvider IsDarkMode="@_isDarkMode">
-    <MudDialogProvider />
-    <MudSnackbarProvider />
-    <MudLayout>
-        <MudAppBar Elevation="1">
-            <MudText Typo="Typo.h6">SilkHat</MudText>
-            <MudSpacer />
-            <MudSwitch T="bool"
-                       @bind-checked="_isDarkMode"
-                       @bind-checked:after="PersistDarkModeAsync"
-                       Color="Color.Secondary" />
-        </MudAppBar>
-        <MudDrawer Open="true" Elevation="1" ClipMode="DrawerClipMode.Always">
-            <NavMenu />
-        </MudDrawer>
-        <MudMainContent>
-            <MudContainer MaxWidth="MaxWidth.Large" Class="mt-6">
-                @Body
-            </MudContainer>
-        </MudMainContent>
-    </MudLayout>
-</MudThemeProvider>
+<MudThemeProvider IsDarkMode="@_isDarkMode" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+<MudPopoverProvider />
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudText Typo="Typo.h6">SilkHat</MudText>
+        <MudSpacer />
+        <MudSwitch T="bool"
+                   @bind-checked="_isDarkMode"
+                   @bind-checked:after="PersistDarkModeAsync"
+                   Color="Color.Secondary" />
+    </MudAppBar>
+    <MudDrawer Open="true" Elevation="1" ClipMode="DrawerClipMode.Always">
+        <NavMenu />
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-6">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
 
 @code {
     private bool _isDarkMode;

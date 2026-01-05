@@ -53,6 +53,7 @@ Each milestone must end with:
 - Resolve UI routing/hosting issues that prevent loading the SPA from Docker.
 - Ensure UI reaches the API on the configured host ports.
 - Verify the UI loads from the mapped host port and can call `/api/health`.
+- Establish a UI component testing strategy and add initial bUnit coverage for existing components.
 
 ## M5: Git via Process: Tree Listing + File History + Co-change
 - Implement git query layer using Process
