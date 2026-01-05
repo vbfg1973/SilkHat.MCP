@@ -11,4 +11,9 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SilkHat.Infrastructure\SilkHat.Infrastructure.csproj" />
+    <ProjectReference Include="..\SilkHat.Core\SilkHat.Core.csproj" />
+  </ItemGroup>
+
 </Project>

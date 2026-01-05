@@ -21,6 +21,12 @@ Each milestone must end with:
 - UI: basic dashboard to list/create/edit configs and groups
 - Persisted DB file via docker volume
 
+## M2a: Controller-Based API Endpoints
+- Convert all existing API endpoints to controller-based endpoints
+- Ensure ProblemDetails and correlationId behavior are preserved
+- Wire future endpoints to use controllers only
+- Swagger reflects controller endpoints
+
 ## M3: Command/Channel Streaming + Repository Load Orchestration
 - Implement command processor per repository
 - Implement streaming NDJSON endpoint for /load

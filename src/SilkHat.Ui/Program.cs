@@ -10,6 +10,7 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddMudServices();
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<RepositoryApiClient>();
 
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"];
 var baseAddress = string.IsNullOrWhiteSpace(apiBaseUrl)

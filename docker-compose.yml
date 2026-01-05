@@ -5,6 +5,10 @@ services:
       dockerfile: src/SilkHat.Api/Dockerfile
     ports:
       - "5000:8080"
+    environment:
+      - ConnectionStrings__SilkHat=Data Source=/data/silkhat.db
+    volumes:
+      - silkhat-data:/data
   ui:
     build:
       context: .
@@ -13,3 +17,5 @@ services:
       - api
     ports:
       - "5001:80"
+volumes:
+  silkhat-data:
