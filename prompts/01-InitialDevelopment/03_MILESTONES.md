@@ -43,6 +43,17 @@ Each milestone must end with:
   - symbol lookup by SymbolKey with expected kind
 - UI: IDE-like view scaffold: left tree, center tabs file viewer (simple text ok), right placeholder
 
+## M4a: Testing Standardization
+- Add controller endpoint tests that verify dependencies are called and responses are correct.
+- Add service unit tests that verify dependency interactions, expected responses, and edge cases.
+- Add service integration tests to validate real behavior.
+- Establish the testing standard as a requirement for all future controllers and services.
+
+## M4b: UI Hosting Fixes
+- Resolve UI routing/hosting issues that prevent loading the SPA from Docker.
+- Ensure UI reaches the API on the configured host ports.
+- Verify the UI loads from the mapped host port and can call `/api/health`.
+
 ## M5: Git via Process: Tree Listing + File History + Co-change
 - Implement git query layer using Process
 - Endpoints:

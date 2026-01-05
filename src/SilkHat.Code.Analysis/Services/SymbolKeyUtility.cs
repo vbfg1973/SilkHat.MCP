@@ -11,7 +11,7 @@ public static class SymbolKeyUtility
     {
         if (GetSymbolKeyStringMethod is null)
         {
-            throw new InvalidOperationException("SymbolKey support is not available in the current Roslyn assemblies.");
+            return symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
         }
 
         return (string)GetSymbolKeyStringMethod.Invoke(null, new object?[] { symbol, compilation })!;

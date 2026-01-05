@@ -4,9 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Commands;
 using SilkHat.Analysis.Models;
-using SilkHat.Analysis.Services;
 using SilkHat.Code.Analysis.Abstractions;
-using SilkHat.Code.Analysis.Services;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 
@@ -18,15 +16,15 @@ public sealed class RepositoryLoadController : ApiControllerBase
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly SilkHatDbContext _dbContext;
-    private readonly LoadedRepositoryStore _store;
-    private readonly CodeWorkspaceStore _codeStore;
+    private readonly ILoadedRepositoryStore _store;
+    private readonly ICodeWorkspaceStore _codeStore;
     private readonly IRepoCommandProcessor _processor;
     private readonly ICodeWorkspaceLoader _workspaceLoader;
 
     public RepositoryLoadController(
         SilkHatDbContext dbContext,
-        LoadedRepositoryStore store,
-        CodeWorkspaceStore codeStore,
+        ILoadedRepositoryStore store,
+        ICodeWorkspaceStore codeStore,
         IRepoCommandProcessor processor,
         ICodeWorkspaceLoader workspaceLoader)
     {
