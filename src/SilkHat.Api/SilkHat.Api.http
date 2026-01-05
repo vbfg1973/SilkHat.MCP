@@ -1,0 +1,6 @@
+@SilkHat.Api_HostAddress = http://localhost:0
+
+GET {{SilkHat.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
