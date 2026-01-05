@@ -1,9 +1,10 @@
 using System.Collections.Concurrent;
+using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Models;
 
 namespace SilkHat.Analysis.Services;
 
-public sealed class LoadedRepositoryStore
+public sealed class LoadedRepositoryStore : ILoadedRepositoryStore
 {
     private readonly ConcurrentDictionary<Guid, LoadedRepository> _loadedRepositories = new();
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _locks = new();

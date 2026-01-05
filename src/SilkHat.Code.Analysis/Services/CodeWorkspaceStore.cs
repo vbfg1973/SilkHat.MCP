@@ -1,9 +1,10 @@
 using System.Collections.Concurrent;
+using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
 
 namespace SilkHat.Code.Analysis.Services;
 
-public sealed class CodeWorkspaceStore
+public sealed class CodeWorkspaceStore : ICodeWorkspaceStore
 {
     private readonly ConcurrentDictionary<Guid, CodeRepositoryWorkspace> _workspaces = new();
 

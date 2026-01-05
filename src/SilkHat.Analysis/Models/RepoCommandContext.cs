@@ -1,12 +1,11 @@
-using SilkHat.Analysis.Services;
+using SilkHat.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Abstractions;
-using SilkHat.Code.Analysis.Services;
 
 namespace SilkHat.Analysis.Models;
 
 public sealed record RepoCommandContext(
     Guid ConfigId,
     string RootPath,
-    LoadedRepositoryStore Store,
-    CodeWorkspaceStore CodeWorkspaceStore,
+    ILoadedRepositoryStore Store,
+    ICodeWorkspaceStore CodeWorkspaceStore,
     ICodeWorkspaceLoader CodeWorkspaceLoader);

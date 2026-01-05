@@ -13,9 +13,9 @@ builder.Services.AddSwaggerGen();
 
 var connectionString = builder.Configuration.GetConnectionString("SilkHat") ?? "Data Source=./silkhat.db";
 builder.Services.AddDbContext<SilkHatDbContext>(options => options.UseSqlite(connectionString));
-builder.Services.AddSingleton<LoadedRepositoryStore>();
+builder.Services.AddSingleton<ILoadedRepositoryStore, LoadedRepositoryStore>();
 builder.Services.AddSingleton<IRepoCommandProcessor, RepoCommandProcessor>();
-builder.Services.AddSingleton<CodeWorkspaceStore>();
+builder.Services.AddSingleton<ICodeWorkspaceStore, CodeWorkspaceStore>();
 builder.Services.AddSingleton<ICodeWorkspaceLoader, CodeWorkspaceLoader>();
 
 var app = builder.Build();
