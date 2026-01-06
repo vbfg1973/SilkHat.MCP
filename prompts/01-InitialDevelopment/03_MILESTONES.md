@@ -91,6 +91,14 @@ Each milestone must end with:
 - Preserve existing API contracts for code analysis endpoints (projects, namespaces, named types, symbol lookup).
 - Provide an IDE tree endpoint derived from solution projects (projects as roots with folders/files beneath).
 
+## M5e: PostgreSQL Migration + Docker Compose Refinement
+- Migrate persistence from SQLite to the latest PostgreSQL.
+- Update docker compose to run PostgreSQL alongside API/UI.
+- Ensure database configuration is driven by environment variables and supports local development.
+- Provide migration path and maintain data access via standard database tools.
+- Add a dedicated integration test project using Testcontainers for real-database tests, excluded from default test runs.
+- Add pgAdmin in docker compose, preconfigured to connect to the PostgreSQL service.
+
 ## M6: Hardening + Docs + Scripts
 - Scripts: build/test/run + docker convenience scripts
 - Docs: architecture overview, API notes, troubleshooting

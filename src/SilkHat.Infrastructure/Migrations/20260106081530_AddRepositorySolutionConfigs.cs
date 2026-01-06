@@ -15,10 +15,10 @@ namespace SilkHat.Infrastructure.Migrations
                 name: "RepositorySolutionConfigs",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    RelativePath = table.Column<string>(type: "TEXT", nullable: false),
-                    IsEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
-                    RepositoryConfigId = table.Column<Guid>(type: "TEXT", nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    RelativePath = table.Column<string>(type: "text", nullable: false),
+                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    RepositoryConfigId = table.Column<Guid>(type: "uuid", nullable: false)
                 },
                 constraints: table =>
                 {

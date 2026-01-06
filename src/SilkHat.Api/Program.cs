@@ -35,8 +35,11 @@ builder.Services.AddCors(options =>
     });
 });
 
-var connectionString = builder.Configuration.GetConnectionString("SilkHat") ?? "Data Source=./silkhat.db";
-builder.Services.AddDbContext<SilkHatDbContext>(options => options.UseSqlite(connectionString));
+var connectionString = builder.Configuration.GetConnectionString("SilkHat")
+                      ?? builder.Configuration["DATABASE_URL"]
+                      ?? "Host=localhost;Port=5432;Database=silkhat;Username=silkhat;Password=silkhat";
+builder.Services.AddDbContext<SilkHatDbContext>(options =>
+    options.UseNpgsql(connectionString, npgsql => npgsql.SetPostgresVersion(18, 0)));
 builder.Services.AddSingleton<ILoadedRepositoryStore, LoadedRepositoryStore>();
 builder.Services.AddSingleton<IRepoCommandProcessor, RepoCommandProcessor>();
 builder.Services.AddSingleton<ICodeWorkspaceStore, CodeWorkspaceStore>();

@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "SilkHat",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "postgres",
+      "Username": "silkhat",
+      "SSLMode": "prefer"
+    }
+  }
+}

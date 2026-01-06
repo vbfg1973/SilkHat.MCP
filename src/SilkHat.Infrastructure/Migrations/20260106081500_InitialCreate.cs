@@ -15,11 +15,11 @@ namespace SilkHat.Infrastructure.Migrations
                 name: "RepositoryGroups",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", nullable: false),
-                    Description = table.Column<string>(type: "TEXT", nullable: true),
-                    CreatedUtc = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedUtc = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "text", nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    CreatedUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -30,13 +30,13 @@ namespace SilkHat.Infrastructure.Migrations
                 name: "RepositoryConfigs",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
-                    Name = table.Column<string>(type: "TEXT", nullable: false),
-                    RootPath = table.Column<string>(type: "TEXT", nullable: false),
-                    Description = table.Column<string>(type: "TEXT", nullable: true),
-                    GroupId = table.Column<Guid>(type: "TEXT", nullable: true),
-                    CreatedUtc = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedUtc = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "text", nullable: false),
+                    RootPath = table.Column<string>(type: "text", nullable: false),
+                    Description = table.Column<string>(type: "text", nullable: true),
+                    GroupId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedUtc = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },
                 constraints: table =>
                 {
