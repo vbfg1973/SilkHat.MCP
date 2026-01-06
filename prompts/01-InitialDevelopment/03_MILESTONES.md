@@ -81,6 +81,16 @@ Each milestone must end with:
 - Edit existing groups: add/remove repositories and enable/disable individual solutions for loading.
 - Loading a repository group destroys existing workspaces and reloads fresh compilations for all enabled solutions in the group.
 
+## M5d: Code Analysis Without Buildalyzer
+- Replace Buildalyzer-based loading with project/solution parsing and MSBuild-free analysis.
+- Parse `.sln` and `.csproj` files directly to build:
+  - project reference graphs
+  - package references + versions
+  - compile items and constants needed for analysis
+- Use Roslyn with parsed inputs (no external tools) to create compilations and indexes.
+- Preserve existing API contracts for code analysis endpoints (projects, namespaces, named types, symbol lookup).
+- Provide an IDE tree endpoint derived from solution projects (projects as roots with folders/files beneath).
+
 ## M6: Hardening + Docs + Scripts
 - Scripts: build/test/run + docker convenience scripts
 - Docs: architecture overview, API notes, troubleshooting

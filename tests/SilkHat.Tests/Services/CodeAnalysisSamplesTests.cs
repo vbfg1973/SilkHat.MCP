@@ -23,6 +23,8 @@ public sealed class CodeAnalysisSamplesTests
         Assert.Contains(workspace.Namespaces, ns => ns == "SilkHat.Sample.App");
         Assert.Contains(workspace.Namespaces, ns => ns == "SilkHat.Sample.Lib");
         Assert.Contains(workspace.Compilations, entry => entry.Value is not null);
+        Assert.Contains(workspace.TreeEntries, entry => entry.Type == CodeTreeEntryType.Project && entry.ProjectName == "SilkHat.Sample.App");
+        Assert.Contains(workspace.TreeEntries, entry => entry.Type == CodeTreeEntryType.File && entry.DisplayPath.Contains("GreetingService.cs", StringComparison.OrdinalIgnoreCase));
 
         AssertNamedType(workspace, "GreetingService", NamedTypeKind.Class, "SilkHat.Sample.App");
         AssertNamedType(workspace, "IGreetingProvider", NamedTypeKind.Interface, "SilkHat.Sample.App");

@@ -17,6 +17,7 @@ public sealed class CodeRepositoryWorkspace
         string rootPath,
         IReadOnlyList<Workspace> workspaces,
         IReadOnlyDictionary<string, ProjectIndex> projects,
+        IReadOnlyList<CodeTreeEntryDto> treeEntries,
         IReadOnlyList<string> namespaces,
         IReadOnlyList<NamedTypeDto> namedTypes,
         IReadOnlyDictionary<string, NamedTypeDto> namedTypesBySymbolKey,
@@ -25,6 +26,7 @@ public sealed class CodeRepositoryWorkspace
         RootPath = rootPath;
         Workspaces = workspaces;
         Projects = projects;
+        TreeEntries = treeEntries;
         Namespaces = namespaces;
         NamedTypes = namedTypes;
         NamedTypesBySymbolKey = namedTypesBySymbolKey;
@@ -34,6 +36,7 @@ public sealed class CodeRepositoryWorkspace
     public string RootPath { get; }
     public IReadOnlyList<Workspace> Workspaces { get; }
     public IReadOnlyDictionary<string, ProjectIndex> Projects { get; }
+    public IReadOnlyList<CodeTreeEntryDto> TreeEntries { get; }
     public IReadOnlyList<string> Namespaces { get; }
     public IReadOnlyList<NamedTypeDto> NamedTypes { get; }
     public IReadOnlyDictionary<string, NamedTypeDto> NamedTypesBySymbolKey { get; }

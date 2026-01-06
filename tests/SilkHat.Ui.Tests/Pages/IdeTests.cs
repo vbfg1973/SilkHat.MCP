@@ -44,13 +44,15 @@ public sealed class IdeTests
   }}
 ]");
         handler.AddJsonResponse($"api/repositories/{configId}/code/projects", "[]");
-        handler.AddJsonResponse($"api/repositories/{configId}/git/tree", """
+        handler.AddJsonResponse($"api/repositories/{configId}/code/tree", """
 [
   {
-    "path": "./src/Program.cs",
+    "repositoryPath": "./src/Program.cs",
+    "displayPath": "Repo One/src/Program.cs",
     "name": "Program.cs",
-    "type": 0,
-    "lastChange": null
+    "type": 2,
+    "projectKey": "alpha",
+    "projectName": "Repo One"
   }
 ]
 """);
@@ -70,8 +72,8 @@ public sealed class IdeTests
         var treeField = typeof(Ide).GetField("_treeEntries", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(treeField);
 
-        var entries = (List<GitTreeEntryModel>)treeField!.GetValue(ide.Instance)!;
-        entries.Add(new GitTreeEntryModel("./src/Program.cs", "Program.cs", GitTreeEntryType.File, null));
+        var entries = (List<CodeTreeEntryModel>)treeField!.GetValue(ide.Instance)!;
+        entries.Add(new CodeTreeEntryModel("./src/Program.cs", "Repo One/src/Program.cs", "Program.cs", CodeTreeEntryType.File, "alpha", "Repo One"));
 
         ide.Render();
 
