@@ -19,8 +19,19 @@ After this change, every code-analysis endpoint is scoped to a specific solution
 - [x] (2026-01-06 19:10Z) Added persisted solutionId storage in repository solution configs and migrated the database schema.
 - [x] (2026-01-06 19:10Z) Updated repository load workflows to use stored solutionIds and backfill missing IDs on load.
 - [x] (2026-01-06 19:10Z) Updated repository discovery and UI configuration flows to carry solutionIds end-to-end.
-- [ ] (2026-01-06 19:15Z) Run `dotnet test` and confirm all non-infrastructure tests pass (attempted; MSBuild failed to create named pipe due to permission denied).
-- [ ] (2026-01-06 19:15Z) Run `docker compose up --build` and confirm API + UI run in Docker (attempted; blocked by Docker daemon socket permissions).
+- [x] (2026-01-06 22:09Z) Implemented hierarchical code tree queries with parentId filtering and registered FluentValidation for query validation.
+- [x] (2026-01-06 22:09Z) Updated IDE to auto-select the first loaded repository/solution and render a hierarchical tree with lazy loading.
+- [x] (2026-01-06 22:09Z) Added API/service/UI tests for tree hierarchy, query validation, and IDE tree behavior.
+- [x] (2026-01-06 22:13Z) Sorted available solutions alphabetically before selecting the default solution in the IDE.
+- [x] (2026-01-06 22:16Z) Aligned FluentValidation.AspNetCore package version with repository constraints (11.3.1).
+- [x] (2026-01-06 22:17Z) Fixed IDE tree toggle to use typed mouse event callbacks for MudBlazor in bUnit.
+- [x] (2026-01-06 22:28Z) Replaced the IDE tree list with MudTreeView and added lazy-loading callbacks that render names and icons correctly.
+- [x] (2026-01-06 22:28Z) Added precomputed tree parent/child maps to solution workspaces for fast tree queries.
+- [x] (2026-01-06 22:50Z) Fixed MudTreeView item click binding and tree parent path calculation build errors.
+- [x] (2026-01-06 22:55Z) Ordered tree children with folders before files and added test coverage for the ordering.
+- [x] (2026-01-06 22:59Z) Removed UI-side tree sorting so server ordering (folders-first) is preserved and fixed test helper path parsing.
+- [ ] (2026-01-06 22:14Z) Run `dotnet test` and confirm all non-infrastructure tests pass (attempted; MSBuild failed to create named pipe due to permission denied).
+- [ ] (2026-01-06 22:14Z) Run `docker compose up --build` and confirm API + UI run in Docker (attempted; blocked by Docker daemon socket permissions).
 - [x] (2026-01-06 15:08Z) Wrote Milestone Commit Notes for M5f and updated milestone state files.
 
 ## Surprises & Discoveries
@@ -40,10 +51,19 @@ After this change, every code-analysis endpoint is scoped to a specific solution
 - Decision: Persist solutionId in `RepositorySolutionConfig` and use it as the source of truth during repository loads.
   Rationale: Storing the identifier guarantees consistent navigation IDs across API, UI, and workspace reloads while still allowing fallback computation for missing values.
   Date/Author: 2026-01-06 19:10Z / Codex
+- Decision: Serve hierarchical tree nodes by filtering stored tree entries by `DisplayPath` and `parentId`.
+  Rationale: Existing tree entries already encode fully qualified display paths, enabling direct-child filtering without recomputing tree structure.
+  Date/Author: 2026-01-06 22:09Z / Codex
+- Decision: Default the IDE solution selection to the alphabetically first solution name (tie-breaking by relative path).
+  Rationale: The UI should consistently choose the first solution when multiple solutions are available, matching the alphabetical selection rule.
+  Date/Author: 2026-01-06 22:13Z / Codex
+- Decision: Precompute a display-path keyed parent/child map for code tree entries during solution load.
+  Rationale: The tree map supports fast, lazy tree lookups without repeated path scans, while keeping the API contract unchanged.
+  Date/Author: 2026-01-06 22:28Z / Codex
 
 ## Outcomes & Retrospective
 
-Implemented solution-scoped workspaces and routes plus UI selection for solution-specific code data, and persisted solutionId values in repository solution configs to keep IDs consistent between storage and analysis. Test and Docker validation remain blocked in this environment due to MSBuild named pipe permissions and Docker daemon access restrictions (also requires `REPO_ROOT`).
+Implemented solution-scoped workspaces and routes plus UI selection for solution-specific code data, persisted solutionId values in repository solution configs, and added hierarchical tree queries with lazy-loading in the IDE. Test and Docker validation remain blocked in this environment due to MSBuild named pipe permissions and Docker daemon access restrictions (also requires `REPO_ROOT`).
 
 ## Context and Orientation
 
@@ -90,3 +110,6 @@ Plan update (2026-01-06 15:08Z): Updated milestone commit notes and progress sta
 Plan update (2026-01-06 15:09Z): Added Docker socket permission failure to validation notes.
 Plan update (2026-01-06 19:10Z): Extended scope to persist solutionId in repository configs and updated progress/decisions.
 Plan update (2026-01-06 19:15Z): Recorded reattempted test and Docker runs with the same environment failures.
+Plan update (2026-01-06 22:09Z): Extended milestone scope to cover hierarchical tree queries and IDE auto-load behavior.
+Plan update (2026-01-06 22:13Z): Recorded alphabetical solution selection change for IDE defaults.
+Plan update (2026-01-06 22:14Z): Re-ran tests and Docker compose; failures unchanged due to MSBuild pipe and Docker socket permissions.

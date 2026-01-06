@@ -120,9 +120,15 @@ public sealed class RepositoryApiClient
     public async Task<IReadOnlyList<CodeTreeEntryModel>> GetCodeTreeAsync(
         Guid repositoryId,
         string solutionId,
+        string? parentId = null,
         CancellationToken cancellationToken = default)
     {
         var url = $"api/repositories/{repositoryId}/code/solutions/{solutionId}/tree";
+        if (!string.IsNullOrWhiteSpace(parentId))
+        {
+            url += $"?parentId={Uri.EscapeDataString(parentId)}";
+        }
+
         return await GetFromJsonAsync<List<CodeTreeEntryModel>>(url, cancellationToken)
                ?? new List<CodeTreeEntryModel>();
     }

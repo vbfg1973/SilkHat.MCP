@@ -18,6 +18,7 @@ public sealed record CodeSolutionWorkspace(
     string RelativePath,
     IReadOnlyDictionary<string, ProjectIndex> Projects,
     IReadOnlyList<CodeTreeEntryDto> TreeEntries,
+    IReadOnlyDictionary<string, IReadOnlyList<CodeTreeEntryDto>> TreeChildrenByParent,
     IReadOnlyList<string> Namespaces,
     IReadOnlyList<NamedTypeDto> NamedTypes,
     IReadOnlyDictionary<string, NamedTypeDto> NamedTypesBySymbolKey,

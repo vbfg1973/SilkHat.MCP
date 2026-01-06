@@ -56,10 +56,10 @@ public sealed class IdeTests
         handler.AddJsonResponse($"api/repositories/{configId}/code/solutions/{solutionId}/tree", """
 [
   {
-    "repositoryPath": "./src/Program.cs",
-    "displayPath": "Repo One/src/Program.cs",
-    "name": "Program.cs",
-    "type": 2,
+    "repositoryPath": "./RepoOne",
+    "displayPath": "Repo One",
+    "name": "Repo One",
+    "type": 0,
     "projectKey": "alpha",
     "projectName": "Repo One"
   }
@@ -77,19 +77,11 @@ public sealed class IdeTests
                     builder.CloseComponent();
                 })));
 
-        var ide = cut.FindComponent<Ide>();
-        var changeMethod = typeof(Ide).GetMethod("OnRepositoryChanged", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(changeMethod);
-        var task = (Task)changeMethod!.Invoke(ide.Instance, new object?[] { configId })!;
-        task.GetAwaiter().GetResult();
-
-        ide.Render();
-
-        var treeField = typeof(Ide).GetField("_treeEntries", BindingFlags.Instance | BindingFlags.NonPublic);
+        var treeField = typeof(Ide).GetField("_treeItems", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(treeField);
 
-        var entries = (List<CodeTreeEntryModel>)treeField!.GetValue(ide.Instance)!;
-        Assert.Single(entries);
-        cut.WaitForAssertion(() => Assert.Contains("Program.cs", cut.Markup));
+        var nodes = (System.Collections.IList)treeField!.GetValue(cut.FindComponent<Ide>().Instance)!;
+        Assert.Equal(1, nodes.Count);
+        cut.WaitForAssertion(() => Assert.Contains("Repo One", cut.Markup));
     }
 }

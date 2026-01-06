@@ -174,6 +174,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             }
 
             var treeEntries = BuildCodeTreeEntries(workspace, rootPath, projectKeyMap);
+            var treeChildrenMap = await Task.Run(() => BuildTreeChildrenMap(treeEntries), cancellationToken);
             var relativeSolutionPath = SolutionIdentity.NormalizeRelativePath(rootPath, parsedSolution.SolutionPath);
 
             solutionWorkspaces[solutionId] = new CodeSolutionWorkspace(
@@ -183,6 +184,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 relativeSolutionPath,
                 projectIndex,
                 treeEntries,
+                treeChildrenMap,
                 namespaces.OrderBy(ns => ns, StringComparer.OrdinalIgnoreCase).ToList(),
                 namedTypes,
                 namedTypeByKey,
@@ -537,6 +539,64 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             type,
             projectKey,
             projectName));
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<CodeTreeEntryDto>> BuildTreeChildrenMap(
+        IReadOnlyList<CodeTreeEntryDto> entries)
+    {
+        var map = new Dictionary<string, List<CodeTreeEntryDto>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var entry in entries)
+        {
+            var parentKey = GetParentDisplayPath(entry);
+            if (!map.TryGetValue(parentKey, out var children))
+            {
+                children = new List<CodeTreeEntryDto>();
+                map[parentKey] = children;
+            }
+
+            children.Add(entry);
+        }
+
+        var finalized = new Dictionary<string, IReadOnlyList<CodeTreeEntryDto>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (parent, children) in map)
+        {
+            var ordered = parent.Length == 0
+                ? children.OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+                : children
+                    .OrderBy(entry => GetNodeSortOrder(entry.Type))
+                    .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase);
+            finalized[parent] = ordered.ToList();
+        }
+
+        return finalized;
+    }
+
+    private static int GetNodeSortOrder(CodeTreeEntryType type)
+    {
+        return type switch
+        {
+            CodeTreeEntryType.Directory => 0,
+            CodeTreeEntryType.File => 1,
+            _ => 0
+        };
+    }
+
+    private static string GetParentDisplayPath(CodeTreeEntryDto entry)
+    {
+        if (entry.Type == CodeTreeEntryType.Project)
+        {
+            return string.Empty;
+        }
+
+        var displayPath = entry.DisplayPath ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(displayPath))
+        {
+            return string.Empty;
+        }
+
+        var lastSeparator = displayPath.LastIndexOf('/');
+        return lastSeparator <= 0 ? string.Empty : displayPath[..lastSeparator];
     }
 
     private static string NormalizePathKey(string path)

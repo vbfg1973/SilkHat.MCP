@@ -55,6 +55,7 @@ public static class CodeWorkspaceFactory
             "./Repo.sln",
             projects,
             new List<CodeTreeEntryDto>(),
+            new Dictionary<string, IReadOnlyList<CodeTreeEntryDto>>(StringComparer.OrdinalIgnoreCase),
             namespaces,
             namedTypes,
             namedTypesByKey,
