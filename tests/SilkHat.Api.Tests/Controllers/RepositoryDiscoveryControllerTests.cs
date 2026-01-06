@@ -17,6 +17,8 @@ public sealed class RepositoryDiscoveryControllerTests
         {
             new("Repo", "Repo", "/repos/Repo", true)
         });
+        discovery.Setup(d => d.ListSolutions("/repos/Repo"))
+            .Returns(new List<AvailableRepositorySolutionDto> { new("./Repo.sln") });
 
         var controller = new RepositoryDiscoveryController(discovery.Object)
         {
@@ -46,5 +48,27 @@ public sealed class RepositoryDiscoveryControllerTests
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(500, problem.StatusCode);
+    }
+
+    [Fact]
+    public void GetSolutions_ReturnsSolutionPaths()
+    {
+        var discovery = new Mock<IRepositoryDiscoveryService>();
+        discovery.Setup(d => d.ListSolutions("/repos/Repo")).Returns(new List<AvailableRepositorySolutionDto>
+        {
+            new("./Repo.sln")
+        });
+
+        var controller = new RepositoryDiscoveryController(discovery.Object)
+        {
+            ControllerContext = ControllerTestFactory.CreateContext()
+        };
+
+        var result = controller.GetSolutions("/repos/Repo");
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var solutions = Assert.IsType<List<AvailableRepositorySolutionDto>>(ok.Value);
+        Assert.Single(solutions);
+        discovery.Verify(d => d.ListSolutions("/repos/Repo"), Times.Once);
     }
 }

@@ -6,5 +6,6 @@ public sealed record RepositoryConfigModel(
     string RootPath,
     string? Description,
     Guid? GroupId,
+    IReadOnlyList<RepositorySolutionModel> Solutions,
     DateTimeOffset CreatedUtc,
     DateTimeOffset UpdatedUtc);

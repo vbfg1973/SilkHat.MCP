@@ -12,6 +12,7 @@ public sealed class SilkHatDbContext : DbContext
 
     public DbSet<RepositoryConfig> RepositoryConfigs => Set<RepositoryConfig>();
     public DbSet<RepositoryGroup> RepositoryGroups => Set<RepositoryGroup>();
+    public DbSet<RepositorySolutionConfig> RepositorySolutionConfigs => Set<RepositorySolutionConfig>();
 
     public override int SaveChanges()
     {
@@ -42,6 +43,16 @@ public sealed class SilkHatDbContext : DbContext
                 .WithMany(group => group.RepositoryConfigs)
                 .HasForeignKey(config => config.GroupId)
                 .OnDelete(DeleteBehavior.SetNull);
+            entity.HasMany(config => config.Solutions)
+                .WithOne(solution => solution.RepositoryConfig)
+                .HasForeignKey(solution => solution.RepositoryConfigId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RepositorySolutionConfig>(entity =>
+        {
+            entity.HasKey(solution => solution.Id);
+            entity.Property(solution => solution.RelativePath).IsRequired();
         });
     }
 

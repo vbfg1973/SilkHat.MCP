@@ -10,14 +10,14 @@ This milestone replaces the existing repository config/group UI with a dedicated
 
 ## Progress
 
-- [ ] Add a new repository group loader component that replaces the existing dashboard group/config UI.
-- [ ] Enable creation of repository groups and selection of repositories from the available list, with per-repository solution selection.
-- [ ] Enable editing of existing groups: add/remove repositories and enable/disable solutions.
-- [ ] Update load workflow to reload group repositories by destroying existing workspaces and creating fresh compilations.
-- [ ] Update or add UI tests covering rendering and key interactions in the new component.
-- [ ] Run `dotnet test` and verify all non-infrastructure tests pass.
-- [ ] Run `docker compose up --build` and confirm API + UI run in Docker.
-- [ ] Write Milestone Commit Notes for M5c and update milestone state files.
+- [x] (2026-01-06 16:20Z) Add a new repository group loader component that replaces the existing dashboard group/config UI.
+- [x] (2026-01-06 16:20Z) Enable creation of repository groups and selection of repositories from the available list, with per-repository solution selection.
+- [x] (2026-01-06 16:20Z) Enable editing of existing groups: add/remove repositories and enable/disable solutions.
+- [x] (2026-01-06 16:20Z) Update load workflow to reload group repositories by destroying existing workspaces and creating fresh compilations.
+- [x] (2026-01-06 16:20Z) Update or add UI tests covering rendering and key interactions in the new component.
+- [x] (2026-01-06 16:28Z) Run `dotnet test` and verify all non-infrastructure tests pass.
+- [x] (2026-01-06 16:31Z) Run `docker compose up --build` and confirm API + UI run in Docker.
+- [x] (2026-01-06 16:34Z) Write Milestone Commit Notes for M5c and update milestone state files.
 
 ## Surprises & Discoveries
 
@@ -25,11 +25,19 @@ None yet.
 
 ## Decision Log
 
-None yet.
+- Decision: Store per-repository solution selections in a new `RepositorySolutionConfig` table linked to repository configs.
+  Rationale: Enables toggling solutions independently while keeping config persistence straightforward.
+  Date/Author: 2026-01-06 / Codex
+- Decision: Add a discovery endpoint to list solution files for a repository path rather than inflating the available repositories payload.
+  Rationale: Keeps the repository list fast while still enabling solution selection when needed.
+  Date/Author: 2026-01-06 / Codex
+- Decision: Clear loaded repository, workspace, and git cache state before group loads.
+  Rationale: Requirement states group loads must rebuild workspaces from a fresh read.
+  Date/Author: 2026-01-06 / Codex
 
 ## Outcomes & Retrospective
 
-To be completed at milestone end.
+M5c delivers a new repository group loader UI that replaces the old config/group dashboard, supports solution selection per repository, and persists those selections in the API. Group loads now reset existing workspace and git cache state before rebuilding, and the new discovery endpoint enables solution selection without slowing repository listings. Tests and Docker validation confirm the updated behavior.
 
 ## Context and Orientation
 
@@ -71,3 +79,5 @@ Use existing `RepositoryApiClient` calls for repository groups and loads, and th
 Add or update bUnit tests in `tests/SilkHat.Ui.Tests` to assert that the new component renders the available repositories list, allows selecting repositories and solutions, and triggers the load call. Use a fake `HttpMessageHandler` with canned API responses and verify calls were made. Run `DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1 dotnet test -m:1 /nr:false /p:BuildInParallel=false /p:UseSharedCompilation=false`.
 
 Plan update (2026-01-06 13:05Z): Created M5c ExecPlan for the repository group loader UI overhaul.
+Plan update (2026-01-06 16:31Z): Recorded UI, API, and load workflow changes, plus test and Docker validation.
+Plan update (2026-01-06 16:34Z): Recorded milestone commit notes completion and outcomes.

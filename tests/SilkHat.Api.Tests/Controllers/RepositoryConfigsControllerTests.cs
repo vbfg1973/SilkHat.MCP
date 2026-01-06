@@ -25,7 +25,12 @@ public sealed class RepositoryConfigsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var request = new CreateRepositoryConfigRequest("Repo", "/tmp/repo", null, null);
+        var request = new CreateRepositoryConfigRequest(
+            "Repo",
+            "/tmp/repo",
+            null,
+            null,
+            new List<RepositorySolutionDto> { new("./Repo.sln", true) });
 
         var result = await controller.Create(request, CancellationToken.None);
 
@@ -59,7 +64,12 @@ public sealed class RepositoryConfigsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var request = new UpdateRepositoryConfigRequest("After", "/tmp/repo", null, null);
+        var request = new UpdateRepositoryConfigRequest(
+            "After",
+            "/tmp/repo",
+            null,
+            null,
+            new List<RepositorySolutionDto> { new("./Repo.sln", true) });
 
         var result = await controller.Update(config.Id, request, CancellationToken.None);
 
@@ -105,7 +115,12 @@ public sealed class RepositoryConfigsControllerTests
         };
 
         var result = await controller.Create(
-            new CreateRepositoryConfigRequest("Repo", "/tmp/repo", null, group.Id),
+            new CreateRepositoryConfigRequest(
+                "Repo",
+                "/tmp/repo",
+                null,
+                group.Id,
+                new List<RepositorySolutionDto> { new("./Repo.sln", true) }),
             CancellationToken.None);
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
@@ -141,5 +156,25 @@ public sealed class RepositoryConfigsControllerTests
         Assert.Single(configs);
         Assert.Equal(first.Id, configs[0].Id);
         store.Verify(s => s.GetAll(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Create_ReturnsProblem_WhenSolutionsMissing()
+    {
+        await using var dbContext = DbContextTestFactory.CreateInMemory();
+        var store = new Mock<ILoadedRepositoryStore>();
+        var discovery = new Mock<IRepositoryDiscoveryService>();
+        discovery.Setup(d => d.TryValidateRepositoryPath("/tmp/repo", out It.Ref<string?>.IsAny)).Returns(true);
+        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object)
+        {
+            ControllerContext = ControllerTestFactory.CreateContext()
+        };
+
+        var result = await controller.Create(
+            new CreateRepositoryConfigRequest("Repo", "/tmp/repo", null, null, null),
+            CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
     }
 }

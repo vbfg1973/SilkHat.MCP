@@ -13,8 +13,9 @@ public sealed class CodeWorkspaceLoaderTests
 
         try
         {
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => loader.LoadAsync(tempRoot, CancellationToken.None));
-            Assert.Contains("No solution files", ex.Message, StringComparison.OrdinalIgnoreCase);
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                loader.LoadAsync(tempRoot, Array.Empty<string>(), CancellationToken.None));
+            Assert.Contains("No solution files selected", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
@@ -69,7 +70,7 @@ EndGlobal
 
         try
         {
-            var workspace = await loader.LoadAsync(tempRoot, CancellationToken.None);
+            var workspace = await loader.LoadAsync(tempRoot, new[] { "./Sample.sln" }, CancellationToken.None);
 
             Assert.Single(workspace.Projects);
             Assert.Contains(workspace.Namespaces, ns => ns == "Sample");

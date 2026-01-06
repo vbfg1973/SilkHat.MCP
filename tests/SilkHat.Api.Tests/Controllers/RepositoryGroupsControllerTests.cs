@@ -7,6 +7,7 @@ using SilkHat.Api.Controllers;
 using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
+using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Infrastructure.Entities;
 
 namespace SilkHat.Api.Tests.Controllers;
@@ -19,10 +20,21 @@ public sealed class RepositoryGroupsControllerTests
         var interceptor = new SaveChangesCounterInterceptor();
         await using var dbContext = DbContextTestFactory.CreateInMemory(interceptor);
         var store = new Mock<ILoadedRepositoryStore>();
+        store.Setup(s => s.GetAll()).Returns(new List<LoadedRepository>
+        {
+            new(Guid.NewGuid(), "/tmp/loaded", DateTimeOffset.UtcNow)
+        });
         var codeStore = new Mock<ICodeWorkspaceStore>();
+        var gitCache = new Mock<IGitRepositoryCacheStore>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
-        var controller = new RepositoryGroupsController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
+        var controller = new RepositoryGroupsController(
+            dbContext,
+            store.Object,
+            codeStore.Object,
+            gitCache.Object,
+            processor.Object,
+            loader.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -52,10 +64,21 @@ public sealed class RepositoryGroupsControllerTests
         await dbContext.SaveChangesAsync();
 
         var store = new Mock<ILoadedRepositoryStore>();
+        store.Setup(s => s.GetAll()).Returns(new List<LoadedRepository>
+        {
+            new(Guid.NewGuid(), "/tmp/loaded", DateTimeOffset.UtcNow)
+        });
         var codeStore = new Mock<ICodeWorkspaceStore>();
+        var gitCache = new Mock<IGitRepositoryCacheStore>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
-        var controller = new RepositoryGroupsController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
+        var controller = new RepositoryGroupsController(
+            dbContext,
+            store.Object,
+            codeStore.Object,
+            gitCache.Object,
+            processor.Object,
+            loader.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -76,9 +99,16 @@ public sealed class RepositoryGroupsControllerTests
         await using var dbContext = DbContextTestFactory.CreateInMemory();
         var store = new Mock<ILoadedRepositoryStore>();
         var codeStore = new Mock<ICodeWorkspaceStore>();
+        var gitCache = new Mock<IGitRepositoryCacheStore>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
-        var controller = new RepositoryGroupsController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
+        var controller = new RepositoryGroupsController(
+            dbContext,
+            store.Object,
+            codeStore.Object,
+            gitCache.Object,
+            processor.Object,
+            loader.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -99,21 +129,50 @@ public sealed class RepositoryGroupsControllerTests
             Name = "Group",
             RepositoryConfigs =
             [
-                new RepositoryConfig { Id = Guid.NewGuid(), Name = "Repo A", RootPath = "/tmp/a" },
-                new RepositoryConfig { Id = Guid.NewGuid(), Name = "Repo B", RootPath = "/tmp/b" }
+                new RepositoryConfig
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Repo A",
+                    RootPath = "/tmp/a",
+                    Solutions = new List<RepositorySolutionConfig>
+                    {
+                        new() { Id = Guid.NewGuid(), RelativePath = "./RepoA.sln", IsEnabled = true }
+                    }
+                },
+                new RepositoryConfig
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Repo B",
+                    RootPath = "/tmp/b",
+                    Solutions = new List<RepositorySolutionConfig>
+                    {
+                        new() { Id = Guid.NewGuid(), RelativePath = "./RepoB.sln", IsEnabled = true }
+                    }
+                }
             ]
         };
         dbContext.RepositoryGroups.Add(group);
         await dbContext.SaveChangesAsync();
 
         var store = new Mock<ILoadedRepositoryStore>();
+        store.Setup(s => s.GetAll()).Returns(new List<LoadedRepository>
+        {
+            new(Guid.NewGuid(), "/tmp/loaded", DateTimeOffset.UtcNow)
+        });
         var codeStore = new Mock<ICodeWorkspaceStore>();
+        var gitCache = new Mock<IGitRepositoryCacheStore>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
         processor.Setup(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()))
             .Returns(StreamEvents());
 
-        var controller = new RepositoryGroupsController(dbContext, store.Object, codeStore.Object, processor.Object, loader.Object)
+        var controller = new RepositoryGroupsController(
+            dbContext,
+            store.Object,
+            codeStore.Object,
+            gitCache.Object,
+            processor.Object,
+            loader.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -124,6 +183,9 @@ public sealed class RepositoryGroupsControllerTests
         var dto = Assert.IsType<RepositoryGroupLoadResultDto>(ok.Value);
         Assert.Equal(2, dto.Repositories.Count);
         processor.Verify(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        store.Verify(s => s.Unload(It.IsAny<Guid>()), Times.AtLeastOnce);
+        codeStore.Verify(s => s.Remove(It.IsAny<Guid>()), Times.AtLeastOnce);
+        gitCache.Verify(s => s.Remove(It.IsAny<Guid>()), Times.AtLeastOnce);
     }
 
     private static async IAsyncEnumerable<RepoEventDto> StreamEvents()

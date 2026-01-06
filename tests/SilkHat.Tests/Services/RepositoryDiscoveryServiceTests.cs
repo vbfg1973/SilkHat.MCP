@@ -93,6 +93,32 @@ public sealed class RepositoryDiscoveryServiceTests
         }
     }
 
+    [Fact]
+    public void ListSolutions_ReturnsRepoRelativePaths()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var repo = Path.Combine(root, "RepoA");
+            Directory.CreateDirectory(Path.Combine(repo, ".git"));
+            var solutionDir = Path.Combine(repo, "src");
+            Directory.CreateDirectory(solutionDir);
+            var slnPath = Path.Combine(solutionDir, "RepoA.sln");
+            File.WriteAllText(slnPath, "sln");
+
+            var service = CreateService(root);
+
+            var solutions = service.ListSolutions(repo);
+
+            Assert.Single(solutions);
+            Assert.Equal("./src/RepoA.sln", solutions[0].RelativePath);
+        }
+        finally
+        {
+            Directory.Delete(root, true);
+        }
+    }
+
     private static RepositoryDiscoveryService CreateService(string root)
     {
         var options = Options.Create(new RepositoryDiscoveryOptions { RepoRoot = root });

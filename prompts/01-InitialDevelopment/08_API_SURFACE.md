@@ -39,6 +39,7 @@ Git:
 
 Discovery:
 - GET /api/repositories/available
+- GET /api/repositories/available/solutions?path=...
 
 Requirements:
 - Swagger enabled

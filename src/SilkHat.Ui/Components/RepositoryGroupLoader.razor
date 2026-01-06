@@ -1,0 +1,578 @@
+@using SilkHat.Ui.Models
+@using System.Linq
+@inject RepositoryApiClient Api
+
+<MudText Typo="Typo.h4" Class="mb-4">Repository Group Loader</MudText>
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Elevation="1" Class="pa-4 mb-4">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">@(_editingGroupId is null ? "Create Group" : "Edit Group")</MudText>
+            <MudTextField T="string" Label="Name" Required="true" @bind-Value="_groupName" />
+            <MudTextField T="string" Label="Description" @bind-Value="_groupDescription" Lines="3" />
+            <MudStack Row="true" Class="mt-3" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveGroupAsync" Disabled="_groupBusy">
+                    Save
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="ClearGroupForm" Disabled="_groupBusy">
+                    Clear
+                </MudButton>
+            </MudStack>
+            @if (!string.IsNullOrWhiteSpace(_groupMessage))
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-3">@_groupMessage</MudAlert>
+            }
+            @if (!string.IsNullOrWhiteSpace(_groupError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@_groupError</MudAlert>
+            }
+        </MudPaper>
+
+        <MudPaper Elevation="1" Class="pa-4">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Repository Groups</MudText>
+            <MudTable Items="_groups" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Description</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Description">@context.Description</MudTd>
+                    <MudTd>
+                        <MudButton Variant="Variant.Text" OnClick="@(() => SelectGroup(context))">Select</MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="8">
+        <MudPaper Elevation="1" Class="pa-4 mb-4">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Selected Group</MudText>
+            @if (_selectedGroup is null)
+            {
+                <MudText Typo="Typo.body2">Select a repository group to manage repositories.</MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.subtitle2">@_selectedGroup.Name</MudText>
+                <MudText Typo="Typo.caption" Class="mb-2">@_selectedGroup.Description</MudText>
+                @if (_groupConfigs.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">No repositories in this group yet.</MudText>
+                }
+                else
+                {
+                    @foreach (var config in _groupConfigs)
+                    {
+                        <MudPaper Elevation="0" Class="pa-3 mb-3" Style="border:1px solid #e0e0e0;">
+                            <MudText Typo="Typo.subtitle2">@config.Name</MudText>
+                            <MudText Typo="Typo.caption" Class="mb-2">@config.RootPath</MudText>
+                            <MudText Typo="Typo.caption">Solutions</MudText>
+                            @if (config.Solutions.Count == 0)
+                            {
+                                <MudText Typo="Typo.body2" Class="mb-2">No solutions configured.</MudText>
+                                <MudButton Variant="Variant.Outlined" OnClick="@(() => LoadSolutionsForConfigAsync(config))" Disabled="_configBusy">
+                                    Load Solutions
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudStack Spacing="1" Class="mb-2">
+                                    @foreach (var solution in config.Solutions)
+                                    {
+                                        <MudCheckBox T="bool" Label="@solution.RelativePath" @bind-Value="solution.IsEnabled" />
+                                    }
+                                </MudStack>
+                            }
+                            <MudStack Row="true" Spacing="2">
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => SaveRepositorySolutionsAsync(config))" Disabled="_configBusy || config.Solutions.Count == 0">
+                                    Save Solutions
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="@(() => RemoveFromGroupAsync(config))" Disabled="_configBusy">
+                                    Remove From Group
+                                </MudButton>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                }
+                @if (!string.IsNullOrWhiteSpace(_configMessage))
+                {
+                    <MudAlert Severity="Severity.Success" Class="mt-2">@_configMessage</MudAlert>
+                }
+                @if (!string.IsNullOrWhiteSpace(_configError))
+                {
+                    <MudAlert Severity="Severity.Error" Class="mt-2">@_configError</MudAlert>
+                }
+            }
+        </MudPaper>
+
+        <MudPaper Elevation="1" Class="pa-4 mb-4">
+            <MudText Typo="Typo.subtitle1" Class="mb-2">Add Repository To Group</MudText>
+            <MudSelect T="string" Label="Repository" Value="_availableSelectedPath" ValueChanged="OnAvailableRepositoryChanged">
+                <MudSelectItem T="string" Value="@(string.Empty)">Select a repository</MudSelectItem>
+                @foreach (var repo in _availableRepositories)
+                {
+                    <MudSelectItem T="string" Value="@(repo.FullPath)">
+                        @($"{repo.Name} ({repo.RelativePath})")
+                    </MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="Guid?" Label="Group" @bind-Value="_availableGroupId">
+                <MudSelectItem T="Guid?" Value="@(default(Guid?))">Select a group</MudSelectItem>
+                @foreach (var group in _groups)
+                {
+                    <MudSelectItem T="Guid?" Value="@(group.Id)">@group.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudText Typo="Typo.caption" Class="mt-2">Solutions</MudText>
+            <MudStack Spacing="1" Class="mb-2">
+                @if (_availableSolutionSelections.Count == 0)
+                {
+                    <MudText Typo="Typo.body2">@(!string.IsNullOrWhiteSpace(_availableSelectedPath) ? "No solutions found." : "Select a repository to list solutions.")</MudText>
+                }
+                else
+                {
+                    @foreach (var solution in _availableSolutionSelections)
+                    {
+                        <MudCheckBox T="bool" Label="@solution.RelativePath" @bind-Value="solution.IsEnabled" />
+                    }
+                }
+            </MudStack>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="AddRepositoryToGroupAsync" Disabled="_availableBusy">
+                    Add Repository
+                </MudButton>
+            </MudStack>
+            @if (!string.IsNullOrWhiteSpace(_availableMessage))
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-3">@_availableMessage</MudAlert>
+            }
+            @if (!string.IsNullOrWhiteSpace(_availableError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@_availableError</MudAlert>
+            }
+        </MudPaper>
+
+        <MudPaper Elevation="1" Class="pa-4">
+            <MudText Typo="Typo.subtitle1">Group Load Results</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartGroupLoadAsync" Disabled="_groupLoadBusy || _selectedGroup is null">
+                Load Selected Group
+            </MudButton>
+            @if (_groupLoadBusy)
+            {
+                <MudProgressLinear Indeterminate="true" Class="mt-2" />
+            }
+            @if (!string.IsNullOrWhiteSpace(_groupLoadError))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-2">@_groupLoadError</MudAlert>
+            }
+            <MudList T="RepositoryLoadResultModel" Dense="true">
+                @foreach (var result in _groupLoadResults)
+                {
+                    <MudListItem T="RepositoryLoadResultModel">
+                        <MudText Typo="Typo.body2">
+                            @($"{result.Name} | {(result.Loaded ? "Loaded" : "Not Loaded")} | {result.Message}")
+                        </MudText>
+                    </MudListItem>
+                }
+            </MudList>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private readonly List<RepositoryGroupModel> _groups = new();
+    private readonly List<RepositoryConfigModel> _configs = new();
+    private readonly List<AvailableRepositoryModel> _availableRepositories = new();
+    private readonly List<RepositoryConfigEditor> _groupConfigs = new();
+    private readonly List<RepositorySolutionEditor> _availableSolutionSelections = new();
+
+    private RepositoryGroupModel? _selectedGroup;
+    private Guid? _editingGroupId;
+    private string _groupName = string.Empty;
+    private string? _groupDescription;
+    private bool _groupBusy;
+    private string? _groupMessage;
+    private string? _groupError;
+
+    private bool _configBusy;
+    private string? _configMessage;
+    private string? _configError;
+
+    private string? _availableSelectedPath;
+    private Guid? _availableGroupId;
+    private bool _availableBusy;
+    private string? _availableMessage;
+    private string? _availableError;
+
+    private readonly List<RepositoryLoadResultModel> _groupLoadResults = new();
+    private bool _groupLoadBusy;
+    private string? _groupLoadError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _groupError = null;
+        _configError = null;
+        _availableError = null;
+
+        try
+        {
+            _groups.Clear();
+            _groups.AddRange(await Api.GetRepositoryGroupsAsync());
+
+            _configs.Clear();
+            _configs.AddRange(await Api.GetRepositoryConfigsAsync());
+
+            _availableRepositories.Clear();
+            _availableRepositories.AddRange(await Api.GetAvailableRepositoriesAsync());
+
+            if (_selectedGroup is not null)
+            {
+                _selectedGroup = _groups.FirstOrDefault(group => group.Id == _selectedGroup.Id);
+                if (_selectedGroup is null)
+                {
+                    _editingGroupId = null;
+                    _groupName = string.Empty;
+                    _groupDescription = null;
+                }
+            }
+
+            RefreshGroupConfigs();
+        }
+        catch (Exception ex)
+        {
+            _groupError = $"Failed to load data: {ex.Message}";
+            _configError = _groupError;
+            _availableError = _groupError;
+        }
+    }
+
+    private void SelectGroup(RepositoryGroupModel group)
+    {
+        _selectedGroup = group;
+        _editingGroupId = group.Id;
+        _groupName = group.Name;
+        _groupDescription = group.Description;
+        _availableGroupId = group.Id;
+        _groupMessage = null;
+        _groupError = null;
+        _configMessage = null;
+        _configError = null;
+        _groupLoadResults.Clear();
+        RefreshGroupConfigs();
+    }
+
+    private void RefreshGroupConfigs()
+    {
+        _groupConfigs.Clear();
+        if (_selectedGroup is null)
+        {
+            return;
+        }
+
+        foreach (var config in _configs.Where(config => config.GroupId == _selectedGroup.Id))
+        {
+            _groupConfigs.Add(RepositoryConfigEditor.FromModel(config));
+        }
+    }
+
+    private async Task SaveGroupAsync()
+    {
+        _groupMessage = null;
+        _groupError = null;
+
+        if (string.IsNullOrWhiteSpace(_groupName))
+        {
+            _groupError = "Group name is required.";
+            return;
+        }
+
+        _groupBusy = true;
+        try
+        {
+            if (_editingGroupId is null)
+            {
+                await Api.CreateRepositoryGroupAsync(new CreateRepositoryGroupRequest(_groupName, _groupDescription));
+                _groupMessage = "Group created.";
+            }
+            else
+            {
+                await Api.UpdateRepositoryGroupAsync(_editingGroupId.Value,
+                    new UpdateRepositoryGroupRequest(_groupName, _groupDescription));
+                _groupMessage = "Group updated.";
+            }
+
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _groupError = ex.Message;
+        }
+        finally
+        {
+            _groupBusy = false;
+        }
+    }
+
+    private void ClearGroupForm()
+    {
+        _editingGroupId = null;
+        _groupName = string.Empty;
+        _groupDescription = null;
+        _groupMessage = null;
+        _groupError = null;
+        _selectedGroup = null;
+        _availableGroupId = null;
+        RefreshGroupConfigs();
+    }
+
+    private async Task OnAvailableRepositoryChanged(string? value)
+    {
+        _availableSelectedPath = string.IsNullOrWhiteSpace(value) ? null : value;
+        _availableSolutionSelections.Clear();
+        _availableMessage = null;
+        _availableError = null;
+
+        if (string.IsNullOrWhiteSpace(_availableSelectedPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var solutions = await Api.GetAvailableRepositorySolutionsAsync(_availableSelectedPath);
+            _availableSolutionSelections.AddRange(solutions.Select(solution => new RepositorySolutionEditor
+            {
+                RelativePath = solution.RelativePath,
+                IsEnabled = true
+            }));
+        }
+        catch (Exception ex)
+        {
+            _availableError = ex.Message;
+        }
+    }
+
+    private async Task AddRepositoryToGroupAsync()
+    {
+        _availableMessage = null;
+        _availableError = null;
+
+        if (string.IsNullOrWhiteSpace(_availableSelectedPath))
+        {
+            _availableError = "Select a repository to add.";
+            return;
+        }
+
+        if (!_availableGroupId.HasValue)
+        {
+            _availableError = "Select a group to add the repository.";
+            return;
+        }
+
+        var selected = _availableRepositories.FirstOrDefault(repo => repo.FullPath == _availableSelectedPath);
+        if (selected is null)
+        {
+            _availableError = "Selected repository not found.";
+            return;
+        }
+
+        if (!selected.IsGitRepository)
+        {
+            _availableError = "Selected repository is not a git repository.";
+            return;
+        }
+
+        if (_availableSolutionSelections.Count == 0 || !_availableSolutionSelections.Any(solution => solution.IsEnabled))
+        {
+            _availableError = "Select at least one solution to load.";
+            return;
+        }
+
+        _availableBusy = true;
+        try
+        {
+            var solutions = _availableSolutionSelections
+                .Select(solution => new RepositorySolutionModel(solution.RelativePath, solution.IsEnabled))
+                .ToList();
+
+            await Api.CreateRepositoryConfigAsync(new CreateRepositoryConfigRequest(
+                selected.Name,
+                selected.FullPath,
+                null,
+                _availableGroupId,
+                solutions));
+            _availableMessage = "Repository added to group.";
+            _availableSelectedPath = null;
+            _availableGroupId = null;
+            _availableSolutionSelections.Clear();
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _availableError = ex.Message;
+        }
+        finally
+        {
+            _availableBusy = false;
+        }
+    }
+
+    private async Task SaveRepositorySolutionsAsync(RepositoryConfigEditor config)
+    {
+        _configMessage = null;
+        _configError = null;
+
+        if (!config.Solutions.Any(solution => solution.IsEnabled))
+        {
+            _configError = "At least one solution must be enabled.";
+            return;
+        }
+
+        _configBusy = true;
+        try
+        {
+            var request = new UpdateRepositoryConfigRequest(
+                config.Name,
+                config.RootPath,
+                config.Description,
+                config.GroupId,
+                config.Solutions.Select(solution => new RepositorySolutionModel(solution.RelativePath, solution.IsEnabled)).ToList());
+
+            await Api.UpdateRepositoryConfigAsync(config.Id, request);
+            _configMessage = "Solutions updated.";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _configError = ex.Message;
+        }
+        finally
+        {
+            _configBusy = false;
+        }
+    }
+
+    private async Task LoadSolutionsForConfigAsync(RepositoryConfigEditor config)
+    {
+        _configMessage = null;
+        _configError = null;
+        _configBusy = true;
+        try
+        {
+            var solutions = await Api.GetAvailableRepositorySolutionsAsync(config.RootPath);
+            config.Solutions.Clear();
+            config.Solutions.AddRange(solutions.Select(solution => new RepositorySolutionEditor
+            {
+                RelativePath = solution.RelativePath,
+                IsEnabled = true
+            }));
+        }
+        catch (Exception ex)
+        {
+            _configError = ex.Message;
+        }
+        finally
+        {
+            _configBusy = false;
+        }
+    }
+
+    private async Task RemoveFromGroupAsync(RepositoryConfigEditor config)
+    {
+        _configMessage = null;
+        _configError = null;
+        _configBusy = true;
+        try
+        {
+            var request = new UpdateRepositoryConfigRequest(
+                config.Name,
+                config.RootPath,
+                config.Description,
+                null,
+                config.Solutions.Select(solution => new RepositorySolutionModel(solution.RelativePath, solution.IsEnabled)).ToList());
+
+            await Api.UpdateRepositoryConfigAsync(config.Id, request);
+            _configMessage = "Repository removed from group.";
+            await LoadDataAsync();
+        }
+        catch (Exception ex)
+        {
+            _configError = ex.Message;
+        }
+        finally
+        {
+            _configBusy = false;
+        }
+    }
+
+    private async Task StartGroupLoadAsync()
+    {
+        if (_selectedGroup is null)
+        {
+            return;
+        }
+
+        _groupLoadBusy = true;
+        _groupLoadError = null;
+        _groupLoadResults.Clear();
+        StateHasChanged();
+
+        try
+        {
+            var result = await Api.LoadRepositoryGroupAsync(_selectedGroup.Id);
+            _groupLoadResults.AddRange(result.Repositories);
+        }
+        catch (Exception ex)
+        {
+            _groupLoadError = ex.Message;
+        }
+        finally
+        {
+            _groupLoadBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private sealed class RepositoryConfigEditor
+    {
+        public Guid Id { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public string RootPath { get; init; } = string.Empty;
+        public string? Description { get; init; }
+        public Guid? GroupId { get; init; }
+        public List<RepositorySolutionEditor> Solutions { get; } = new();
+
+        public static RepositoryConfigEditor FromModel(RepositoryConfigModel model)
+        {
+            var editor = new RepositoryConfigEditor
+            {
+                Id = model.Id,
+                Name = model.Name,
+                RootPath = model.RootPath,
+                Description = model.Description,
+                GroupId = model.GroupId
+            };
+
+            editor.Solutions.AddRange(model.Solutions.Select(solution => new RepositorySolutionEditor
+            {
+                RelativePath = solution.RelativePath,
+                IsEnabled = solution.IsEnabled
+            }));
+
+            return editor;
+        }
+    }
+
+    private sealed class RepositorySolutionEditor
+    {
+        public string RelativePath { get; init; } = string.Empty;
+        public bool IsEnabled { get; set; }
+    }
+}

@@ -61,6 +61,15 @@ public sealed class RepositoryApiClient
                ?? new List<AvailableRepositoryModel>();
     }
 
+    public async Task<IReadOnlyList<AvailableRepositorySolutionModel>> GetAvailableRepositorySolutionsAsync(
+        string rootPath,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/available/solutions?path={Uri.EscapeDataString(rootPath)}";
+        return await _httpClient.GetFromJsonAsync<List<AvailableRepositorySolutionModel>>(url, cancellationToken)
+               ?? new List<AvailableRepositorySolutionModel>();
+    }
+
     public async Task<RepositoryConfigModel> CreateRepositoryConfigAsync(CreateRepositoryConfigRequest request, CancellationToken cancellationToken = default)
     {
         var response = await _httpClient.PostAsJsonAsync("api/repositories", request, cancellationToken);

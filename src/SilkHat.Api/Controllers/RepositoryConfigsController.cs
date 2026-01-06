@@ -30,6 +30,7 @@ public sealed class RepositoryConfigsController : ApiControllerBase
     public async Task<ActionResult<IReadOnlyList<RepositoryConfigDto>>> GetAll(CancellationToken cancellationToken)
     {
         var configs = await _dbContext.RepositoryConfigs
+            .Include(config => config.Solutions)
             .AsNoTracking()
             .OrderBy(config => config.Name)
             .Select(config => config.ToDto())
@@ -43,6 +44,7 @@ public sealed class RepositoryConfigsController : ApiControllerBase
     {
         var loadedIds = _store.GetAll().Select(repo => repo.ConfigId).ToHashSet();
         var configs = await _dbContext.RepositoryConfigs
+            .Include(config => config.Solutions)
             .AsNoTracking()
             .Where(config => loadedIds.Contains(config.Id))
             .OrderBy(config => config.Name)
@@ -56,6 +58,7 @@ public sealed class RepositoryConfigsController : ApiControllerBase
     public async Task<ActionResult<RepositoryConfigDto>> GetById(Guid id, CancellationToken cancellationToken)
     {
         var config = await _dbContext.RepositoryConfigs
+            .Include(item => item.Solutions)
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
 
@@ -80,6 +83,11 @@ public sealed class RepositoryConfigsController : ApiControllerBase
         if (string.IsNullOrWhiteSpace(request.RootPath))
         {
             return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", "RootPath is required.", "Validation");
+        }
+
+        if (!TryValidateSolutions(request.Solutions, out var solutionError))
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", solutionError ?? "Solutions are required.", "Validation");
         }
 
         if (!RepositoryInputNormalization.TryNormalizeRootPath(request.RootPath, out var normalizedPath, out var error))
@@ -110,6 +118,8 @@ public sealed class RepositoryConfigsController : ApiControllerBase
             Description = RepositoryInputNormalization.NormalizeOptional(request.Description),
             GroupId = request.GroupId
         };
+        config.Solutions = BuildSolutions(config, request.Solutions);
+        _dbContext.RepositorySolutionConfigs.AddRange(config.Solutions);
 
         _dbContext.RepositoryConfigs.Add(config);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -123,7 +133,9 @@ public sealed class RepositoryConfigsController : ApiControllerBase
         [FromBody] UpdateRepositoryConfigRequest request,
         CancellationToken cancellationToken)
     {
-        var config = await _dbContext.RepositoryConfigs.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        var config = await _dbContext.RepositoryConfigs
+            .Include(item => item.Solutions)
+            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (config is null)
         {
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Repository config not found.", "NotFound");
@@ -137,6 +149,11 @@ public sealed class RepositoryConfigsController : ApiControllerBase
         if (string.IsNullOrWhiteSpace(request.RootPath))
         {
             return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", "RootPath is required.", "Validation");
+        }
+
+        if (!TryValidateSolutions(request.Solutions, out var solutionError))
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", solutionError ?? "Solutions are required.", "Validation");
         }
 
         if (!RepositoryInputNormalization.TryNormalizeRootPath(request.RootPath, out var normalizedPath, out var error))
@@ -163,9 +180,80 @@ public sealed class RepositoryConfigsController : ApiControllerBase
         config.RootPath = normalizedPath;
         config.Description = RepositoryInputNormalization.NormalizeOptional(request.Description);
         config.GroupId = request.GroupId;
+        _dbContext.RepositorySolutionConfigs.RemoveRange(config.Solutions);
+        config.Solutions.Clear();
+        var updatedSolutions = BuildSolutions(config, request.Solutions);
+        foreach (var solution in updatedSolutions)
+        {
+            config.Solutions.Add(solution);
+        }
+        _dbContext.RepositorySolutionConfigs.AddRange(updatedSolutions);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(config.ToDto());
+    }
+
+    private static bool TryValidateSolutions(IReadOnlyList<RepositorySolutionDto>? solutions, out string? error)
+    {
+        error = null;
+
+        if (solutions is null || solutions.Count == 0)
+        {
+            error = "At least one solution is required.";
+            return false;
+        }
+
+        if (!solutions.Any(solution => solution.IsEnabled))
+        {
+            error = "At least one solution must be enabled.";
+            return false;
+        }
+
+        foreach (var solution in solutions)
+        {
+            if (string.IsNullOrWhiteSpace(solution.RelativePath))
+            {
+                error = "Solution path is required.";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static List<RepositorySolutionConfig> BuildSolutions(RepositoryConfig config, IReadOnlyList<RepositorySolutionDto>? solutions)
+    {
+        var results = new List<RepositorySolutionConfig>();
+        if (solutions is null)
+        {
+            return results;
+        }
+
+        foreach (var solution in solutions
+                     .GroupBy(solution => NormalizeSolutionPath(solution.RelativePath), StringComparer.OrdinalIgnoreCase))
+        {
+            results.Add(new RepositorySolutionConfig
+            {
+                Id = Guid.NewGuid(),
+                RepositoryConfigId = config.Id,
+                RepositoryConfig = config,
+                RelativePath = solution.Key,
+                IsEnabled = solution.Any(entry => entry.IsEnabled)
+            });
+        }
+
+        return results;
+    }
+
+    private static string NormalizeSolutionPath(string path)
+    {
+        var trimmed = path.Trim().Replace('\\', '/').TrimStart('/');
+        if (trimmed.StartsWith("./", StringComparison.Ordinal))
+        {
+            return "./" + trimmed[2..];
+        }
+
+        return trimmed.StartsWith(".", StringComparison.Ordinal) ? trimmed : "./" + trimmed;
     }
 }

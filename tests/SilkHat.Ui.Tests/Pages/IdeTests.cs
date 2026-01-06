@@ -32,6 +32,12 @@ public sealed class IdeTests
     ""rootPath"": ""/repo"",
     ""description"": null,
     ""groupId"": null,
+    ""solutions"": [
+      {{
+        ""relativePath"": ""./RepoOne.sln"",
+        ""isEnabled"": true
+      }}
+    ],
     ""createdUtc"": ""2024-01-01T00:00:00Z"",
     ""updatedUtc"": ""2024-01-01T00:00:00Z""
   }}

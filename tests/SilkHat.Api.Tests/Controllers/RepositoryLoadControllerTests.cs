@@ -44,7 +44,11 @@ public sealed class RepositoryLoadControllerTests
         {
             Id = Guid.NewGuid(),
             Name = "Repo",
-            RootPath = "/tmp/repo"
+            RootPath = "/tmp/repo",
+            Solutions = new List<RepositorySolutionConfig>
+            {
+                new() { Id = Guid.NewGuid(), RelativePath = "./Repo.sln", IsEnabled = true }
+            }
         };
         dbContext.RepositoryConfigs.Add(config);
         await dbContext.SaveChangesAsync();
@@ -67,6 +71,41 @@ public sealed class RepositoryLoadControllerTests
 
         Assert.IsType<EmptyResult>(result);
         processor.Verify(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Load_ReturnsProblem_WhenNoEnabledSolutions()
+    {
+        await using var dbContext = DbContextTestFactory.CreateInMemory();
+        var config = new RepositoryConfig
+        {
+            Id = Guid.NewGuid(),
+            Name = "Repo",
+            RootPath = "/tmp/repo",
+            Solutions = new List<RepositorySolutionConfig>
+            {
+                new() { Id = Guid.NewGuid(), RelativePath = "./Repo.sln", IsEnabled = false }
+            }
+        };
+        dbContext.RepositoryConfigs.Add(config);
+        await dbContext.SaveChangesAsync();
+
+        var store = new Mock<ILoadedRepositoryStore>();
+        var codeStore = new Mock<ICodeWorkspaceStore>();
+        var processor = new Mock<IRepoCommandProcessor>();
+        var loader = new Mock<ICodeWorkspaceLoader>();
+        var gitCache = new Mock<IGitRepositoryCacheStore>();
+
+        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object)
+        {
+            ControllerContext = ControllerTestFactory.CreateContext()
+        };
+
+        var result = await controller.Load(config.Id, CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+        processor.Verify(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

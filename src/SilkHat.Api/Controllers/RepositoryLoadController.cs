@@ -8,6 +8,7 @@ using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
+using System.Linq;
 
 namespace SilkHat.Api.Controllers;
 
@@ -44,6 +45,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
     public async Task<IActionResult> Load(Guid id, CancellationToken cancellationToken)
     {
         var config = await _dbContext.RepositoryConfigs
+            .Include(item => item.Solutions)
             .AsNoTracking()
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
 
@@ -52,10 +54,20 @@ public sealed class RepositoryLoadController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Repository config not found.", "NotFound");
         }
 
+        var solutionPaths = config.Solutions
+            .Where(solution => solution.IsEnabled)
+            .Select(solution => solution.RelativePath)
+            .ToList();
+        if (solutionPaths.Count == 0)
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed",
+                "No enabled solution files configured for this repository.", "Validation");
+        }
+
         Response.StatusCode = StatusCodes.Status200OK;
         Response.ContentType = "application/x-ndjson";
 
-        var context = new RepoCommandContext(config.Id, config.RootPath, _store, _codeStore, _workspaceLoader);
+        var context = new RepoCommandContext(config.Id, config.RootPath, solutionPaths, _store, _codeStore, _workspaceLoader);
         var command = new LoadRepositoryCommand();
 
         await foreach (var evt in _processor.ExecuteAsync(command, context, cancellationToken))

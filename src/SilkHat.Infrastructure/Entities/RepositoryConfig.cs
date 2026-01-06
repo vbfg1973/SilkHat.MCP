@@ -8,6 +8,7 @@ public sealed class RepositoryConfig
     public string? Description { get; set; }
     public Guid? GroupId { get; set; }
     public RepositoryGroup? Group { get; set; }
+    public ICollection<RepositorySolutionConfig> Solutions { get; set; } = new List<RepositorySolutionConfig>();
     public DateTimeOffset CreatedUtc { get; set; }
     public DateTimeOffset UpdatedUtc { get; set; }
 }

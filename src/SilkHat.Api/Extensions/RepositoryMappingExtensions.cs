@@ -1,5 +1,6 @@
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure.Entities;
+using System.Linq;
 
 namespace SilkHat.Api.Extensions;
 
@@ -7,12 +8,18 @@ public static class RepositoryMappingExtensions
 {
     public static RepositoryConfigDto ToDto(this RepositoryConfig config)
     {
+        var solutions = config.Solutions
+            .OrderBy(solution => solution.RelativePath, StringComparer.OrdinalIgnoreCase)
+            .Select(solution => new RepositorySolutionDto(solution.RelativePath, solution.IsEnabled))
+            .ToList();
+
         return new RepositoryConfigDto(
             config.Id,
             config.Name,
             config.RootPath,
             config.Description,
             config.GroupId,
+            solutions,
             config.CreatedUtc,
             config.UpdatedUtc);
     }

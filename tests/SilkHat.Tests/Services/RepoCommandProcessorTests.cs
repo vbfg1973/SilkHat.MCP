@@ -4,6 +4,7 @@ using SilkHat.Analysis.Models;
 using SilkHat.Analysis.Services;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
+using System.Collections.Generic;
 
 namespace SilkHat.Tests.Services;
 
@@ -17,7 +18,7 @@ public sealed class RepoCommandProcessorTests
 
         var codeStore = new Mock<ICodeWorkspaceStore>();
         var loader = new Mock<ICodeWorkspaceLoader>();
-        var context = new RepoCommandContext(Guid.NewGuid(), "/repo", store.Object, codeStore.Object, loader.Object);
+        var context = new RepoCommandContext(Guid.NewGuid(), "/repo", new List<string> { "./Repo.sln" }, store.Object, codeStore.Object, loader.Object);
 
         var command = new TestCommand();
         var processor = new RepoCommandProcessor();
@@ -43,7 +44,7 @@ public sealed class RepoCommandProcessorTests
         var processor = new RepoCommandProcessor();
         var configId = Guid.NewGuid();
 
-        var context = new RepoCommandContext(configId, "/repo", store, codeStore.Object, loader.Object);
+        var context = new RepoCommandContext(configId, "/repo", new List<string> { "./Repo.sln" }, store, codeStore.Object, loader.Object);
         var tracker = new ConcurrencyTracker();
         var command = new BlockingCommand(tracker);
 

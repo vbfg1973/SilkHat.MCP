@@ -26,4 +26,23 @@ public sealed class RepositoryDiscoveryController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status500InternalServerError, "Configuration Error", ex.Message, "Configuration");
         }
     }
+
+    [HttpGet("solutions")]
+    public ActionResult<IReadOnlyList<AvailableRepositorySolutionDto>> GetSolutions([FromQuery] string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", "Path is required.", "Validation");
+        }
+
+        var decodedPath = path.Contains('%') ? Uri.UnescapeDataString(path) : path;
+        try
+        {
+            return Ok(_discovery.ListSolutions(decodedPath));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", ex.Message, "Validation");
+        }
+    }
 }

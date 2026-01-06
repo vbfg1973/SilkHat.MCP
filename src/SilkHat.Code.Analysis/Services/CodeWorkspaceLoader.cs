@@ -9,22 +9,37 @@ namespace SilkHat.Code.Analysis.Services;
 
 public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 {
-    public async Task<CodeRepositoryWorkspace> LoadAsync(string rootPath, CancellationToken cancellationToken)
+    public async Task<CodeRepositoryWorkspace> LoadAsync(
+        string rootPath,
+        IReadOnlyList<string> solutionPaths,
+        CancellationToken cancellationToken)
     {
-        var solutionPaths = Directory.EnumerateFiles(rootPath, "*.sln", SearchOption.AllDirectories)
+        if (solutionPaths is null || solutionPaths.Count == 0)
+        {
+            throw new InvalidOperationException("No solution files selected for loading.");
+        }
+
+        var resolvedSolutions = solutionPaths
+            .Select(path => ResolveSolutionPath(rootPath, path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (solutionPaths.Count == 0)
+        if (resolvedSolutions.Count == 0)
         {
-            throw new InvalidOperationException("No solution files found under the repository root.");
+            throw new InvalidOperationException("No solution files selected for loading.");
         }
 
         var workspaces = new List<Workspace>();
         var projectsByPath = new Dictionary<string, Project>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var solutionPath in solutionPaths)
+        foreach (var solutionPath in resolvedSolutions)
         {
+            if (!File.Exists(solutionPath))
+            {
+                throw new InvalidOperationException($"Solution file not found: {solutionPath}");
+            }
+
             var manager = new AnalyzerManager(solutionPath);
             var workspace = new AdhocWorkspace();
 
@@ -141,6 +156,22 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             namedTypes,
             namedTypeByKey,
             compilations);
+    }
+
+    private static string ResolveSolutionPath(string rootPath, string solutionPath)
+    {
+        if (Path.IsPathRooted(solutionPath))
+        {
+            return Path.GetFullPath(solutionPath);
+        }
+
+        var relative = solutionPath.Trim().Replace('\\', '/').TrimStart('/');
+        if (relative.StartsWith("./", StringComparison.Ordinal))
+        {
+            relative = relative[2..];
+        }
+
+        return Path.GetFullPath(Path.Combine(rootPath, relative));
     }
 
     private static IEnumerable<INamedTypeSymbol> EnumerateNamedTypes(INamespaceSymbol root)

@@ -5,6 +5,7 @@ using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Commands;
 using SilkHat.Analysis.Models;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
@@ -18,6 +19,7 @@ public sealed class RepositoryGroupsController : ApiControllerBase
     private readonly SilkHatDbContext _dbContext;
     private readonly ILoadedRepositoryStore _store;
     private readonly ICodeWorkspaceStore _codeStore;
+    private readonly IGitRepositoryCacheStore _gitCacheStore;
     private readonly IRepoCommandProcessor _processor;
     private readonly ICodeWorkspaceLoader _workspaceLoader;
 
@@ -25,12 +27,14 @@ public sealed class RepositoryGroupsController : ApiControllerBase
         SilkHatDbContext dbContext,
         ILoadedRepositoryStore store,
         ICodeWorkspaceStore codeStore,
+        IGitRepositoryCacheStore gitCacheStore,
         IRepoCommandProcessor processor,
         ICodeWorkspaceLoader workspaceLoader)
     {
         _dbContext = dbContext;
         _store = store;
         _codeStore = codeStore;
+        _gitCacheStore = gitCacheStore;
         _processor = processor;
         _workspaceLoader = workspaceLoader;
     }
@@ -117,6 +121,7 @@ public sealed class RepositoryGroupsController : ApiControllerBase
     {
         var group = await _dbContext.RepositoryGroups
             .Include(group => group.RepositoryConfigs)
+            .ThenInclude(config => config.Solutions)
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
 
         if (group is null)
@@ -124,10 +129,31 @@ public sealed class RepositoryGroupsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Repository group not found.", "NotFound");
         }
 
+        foreach (var loaded in _store.GetAll() ?? Array.Empty<LoadedRepository>())
+        {
+            _store.Unload(loaded.ConfigId);
+            _codeStore.Remove(loaded.ConfigId);
+            _gitCacheStore.Remove(loaded.ConfigId);
+        }
+
         var results = new List<RepositoryLoadResultDto>();
         foreach (var config in group.RepositoryConfigs.OrderBy(config => config.Name))
         {
-            var context = new RepoCommandContext(config.Id, config.RootPath, _store, _codeStore, _workspaceLoader);
+            var solutionPaths = config.Solutions
+                .Where(solution => solution.IsEnabled)
+                .Select(solution => solution.RelativePath)
+                .ToList();
+            if (solutionPaths.Count == 0)
+            {
+                results.Add(new RepositoryLoadResultDto(
+                    config.Id,
+                    config.Name,
+                    false,
+                    "No enabled solution files configured."));
+                continue;
+            }
+
+            var context = new RepoCommandContext(config.Id, config.RootPath, solutionPaths, _store, _codeStore, _workspaceLoader);
             var command = new LoadRepositoryCommand();
             RepoEventDto? lastEvent = null;
 

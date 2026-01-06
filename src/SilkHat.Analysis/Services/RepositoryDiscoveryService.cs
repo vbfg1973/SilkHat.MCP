@@ -45,6 +45,39 @@ public sealed class RepositoryDiscoveryService : IRepositoryDiscoveryService
             .ToList();
     }
 
+    public IReadOnlyList<AvailableRepositorySolutionDto> ListSolutions(string rootPath)
+    {
+        EnsureConfigured();
+
+        var fullPath = NormalizeRoot(rootPath);
+        if (string.IsNullOrWhiteSpace(fullPath))
+        {
+            throw new InvalidOperationException("RootPath is invalid.");
+        }
+
+        if (!Directory.Exists(fullPath))
+        {
+            throw new InvalidOperationException("RootPath does not exist.");
+        }
+
+        if (!IsUnderRoot(fullPath, _repoRoot!))
+        {
+            throw new InvalidOperationException("RootPath must be under the configured repository root.");
+        }
+
+        if (!IsGitRepository(fullPath))
+        {
+            throw new InvalidOperationException("RootPath is not a git repository.");
+        }
+
+        var solutions = Directory.EnumerateFiles(fullPath, "*.sln", SearchOption.AllDirectories)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .Select(path => new AvailableRepositorySolutionDto(NormalizeRelativePath(fullPath, path)))
+            .ToList();
+
+        return solutions;
+    }
+
     public bool TryValidateRepositoryPath(string rootPath, out string? error)
     {
         error = null;
@@ -105,6 +138,18 @@ public sealed class RepositoryDiscoveryService : IRepositoryDiscoveryService
         }
 
         return Path.GetFullPath(path.Trim());
+    }
+
+    private static string NormalizeRelativePath(string rootPath, string fullPath)
+    {
+        var relative = Path.GetRelativePath(rootPath, fullPath);
+        relative = relative.Replace('\\', '/');
+        if (!relative.StartsWith(".", StringComparison.Ordinal))
+        {
+            relative = "./" + relative;
+        }
+
+        return relative;
     }
 
     private static bool IsUnderRoot(string candidate, string root)

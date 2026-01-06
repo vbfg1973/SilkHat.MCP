@@ -12,10 +12,12 @@ public sealed record CreateRepositoryConfigRequest(
     string Name,
     string RootPath,
     string? Description,
-    Guid? GroupId);
+    Guid? GroupId,
+    IReadOnlyList<RepositorySolutionModel>? Solutions);
 
 public sealed record UpdateRepositoryConfigRequest(
     string Name,
     string RootPath,
     string? Description,
-    Guid? GroupId);
+    Guid? GroupId,
+    IReadOnlyList<RepositorySolutionModel>? Solutions);

@@ -6,5 +6,6 @@ public sealed record RepositoryConfigDto(
     string RootPath,
     string? Description,
     Guid? GroupId,
+    IReadOnlyList<RepositorySolutionDto> Solutions,
     DateTimeOffset CreatedUtc,
     DateTimeOffset UpdatedUtc);
