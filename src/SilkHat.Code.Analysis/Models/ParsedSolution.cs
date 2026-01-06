@@ -1,8 +1,10 @@
 namespace SilkHat.Code.Analysis.Models;
 
 public sealed record ParsedSolution(
+    string SolutionName,
     string SolutionPath,
     string SolutionDirectory,
+    Guid? SolutionGuid,
     IReadOnlyList<SolutionProject> Projects);
 
 public sealed record SolutionProject(

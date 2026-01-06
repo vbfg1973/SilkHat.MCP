@@ -99,6 +99,12 @@ Each milestone must end with:
 - Add a dedicated integration test project using Testcontainers for real-database tests, excluded from default test runs.
 - Add pgAdmin in docker compose, preconfigured to connect to the PostgreSQL service.
 
+## M5f: Solution-Scoped Code Endpoints
+- Introduce stable solution identifiers (prefer reading from the solution when possible).
+- Update all code-related endpoints to include solutionId in the route.
+- Ensure code tree, projects, namespaces, named types, symbol lookup, and any other solution-derived data are scoped to a specific solution.
+- Update UI/API clients and tests to use solution-scoped routes.
+
 ## M6: Hardening + Docs + Scripts
 - Scripts: build/test/run + docker convenience scripts
 - Docs: architecture overview, API notes, troubleshooting

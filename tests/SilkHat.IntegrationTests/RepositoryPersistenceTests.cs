@@ -39,6 +39,7 @@ public sealed class RepositoryPersistenceTests
                 {
                     Id = Guid.NewGuid(),
                     RelativePath = "./RepoA.sln",
+                    SolutionId = "solution-1",
                     IsEnabled = true
                 }
             }

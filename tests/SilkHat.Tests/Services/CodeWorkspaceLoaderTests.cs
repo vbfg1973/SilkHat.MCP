@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using SilkHat.Code.Analysis.Services;
+using SilkHat.Code.Analysis.Models;
 
 namespace SilkHat.Tests.Services;
 
@@ -15,7 +16,7 @@ public sealed class CodeWorkspaceLoaderTests
         try
         {
             var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                loader.LoadAsync(tempRoot, Array.Empty<string>(), CancellationToken.None));
+                loader.LoadAsync(tempRoot, Array.Empty<SolutionReference>(), CancellationToken.None));
             Assert.Contains("No solution files selected", ex.Message, StringComparison.OrdinalIgnoreCase);
         }
         finally
@@ -71,11 +72,15 @@ EndGlobal
 
         try
         {
-            var workspace = await loader.LoadAsync(tempRoot, new[] { "./Sample.sln" }, CancellationToken.None);
+            var workspace = await loader.LoadAsync(
+                tempRoot,
+                new[] { new SolutionReference("./Sample.sln", "solution-1") },
+                CancellationToken.None);
 
-            Assert.Single(workspace.Projects);
-            Assert.Contains(workspace.Namespaces, ns => ns == "Sample");
-            Assert.Contains(workspace.NamedTypes, type => type.Name == "Foo");
+            var solution = Assert.Single(workspace.Solutions.Values);
+            Assert.Single(solution.Projects);
+            Assert.Contains(solution.Namespaces, ns => ns == "Sample");
+            Assert.Contains(solution.NamedTypes, type => type.Name == "Foo");
         }
         finally
         {

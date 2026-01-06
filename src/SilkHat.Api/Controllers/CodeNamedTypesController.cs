@@ -4,7 +4,7 @@ using SilkHat.Code.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
 
-[Route("api/repositories/{id:guid}/code/named-types")]
+[Route("api/repositories/{id:guid}/code/solutions/{solutionId}/named-types")]
 public sealed class CodeNamedTypesController : ApiControllerBase
 {
     private readonly ICodeWorkspaceStore _codeStore;
@@ -17,6 +17,7 @@ public sealed class CodeNamedTypesController : ApiControllerBase
     [HttpGet]
     public ActionResult<IReadOnlyList<NamedTypeDto>> GetNamedTypes(
         Guid id,
+        string solutionId,
         [FromQuery] string? pathPrefix,
         [FromQuery] string? namespacePrefix,
         [FromQuery] string? nameContains,
@@ -29,7 +30,13 @@ public sealed class CodeNamedTypesController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
         }
 
-        IEnumerable<NamedTypeDto> query = workspace.NamedTypes;
+        var solution = workspace.TryGetSolution(solutionId);
+        if (solution is null)
+        {
+            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+        }
+
+        IEnumerable<NamedTypeDto> query = solution.NamedTypes;
 
         if (!string.IsNullOrWhiteSpace(pathPrefix))
         {

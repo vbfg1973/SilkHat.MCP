@@ -21,7 +21,7 @@ public sealed class CodeNamedTypesControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetNamedTypes(Guid.NewGuid(), null, null, null, null, null);
+        var result = controller.GetNamedTypes(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, null, null, null, null, null);
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
@@ -39,7 +39,7 @@ public sealed class CodeNamedTypesControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetNamedTypes(Guid.NewGuid(), null, "Alpha.Sub", null, null, null);
+        var result = controller.GetNamedTypes(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, null, "Alpha.Sub", null, null, null);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var list = Assert.IsAssignableFrom<IReadOnlyList<NamedTypeDto>>(ok.Value);

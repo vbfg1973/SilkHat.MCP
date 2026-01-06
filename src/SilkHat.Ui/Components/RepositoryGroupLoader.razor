@@ -350,6 +350,7 @@
             _availableSolutionSelections.AddRange(solutions.Select(solution => new RepositorySolutionEditor
             {
                 RelativePath = solution.RelativePath,
+                SolutionId = solution.SolutionId,
                 IsEnabled = true
             }));
         }
@@ -399,7 +400,7 @@
         try
         {
             var solutions = _availableSolutionSelections
-                .Select(solution => new RepositorySolutionModel(solution.RelativePath, solution.IsEnabled))
+                .Select(solution => new RepositorySolutionModel(solution.RelativePath, solution.IsEnabled, solution.SolutionId))
                 .ToList();
 
             await Api.CreateRepositoryConfigAsync(new CreateRepositoryConfigRequest(
@@ -443,7 +444,9 @@
                 config.RootPath,
                 config.Description,
                 config.GroupId,
-                config.Solutions.Select(solution => new RepositorySolutionModel(solution.RelativePath, solution.IsEnabled)).ToList());
+                config.Solutions
+                    .Select(solution => new RepositorySolutionModel(solution.RelativePath, solution.IsEnabled, solution.SolutionId))
+                    .ToList());
 
             await Api.UpdateRepositoryConfigAsync(config.Id, request);
             _configMessage = "Solutions updated.";
@@ -471,6 +474,7 @@
             config.Solutions.AddRange(solutions.Select(solution => new RepositorySolutionEditor
             {
                 RelativePath = solution.RelativePath,
+                SolutionId = solution.SolutionId,
                 IsEnabled = true
             }));
         }
@@ -496,7 +500,9 @@
                 config.RootPath,
                 config.Description,
                 null,
-                config.Solutions.Select(solution => new RepositorySolutionModel(solution.RelativePath, solution.IsEnabled)).ToList());
+                config.Solutions
+                    .Select(solution => new RepositorySolutionModel(solution.RelativePath, solution.IsEnabled, solution.SolutionId))
+                    .ToList());
 
             await Api.UpdateRepositoryConfigAsync(config.Id, request);
             _configMessage = "Repository removed from group.";
@@ -563,6 +569,7 @@
             editor.Solutions.AddRange(model.Solutions.Select(solution => new RepositorySolutionEditor
             {
                 RelativePath = solution.RelativePath,
+                SolutionId = solution.SolutionId,
                 IsEnabled = solution.IsEnabled
             }));
 
@@ -573,6 +580,7 @@
     private sealed class RepositorySolutionEditor
     {
         public string RelativePath { get; init; } = string.Empty;
+        public string SolutionId { get; init; } = string.Empty;
         public bool IsEnabled { get; set; }
     }
 }

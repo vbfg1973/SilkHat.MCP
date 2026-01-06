@@ -53,6 +53,7 @@ public sealed class SilkHatDbContext : DbContext
         {
             entity.HasKey(solution => solution.Id);
             entity.Property(solution => solution.RelativePath).IsRequired();
+            entity.Property(solution => solution.SolutionId).IsRequired();
         });
     }
 

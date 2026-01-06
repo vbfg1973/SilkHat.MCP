@@ -2,7 +2,9 @@ namespace SilkHat.Ui.Models;
 
 public sealed record RepositorySolutionModel(
     string RelativePath,
-    bool IsEnabled);
+    bool IsEnabled,
+    string SolutionId);
 
 public sealed record AvailableRepositorySolutionModel(
-    string RelativePath);
+    string RelativePath,
+    string SolutionId);

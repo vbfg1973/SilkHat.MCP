@@ -9,6 +9,8 @@ using SilkHat.Code.Analysis.Services;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Git.Analysis.Services;
 using SilkHat.Infrastructure;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +23,8 @@ builder.Host.UseSerilog((context, services, configuration) =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
@@ -44,6 +48,7 @@ builder.Services.AddSingleton<ILoadedRepositoryStore, LoadedRepositoryStore>();
 builder.Services.AddSingleton<IRepoCommandProcessor, RepoCommandProcessor>();
 builder.Services.AddSingleton<ICodeWorkspaceStore, CodeWorkspaceStore>();
 builder.Services.AddSingleton<ICodeWorkspaceLoader, CodeWorkspaceLoader>();
+builder.Services.AddSingleton<ICodeTreeService, CodeTreeService>();
 builder.Services.Configure<RepositoryDiscoveryOptions>(options =>
 {
     options.RepoRoot = builder.Configuration["REPO_ROOT"];

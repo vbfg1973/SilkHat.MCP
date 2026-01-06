@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SilkHat.Api.Extensions;
 using SilkHat.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Services;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
@@ -15,6 +16,7 @@ public sealed class RepositoryConfigsController : ApiControllerBase
     private readonly SilkHatDbContext _dbContext;
     private readonly ILoadedRepositoryStore _store;
     private readonly IRepositoryDiscoveryService _discovery;
+    private readonly SolutionIdentityResolver _solutionIdentityResolver = new();
 
     public RepositoryConfigsController(
         SilkHatDbContext dbContext,
@@ -222,7 +224,7 @@ public sealed class RepositoryConfigsController : ApiControllerBase
         return true;
     }
 
-    private static List<RepositorySolutionConfig> BuildSolutions(RepositoryConfig config, IReadOnlyList<RepositorySolutionDto>? solutions)
+    private List<RepositorySolutionConfig> BuildSolutions(RepositoryConfig config, IReadOnlyList<RepositorySolutionDto>? solutions)
     {
         var results = new List<RepositorySolutionConfig>();
         if (solutions is null)
@@ -233,12 +235,20 @@ public sealed class RepositoryConfigsController : ApiControllerBase
         foreach (var solution in solutions
                      .GroupBy(solution => NormalizeSolutionPath(solution.RelativePath), StringComparer.OrdinalIgnoreCase))
         {
+            var suppliedId = solution
+                .Select(entry => entry.SolutionId)
+                .FirstOrDefault(entry => !string.IsNullOrWhiteSpace(entry));
+            var solutionId = !string.IsNullOrWhiteSpace(suppliedId)
+                ? suppliedId!
+                : _solutionIdentityResolver.ResolveFromRelativePath(config.RootPath, solution.Key);
+
             results.Add(new RepositorySolutionConfig
             {
                 Id = Guid.NewGuid(),
                 RepositoryConfigId = config.Id,
                 RepositoryConfig = config,
                 RelativePath = solution.Key,
+                SolutionId = solutionId,
                 IsEnabled = solution.Any(entry => entry.IsEnabled)
             });
         }

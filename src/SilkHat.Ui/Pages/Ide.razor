@@ -16,9 +16,24 @@
             <MudSelectItem T="Guid?" Value="@config.Id">@config.Name</MudSelectItem>
         }
     </MudSelect>
+    <MudSelect T="string"
+               Label="Solution"
+               Value="_selectedSolutionId"
+               ValueChanged="OnSolutionChanged"
+               Disabled="@(!_selectedConfigId.HasValue)"
+               Class="mt-3">
+        @foreach (var solution in _solutions)
+        {
+            <MudSelectItem T="string" Value="@solution.SolutionId">@solution.Name</MudSelectItem>
+        }
+    </MudSelect>
     @if (!string.IsNullOrWhiteSpace(_projectError))
     {
         <MudAlert Severity="Severity.Error" Class="mt-3">@_projectError</MudAlert>
+    }
+    @if (!string.IsNullOrWhiteSpace(_solutionError))
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-3">@_solutionError</MudAlert>
     }
 </MudPaper>
 
@@ -30,24 +45,20 @@
             {
                 <MudAlert Severity="Severity.Error" Class="mb-2">@_treeError</MudAlert>
             }
-            <MudList T="CodeTreeEntryModel" Dense="true">
-                @foreach (var entry in _treeEntries)
-                {
-                    <MudListItem T="CodeTreeEntryModel" OnClick="@(() => OnTreeEntrySelected(entry))">
-                        <MudText Typo="Typo.body2">
-                            @if (entry.Type == CodeTreeEntryType.Directory || entry.Type == CodeTreeEntryType.Project)
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Folder" Class="me-1" />
-                            }
-                            else
-                            {
-                                <MudIcon Icon="@Icons.Material.Filled.Description" Class="me-1" />
-                            }
-                            @entry.DisplayPath
-                        </MudText>
-                    </MudListItem>
-                }
-            </MudList>
+            <MudTreeView T="CodeTreeEntryModel" ServerData="LoadTreeChildrenAsync" Items="_treeItems">
+                <ItemTemplate>
+                    <MudTreeViewItem T="CodeTreeEntryModel"
+                                     Value="@context.Value"
+                                     Text="@context.Text"
+                                    Items="@context.Children"
+                                    ItemsChanged="@(new Action<IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>>>(items => OnItemsLoaded(context, items)))"
+                                    @bind-Expanded="context.Expanded"
+                                    CanExpand="@context.Expandable"
+                                    Icon="@context.Icon"
+                                    LoadingIconColor="Color.Info"
+                                     OnClick="@(async (MouseEventArgs _) => await OnTreeEntrySelected(context.Value))" />
+                </ItemTemplate>
+            </MudTreeView>
         </MudPaper>
     </MudItem>
     <MudItem xs="12" md="6">
@@ -95,11 +106,14 @@
 
 @code {
     private readonly List<RepositoryConfigModel> _configs = new();
+    private readonly List<CodeSolutionModel> _solutions = new();
     private readonly List<CodeProjectDto> _projects = new();
-    private readonly List<CodeTreeEntryModel> _treeEntries = new();
+    private readonly List<TreeItemData<CodeTreeEntryModel>> _treeItems = new();
     private readonly List<GitFileHistoryEntryModel> _historyEntries = new();
     private Guid? _selectedConfigId;
+    private string? _selectedSolutionId;
     private string? _projectError;
+    private string? _solutionError;
     private string? _treeError;
     private string? _historyError;
     private bool _historyBusy;
@@ -108,15 +122,23 @@
     protected override async Task OnInitializedAsync()
     {
         _configs.AddRange(await Api.GetLoadedRepositoryConfigsAsync());
+        _configs.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
+        if (_configs.Count > 0)
+        {
+            await OnRepositoryChanged(_configs[0].Id);
+        }
     }
 
     private async Task OnRepositoryChanged(Guid? configId)
     {
         _selectedConfigId = configId;
+        _selectedSolutionId = null;
+        _solutions.Clear();
         _projects.Clear();
-        _treeEntries.Clear();
+        _treeItems.Clear();
         _historyEntries.Clear();
         _projectError = null;
+        _solutionError = null;
         _treeError = null;
         _historyError = null;
         _selectedPath = null;
@@ -127,7 +149,60 @@
 
         try
         {
-            var projects = await Api.GetCodeProjectsAsync(configId.Value);
+            var solutions = await Api.GetCodeSolutionsAsync(configId.Value);
+            if (solutions.Count == 0)
+            {
+                _solutionError = "No solutions are loaded for this repository.";
+                return;
+            }
+
+            _solutions.AddRange(solutions);
+            _solutions.Sort((left, right) =>
+            {
+                var nameComparison = string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase);
+                if (nameComparison != 0)
+                {
+                    return nameComparison;
+                }
+
+                return string.Compare(left.RelativePath, right.RelativePath, StringComparison.OrdinalIgnoreCase);
+            });
+            _selectedSolutionId = _solutions[0].SolutionId;
+        }
+        catch (Exception ex)
+        {
+            _solutionError = ex.Message;
+            return;
+        }
+
+        await LoadSolutionDataAsync(configId.Value, _selectedSolutionId);
+    }
+
+    private async Task OnSolutionChanged(string? solutionId)
+    {
+        _selectedSolutionId = solutionId;
+        _projects.Clear();
+        _treeItems.Clear();
+        _projectError = null;
+        _treeError = null;
+        if (!_selectedConfigId.HasValue || string.IsNullOrWhiteSpace(_selectedSolutionId))
+        {
+            return;
+        }
+
+        await LoadSolutionDataAsync(_selectedConfigId.Value, _selectedSolutionId);
+    }
+
+    private async Task LoadSolutionDataAsync(Guid configId, string? solutionId)
+    {
+        if (string.IsNullOrWhiteSpace(solutionId))
+        {
+            return;
+        }
+
+        try
+        {
+            var projects = await Api.GetCodeProjectsAsync(configId, solutionId);
             _projects.AddRange(projects);
         }
         catch (Exception ex)
@@ -137,8 +212,8 @@
 
         try
         {
-            var tree = await Api.GetCodeTreeAsync(configId.Value);
-            _treeEntries.AddRange(tree.OrderBy(entry => entry.DisplayPath, StringComparer.OrdinalIgnoreCase));
+            var tree = await Api.GetCodeTreeAsync(configId, solutionId);
+            _treeItems.AddRange(tree.Select(BuildTreeItem));
         }
         catch (Exception ex)
         {
@@ -146,9 +221,9 @@
         }
     }
 
-    private async Task OnTreeEntrySelected(CodeTreeEntryModel entry)
+    private async Task OnTreeEntrySelected(CodeTreeEntryModel? entry)
     {
-        if (entry.Type != CodeTreeEntryType.File || !_selectedConfigId.HasValue)
+        if (entry is null || entry.Type != CodeTreeEntryType.File || !_selectedConfigId.HasValue)
         {
             return;
         }
@@ -170,5 +245,61 @@
         {
             _historyBusy = false;
         }
+    }
+
+    private async Task<IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>>> LoadTreeChildrenAsync(
+        CodeTreeEntryModel? parent)
+    {
+        if (parent is null)
+        {
+            return _treeItems;
+        }
+
+        if (!_selectedConfigId.HasValue || string.IsNullOrWhiteSpace(_selectedSolutionId))
+        {
+            return Array.Empty<TreeItemData<CodeTreeEntryModel>>();
+        }
+
+        try
+        {
+            var children = await Api.GetCodeTreeAsync(_selectedConfigId.Value, _selectedSolutionId, parent.DisplayPath);
+            return children
+                .Select(BuildTreeItem)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _treeError = ex.Message;
+            return Array.Empty<TreeItemData<CodeTreeEntryModel>>();
+        }
+    }
+
+    private static void OnItemsLoaded(
+        TreeItemData<CodeTreeEntryModel> treeItemData,
+        IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>> children)
+    {
+        treeItemData.Children = children?.ToList() ?? new List<TreeItemData<CodeTreeEntryModel>>();
+    }
+
+    private static TreeItemData<CodeTreeEntryModel> BuildTreeItem(CodeTreeEntryModel entry)
+    {
+        return new TreeItemData<CodeTreeEntryModel>
+        {
+            Value = entry,
+            Text = entry.Name,
+            Icon = GetEntryIcon(entry),
+            Expandable = entry.Type == CodeTreeEntryType.Project || entry.Type == CodeTreeEntryType.Directory,
+            Expanded = false
+        };
+    }
+
+    private static string GetEntryIcon(CodeTreeEntryModel entry)
+    {
+        return entry.Type switch
+        {
+            CodeTreeEntryType.Project => Icons.Material.Filled.AccountTree,
+            CodeTreeEntryType.Directory => Icons.Material.Filled.Folder,
+            _ => Icons.Material.Filled.Description
+        };
     }
 }

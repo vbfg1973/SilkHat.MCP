@@ -136,7 +136,7 @@ public sealed class RepositoryGroupsControllerTests
                     RootPath = "/tmp/a",
                     Solutions = new List<RepositorySolutionConfig>
                     {
-                        new() { Id = Guid.NewGuid(), RelativePath = "./RepoA.sln", IsEnabled = true }
+                        new() { Id = Guid.NewGuid(), RelativePath = "./RepoA.sln", SolutionId = "solution-1", IsEnabled = true }
                     }
                 },
                 new RepositoryConfig
@@ -146,7 +146,7 @@ public sealed class RepositoryGroupsControllerTests
                     RootPath = "/tmp/b",
                     Solutions = new List<RepositorySolutionConfig>
                     {
-                        new() { Id = Guid.NewGuid(), RelativePath = "./RepoB.sln", IsEnabled = true }
+                        new() { Id = Guid.NewGuid(), RelativePath = "./RepoB.sln", SolutionId = "solution-2", IsEnabled = true }
                     }
                 }
             ]

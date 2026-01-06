@@ -6,6 +6,6 @@ public interface ICodeWorkspaceLoader
 {
     Task<CodeRepositoryWorkspace> LoadAsync(
         string rootPath,
-        IReadOnlyList<string> solutionPaths,
+        IReadOnlyList<SolutionReference> solutions,
         CancellationToken cancellationToken);
 }

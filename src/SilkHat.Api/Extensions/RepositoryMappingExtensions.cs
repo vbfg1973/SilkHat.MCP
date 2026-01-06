@@ -10,7 +10,7 @@ public static class RepositoryMappingExtensions
     {
         var solutions = config.Solutions
             .OrderBy(solution => solution.RelativePath, StringComparer.OrdinalIgnoreCase)
-            .Select(solution => new RepositorySolutionDto(solution.RelativePath, solution.IsEnabled))
+            .Select(solution => new RepositorySolutionDto(solution.RelativePath, solution.IsEnabled, solution.SolutionId))
             .ToList();
 
         return new RepositoryConfigDto(
