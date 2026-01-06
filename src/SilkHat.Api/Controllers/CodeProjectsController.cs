@@ -4,7 +4,7 @@ using SilkHat.Code.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
 
-[Route("api/repositories/{id:guid}/code/projects")]
+[Route("api/repositories/{id:guid}/code/solutions/{solutionId}/projects")]
 public sealed class CodeProjectsController : ApiControllerBase
 {
     private readonly ICodeWorkspaceStore _codeStore;
@@ -15,7 +15,7 @@ public sealed class CodeProjectsController : ApiControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IReadOnlyList<CodeProjectDto>> GetProjects(Guid id, [FromQuery] string? name)
+    public ActionResult<IReadOnlyList<CodeProjectDto>> GetProjects(Guid id, string solutionId, [FromQuery] string? name)
     {
         var workspace = _codeStore.Get(id);
         if (workspace is null)
@@ -23,7 +23,13 @@ public sealed class CodeProjectsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
         }
 
-        var projects = workspace.Projects.Values.AsEnumerable();
+        var solution = workspace.TryGetSolution(solutionId);
+        if (solution is null)
+        {
+            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+        }
+
+        var projects = solution.Projects.Values.AsEnumerable();
         if (!string.IsNullOrWhiteSpace(name))
         {
             projects = projects.Where(project => project.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
@@ -38,7 +44,7 @@ public sealed class CodeProjectsController : ApiControllerBase
     }
 
     [HttpGet("{projectKey}")]
-    public ActionResult<CodeProjectDto> GetProject(Guid id, string projectKey)
+    public ActionResult<CodeProjectDto> GetProject(Guid id, string solutionId, string projectKey)
     {
         var workspace = _codeStore.Get(id);
         if (workspace is null)
@@ -46,7 +52,13 @@ public sealed class CodeProjectsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
         }
 
-        if (!workspace.Projects.TryGetValue(projectKey, out var project))
+        var solution = workspace.TryGetSolution(solutionId);
+        if (solution is null)
+        {
+            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+        }
+
+        if (!solution.Projects.TryGetValue(projectKey, out var project))
         {
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Project not found.", "Code");
         }
@@ -55,7 +67,7 @@ public sealed class CodeProjectsController : ApiControllerBase
     }
 
     [HttpGet("{projectKey}/references")]
-    public ActionResult<IReadOnlyList<CodeProjectReferenceDto>> GetProjectReferences(Guid id, string projectKey)
+    public ActionResult<IReadOnlyList<CodeProjectReferenceDto>> GetProjectReferences(Guid id, string solutionId, string projectKey)
     {
         var workspace = _codeStore.Get(id);
         if (workspace is null)
@@ -63,7 +75,13 @@ public sealed class CodeProjectsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
         }
 
-        if (!workspace.Projects.TryGetValue(projectKey, out var project))
+        var solution = workspace.TryGetSolution(solutionId);
+        if (solution is null)
+        {
+            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+        }
+
+        if (!solution.Projects.TryGetValue(projectKey, out var project))
         {
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Project not found.", "Code");
         }
@@ -72,7 +90,7 @@ public sealed class CodeProjectsController : ApiControllerBase
     }
 
     [HttpGet("{projectKey}/referenced-by")]
-    public ActionResult<IReadOnlyList<CodeProjectReferenceDto>> GetProjectReferencedBy(Guid id, string projectKey)
+    public ActionResult<IReadOnlyList<CodeProjectReferenceDto>> GetProjectReferencedBy(Guid id, string solutionId, string projectKey)
     {
         var workspace = _codeStore.Get(id);
         if (workspace is null)
@@ -80,7 +98,13 @@ public sealed class CodeProjectsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
         }
 
-        if (!workspace.Projects.TryGetValue(projectKey, out var project))
+        var solution = workspace.TryGetSolution(solutionId);
+        if (solution is null)
+        {
+            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+        }
+
+        if (!solution.Projects.TryGetValue(projectKey, out var project))
         {
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Project not found.", "Code");
         }

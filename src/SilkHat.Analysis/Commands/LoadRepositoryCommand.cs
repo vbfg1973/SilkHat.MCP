@@ -54,7 +54,7 @@ public sealed class LoadRepositoryCommand : IRepoCommand
             null,
             null);
 
-        var workspace = await context.CodeWorkspaceLoader.LoadAsync(context.RootPath, context.SolutionPaths, cancellationToken);
+        var workspace = await context.CodeWorkspaceLoader.LoadAsync(context.RootPath, context.Solutions, cancellationToken);
         context.CodeWorkspaceStore.Set(context.ConfigId, workspace);
 
         context.Store.SetLoaded(context.ConfigId, context.RootPath);

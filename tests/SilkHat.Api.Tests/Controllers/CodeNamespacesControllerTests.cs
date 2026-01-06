@@ -20,7 +20,7 @@ public sealed class CodeNamespacesControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetNamespaces(Guid.NewGuid(), null);
+        var result = controller.GetNamespaces(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, null);
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
@@ -38,7 +38,7 @@ public sealed class CodeNamespacesControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetNamespaces(Guid.NewGuid(), "Alpha.Sub");
+        var result = controller.GetNamespaces(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, "Alpha.Sub");
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var list = Assert.IsAssignableFrom<IReadOnlyList<string>>(ok.Value);

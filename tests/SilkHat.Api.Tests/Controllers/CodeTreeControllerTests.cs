@@ -19,7 +19,7 @@ public sealed class CodeTreeControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetTree(Guid.NewGuid());
+        var result = controller.GetTree(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId);
 
         Assert.IsType<ObjectResult>(result.Result);
         store.Verify(s => s.Get(It.IsAny<Guid>()), Times.Once);
@@ -31,22 +31,23 @@ public sealed class CodeTreeControllerTests
         var store = new Mock<ICodeWorkspaceStore>();
         var workspace = CodeWorkspaceFactory.CreateWorkspace();
         var entry = new CodeTreeEntryDto("./Repo.csproj", "Repo", "Repo", CodeTreeEntryType.Project, "alpha", "Alpha");
+        var solution = workspace.TryGetSolution(CodeWorkspaceFactory.DefaultSolutionId)! with
+        {
+            TreeEntries = new List<CodeTreeEntryDto> { entry }
+        };
         var updated = new SilkHat.Code.Analysis.Models.CodeRepositoryWorkspace(
             workspace.RootPath,
-            workspace.Workspaces,
-            workspace.Projects,
-            new List<CodeTreeEntryDto> { entry },
-            workspace.Namespaces,
-            workspace.NamedTypes,
-            workspace.NamedTypesBySymbolKey,
-            workspace.Compilations);
+            new Dictionary<string, SilkHat.Code.Analysis.Models.CodeSolutionWorkspace>
+            {
+                [solution.SolutionId] = solution
+            });
         store.Setup(s => s.Get(It.IsAny<Guid>())).Returns(updated);
         var controller = new CodeTreeController(store.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetTree(Guid.NewGuid());
+        var result = controller.GetTree(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var entries = Assert.IsAssignableFrom<IReadOnlyList<CodeTreeEntryDto>>(ok.Value);

@@ -11,34 +11,31 @@ public sealed record ProjectIndex(
     IReadOnlyList<CodeProjectReferenceDto> References,
     IReadOnlyList<CodeProjectReferenceDto> ReferencedBy);
 
+public sealed record CodeSolutionWorkspace(
+    string SolutionId,
+    string SolutionName,
+    string SolutionPath,
+    string RelativePath,
+    IReadOnlyDictionary<string, ProjectIndex> Projects,
+    IReadOnlyList<CodeTreeEntryDto> TreeEntries,
+    IReadOnlyList<string> Namespaces,
+    IReadOnlyList<NamedTypeDto> NamedTypes,
+    IReadOnlyDictionary<string, NamedTypeDto> NamedTypesBySymbolKey,
+    IReadOnlyDictionary<string, Compilation> Compilations);
+
 public sealed class CodeRepositoryWorkspace
 {
     public CodeRepositoryWorkspace(
         string rootPath,
-        IReadOnlyList<Workspace> workspaces,
-        IReadOnlyDictionary<string, ProjectIndex> projects,
-        IReadOnlyList<CodeTreeEntryDto> treeEntries,
-        IReadOnlyList<string> namespaces,
-        IReadOnlyList<NamedTypeDto> namedTypes,
-        IReadOnlyDictionary<string, NamedTypeDto> namedTypesBySymbolKey,
-        IReadOnlyDictionary<string, Compilation> compilations)
+        IReadOnlyDictionary<string, CodeSolutionWorkspace> solutions)
     {
         RootPath = rootPath;
-        Workspaces = workspaces;
-        Projects = projects;
-        TreeEntries = treeEntries;
-        Namespaces = namespaces;
-        NamedTypes = namedTypes;
-        NamedTypesBySymbolKey = namedTypesBySymbolKey;
-        Compilations = compilations;
+        Solutions = solutions;
     }
 
     public string RootPath { get; }
-    public IReadOnlyList<Workspace> Workspaces { get; }
-    public IReadOnlyDictionary<string, ProjectIndex> Projects { get; }
-    public IReadOnlyList<CodeTreeEntryDto> TreeEntries { get; }
-    public IReadOnlyList<string> Namespaces { get; }
-    public IReadOnlyList<NamedTypeDto> NamedTypes { get; }
-    public IReadOnlyDictionary<string, NamedTypeDto> NamedTypesBySymbolKey { get; }
-    public IReadOnlyDictionary<string, Compilation> Compilations { get; }
+    public IReadOnlyDictionary<string, CodeSolutionWorkspace> Solutions { get; }
+
+    public CodeSolutionWorkspace? TryGetSolution(string solutionId)
+        => Solutions.TryGetValue(solutionId, out var solution) ? solution : null;
 }

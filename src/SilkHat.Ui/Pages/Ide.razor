@@ -16,9 +16,24 @@
             <MudSelectItem T="Guid?" Value="@config.Id">@config.Name</MudSelectItem>
         }
     </MudSelect>
+    <MudSelect T="string"
+               Label="Solution"
+               Value="_selectedSolutionId"
+               ValueChanged="OnSolutionChanged"
+               Disabled="@(!_selectedConfigId.HasValue)"
+               Class="mt-3">
+        @foreach (var solution in _solutions)
+        {
+            <MudSelectItem T="string" Value="@solution.SolutionId">@solution.Name</MudSelectItem>
+        }
+    </MudSelect>
     @if (!string.IsNullOrWhiteSpace(_projectError))
     {
         <MudAlert Severity="Severity.Error" Class="mt-3">@_projectError</MudAlert>
+    }
+    @if (!string.IsNullOrWhiteSpace(_solutionError))
+    {
+        <MudAlert Severity="Severity.Error" Class="mt-3">@_solutionError</MudAlert>
     }
 </MudPaper>
 
@@ -95,11 +110,14 @@
 
 @code {
     private readonly List<RepositoryConfigModel> _configs = new();
+    private readonly List<CodeSolutionModel> _solutions = new();
     private readonly List<CodeProjectDto> _projects = new();
     private readonly List<CodeTreeEntryModel> _treeEntries = new();
     private readonly List<GitFileHistoryEntryModel> _historyEntries = new();
     private Guid? _selectedConfigId;
+    private string? _selectedSolutionId;
     private string? _projectError;
+    private string? _solutionError;
     private string? _treeError;
     private string? _historyError;
     private bool _historyBusy;
@@ -113,10 +131,13 @@
     private async Task OnRepositoryChanged(Guid? configId)
     {
         _selectedConfigId = configId;
+        _selectedSolutionId = null;
+        _solutions.Clear();
         _projects.Clear();
         _treeEntries.Clear();
         _historyEntries.Clear();
         _projectError = null;
+        _solutionError = null;
         _treeError = null;
         _historyError = null;
         _selectedPath = null;
@@ -127,7 +148,50 @@
 
         try
         {
-            var projects = await Api.GetCodeProjectsAsync(configId.Value);
+            var solutions = await Api.GetCodeSolutionsAsync(configId.Value);
+            if (solutions.Count == 0)
+            {
+                _solutionError = "No solutions are loaded for this repository.";
+                return;
+            }
+
+            _solutions.AddRange(solutions);
+            _selectedSolutionId = _solutions[0].SolutionId;
+        }
+        catch (Exception ex)
+        {
+            _solutionError = ex.Message;
+            return;
+        }
+
+        await LoadSolutionDataAsync(configId.Value, _selectedSolutionId);
+    }
+
+    private async Task OnSolutionChanged(string? solutionId)
+    {
+        _selectedSolutionId = solutionId;
+        _projects.Clear();
+        _treeEntries.Clear();
+        _projectError = null;
+        _treeError = null;
+        if (!_selectedConfigId.HasValue || string.IsNullOrWhiteSpace(_selectedSolutionId))
+        {
+            return;
+        }
+
+        await LoadSolutionDataAsync(_selectedConfigId.Value, _selectedSolutionId);
+    }
+
+    private async Task LoadSolutionDataAsync(Guid configId, string? solutionId)
+    {
+        if (string.IsNullOrWhiteSpace(solutionId))
+        {
+            return;
+        }
+
+        try
+        {
+            var projects = await Api.GetCodeProjectsAsync(configId, solutionId);
             _projects.AddRange(projects);
         }
         catch (Exception ex)
@@ -137,7 +201,7 @@
 
         try
         {
-            var tree = await Api.GetCodeTreeAsync(configId.Value);
+            var tree = await Api.GetCodeTreeAsync(configId, solutionId);
             _treeEntries.AddRange(tree.OrderBy(entry => entry.DisplayPath, StringComparer.OrdinalIgnoreCase));
         }
         catch (Exception ex)

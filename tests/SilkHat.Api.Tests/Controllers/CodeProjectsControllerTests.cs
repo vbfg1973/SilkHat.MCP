@@ -21,7 +21,7 @@ public sealed class CodeProjectsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetProjects(Guid.NewGuid(), null);
+        var result = controller.GetProjects(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, null);
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
@@ -39,7 +39,7 @@ public sealed class CodeProjectsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetProjects(Guid.NewGuid(), "Alpha");
+        var result = controller.GetProjects(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, "Alpha");
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var list = Assert.IsAssignableFrom<IReadOnlyList<CodeProjectDto>>(ok.Value);
@@ -59,7 +59,7 @@ public sealed class CodeProjectsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetProject(Guid.NewGuid(), "missing");
+        var result = controller.GetProject(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, "missing");
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status404NotFound, problem.StatusCode);
@@ -77,7 +77,7 @@ public sealed class CodeProjectsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetProjectReferences(Guid.NewGuid(), "alpha");
+        var result = controller.GetProjectReferences(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, "alpha");
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var list = Assert.IsAssignableFrom<IReadOnlyList<CodeProjectReferenceDto>>(ok.Value);
@@ -97,7 +97,7 @@ public sealed class CodeProjectsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetProjectReferencedBy(Guid.NewGuid(), "beta");
+        var result = controller.GetProjectReferencedBy(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, "beta");
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var list = Assert.IsAssignableFrom<IReadOnlyList<CodeProjectReferenceDto>>(ok.Value);

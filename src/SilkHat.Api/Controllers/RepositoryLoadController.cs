@@ -5,9 +5,12 @@ using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Commands;
 using SilkHat.Analysis.Models;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Models;
+using SilkHat.Code.Analysis.Services;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
+using SilkHat.Infrastructure.Entities;
 using System.Linq;
 
 namespace SilkHat.Api.Controllers;
@@ -46,7 +49,6 @@ public sealed class RepositoryLoadController : ApiControllerBase
     {
         var config = await _dbContext.RepositoryConfigs
             .Include(item => item.Solutions)
-            .AsNoTracking()
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
 
         if (config is null)
@@ -54,20 +56,23 @@ public sealed class RepositoryLoadController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Repository config not found.", "NotFound");
         }
 
-        var solutionPaths = config.Solutions
-            .Where(solution => solution.IsEnabled)
-            .Select(solution => solution.RelativePath)
-            .ToList();
-        if (solutionPaths.Count == 0)
+        var resolver = new SolutionIdentityResolver();
+        var solutionReferences = BuildSolutionReferences(config, resolver, out var updatedSolutions);
+        if (solutionReferences.Count == 0)
         {
             return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed",
                 "No enabled solution files configured for this repository.", "Validation");
         }
 
+        if (updatedSolutions)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         Response.StatusCode = StatusCodes.Status200OK;
         Response.ContentType = "application/x-ndjson";
 
-        var context = new RepoCommandContext(config.Id, config.RootPath, solutionPaths, _store, _codeStore, _workspaceLoader);
+        var context = new RepoCommandContext(config.Id, config.RootPath, solutionReferences, _store, _codeStore, _workspaceLoader);
         var command = new LoadRepositoryCommand();
 
         await foreach (var evt in _processor.ExecuteAsync(command, context, cancellationToken))
@@ -105,5 +110,29 @@ public sealed class RepositoryLoadController : ApiControllerBase
             null,
             null,
             new RepoEventSummaryDto(message)));
+    }
+
+    private static List<SolutionReference> BuildSolutionReferences(
+        RepositoryConfig config,
+        SolutionIdentityResolver resolver,
+        out bool updatedSolutions)
+    {
+        updatedSolutions = false;
+        var results = new List<SolutionReference>();
+
+        foreach (var solution in config.Solutions.Where(item => item.IsEnabled))
+        {
+            var solutionId = solution.SolutionId;
+            if (string.IsNullOrWhiteSpace(solutionId))
+            {
+                solutionId = resolver.ResolveFromRelativePath(config.RootPath, solution.RelativePath);
+                solution.SolutionId = solutionId;
+                updatedSolutions = true;
+            }
+
+            results.Add(new SolutionReference(solution.RelativePath, solutionId));
+        }
+
+        return results;
     }
 }

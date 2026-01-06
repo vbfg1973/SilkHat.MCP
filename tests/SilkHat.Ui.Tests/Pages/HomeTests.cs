@@ -46,7 +46,8 @@ public sealed class HomeTests
     "solutions": [
       {
         "relativePath": "./RepoOne.sln",
-        "isEnabled": true
+        "isEnabled": true,
+        "solutionId": "solution-1"
       }
     ],
     "createdUtc": "2024-01-01T00:00:00Z",
@@ -117,7 +118,8 @@ public sealed class HomeTests
     "solutions": [
       {
         "relativePath": "./RepoOne.sln",
-        "isEnabled": true
+        "isEnabled": true,
+        "solutionId": "solution-1"
       }
     ],
     "createdUtc": "2024-01-01T00:00:00Z",

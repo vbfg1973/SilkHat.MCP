@@ -30,13 +30,14 @@ public sealed class RepositoryConfigsControllerTests
             "/tmp/repo",
             null,
             null,
-            new List<RepositorySolutionDto> { new("./Repo.sln", true) });
+            new List<RepositorySolutionDto> { new("./Repo.sln", true, "solution-1") });
 
         var result = await controller.Create(request, CancellationToken.None);
 
         var created = Assert.IsType<CreatedAtActionResult>(result.Result);
         var dto = Assert.IsType<RepositoryConfigDto>(created.Value);
         Assert.Equal("Repo", dto.Name);
+        Assert.Equal("solution-1", dto.Solutions[0].SolutionId);
         Assert.True(interceptor.SaveChangesAsyncCalls > 0);
         Assert.Single(dbContext.RepositoryConfigs);
         discovery.Verify(d => d.TryValidateRepositoryPath("/tmp/repo", out It.Ref<string?>.IsAny), Times.Once);
@@ -69,13 +70,14 @@ public sealed class RepositoryConfigsControllerTests
             "/tmp/repo",
             null,
             null,
-            new List<RepositorySolutionDto> { new("./Repo.sln", true) });
+            new List<RepositorySolutionDto> { new("./Repo.sln", true, "solution-1") });
 
         var result = await controller.Update(config.Id, request, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<RepositoryConfigDto>(ok.Value);
         Assert.Equal("After", dto.Name);
+        Assert.Equal("solution-1", dto.Solutions[0].SolutionId);
         Assert.True(interceptor.SaveChangesAsyncCalls > 0);
         discovery.Verify(d => d.TryValidateRepositoryPath("/tmp/repo", out It.Ref<string?>.IsAny), Times.Once);
     }
@@ -120,7 +122,7 @@ public sealed class RepositoryConfigsControllerTests
                 "/tmp/repo",
                 null,
                 group.Id,
-                new List<RepositorySolutionDto> { new("./Repo.sln", true) }),
+                new List<RepositorySolutionDto> { new("./Repo.sln", true, "solution-1") }),
             CancellationToken.None);
 
         var problem = Assert.IsType<ObjectResult>(result.Result);

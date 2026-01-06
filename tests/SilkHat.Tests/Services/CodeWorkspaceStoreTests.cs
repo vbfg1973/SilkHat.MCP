@@ -10,15 +10,23 @@ public sealed class CodeWorkspaceStoreTests
     {
         var store = new CodeWorkspaceStore();
         var id = Guid.NewGuid();
-        var workspace = new CodeRepositoryWorkspace(
-            "/repo",
-            new List<Microsoft.CodeAnalysis.Workspace>(),
+        var solution = new CodeSolutionWorkspace(
+            "solution-1",
+            "Repo",
+            "/repo/Repo.sln",
+            "./Repo.sln",
             new Dictionary<string, ProjectIndex>(),
             new List<SilkHat.Code.Core.Dtos.CodeTreeEntryDto>(),
             new List<string>(),
             new List<SilkHat.Code.Core.Dtos.NamedTypeDto>(),
             new Dictionary<string, SilkHat.Code.Core.Dtos.NamedTypeDto>(),
             new Dictionary<string, Microsoft.CodeAnalysis.Compilation>());
+        var workspace = new CodeRepositoryWorkspace(
+            "/repo",
+            new Dictionary<string, CodeSolutionWorkspace>
+            {
+                [solution.SolutionId] = solution
+            });
 
         store.Set(id, workspace);
 
@@ -30,15 +38,23 @@ public sealed class CodeWorkspaceStoreTests
     {
         var store = new CodeWorkspaceStore();
         var id = Guid.NewGuid();
-        var workspace = new CodeRepositoryWorkspace(
-            "/repo",
-            new List<Microsoft.CodeAnalysis.Workspace>(),
+        var solution = new CodeSolutionWorkspace(
+            "solution-1",
+            "Repo",
+            "/repo/Repo.sln",
+            "./Repo.sln",
             new Dictionary<string, ProjectIndex>(),
             new List<SilkHat.Code.Core.Dtos.CodeTreeEntryDto>(),
             new List<string>(),
             new List<SilkHat.Code.Core.Dtos.NamedTypeDto>(),
             new Dictionary<string, SilkHat.Code.Core.Dtos.NamedTypeDto>(),
             new Dictionary<string, Microsoft.CodeAnalysis.Compilation>());
+        var workspace = new CodeRepositoryWorkspace(
+            "/repo",
+            new Dictionary<string, CodeSolutionWorkspace>
+            {
+                [solution.SolutionId] = solution
+            });
 
         store.Set(id, workspace);
 

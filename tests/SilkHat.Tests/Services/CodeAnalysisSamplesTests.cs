@@ -15,32 +15,33 @@ public sealed class CodeAnalysisSamplesTests
 
         var workspace = await loader.LoadAsync(
             sampleRoot,
-            new[] { "./SilkHat.Sample.sln" },
+            new[] { new SolutionReference("./SilkHat.Sample.sln", "solution-1") },
             CancellationToken.None);
 
-        Assert.NotEmpty(workspace.Projects);
-        Assert.Equal(2, workspace.Projects.Count);
-        Assert.Contains(workspace.Namespaces, ns => ns == "SilkHat.Sample.App");
-        Assert.Contains(workspace.Namespaces, ns => ns == "SilkHat.Sample.Lib");
-        Assert.Contains(workspace.Compilations, entry => entry.Value is not null);
-        Assert.Contains(workspace.TreeEntries, entry => entry.Type == CodeTreeEntryType.Project && entry.ProjectName == "SilkHat.Sample.App");
-        Assert.Contains(workspace.TreeEntries, entry => entry.Type == CodeTreeEntryType.File && entry.DisplayPath.Contains("GreetingService.cs", StringComparison.OrdinalIgnoreCase));
+        var solution = Assert.Single(workspace.Solutions.Values);
+        Assert.NotEmpty(solution.Projects);
+        Assert.Equal(2, solution.Projects.Count);
+        Assert.Contains(solution.Namespaces, ns => ns == "SilkHat.Sample.App");
+        Assert.Contains(solution.Namespaces, ns => ns == "SilkHat.Sample.Lib");
+        Assert.Contains(solution.Compilations, entry => entry.Value is not null);
+        Assert.Contains(solution.TreeEntries, entry => entry.Type == CodeTreeEntryType.Project && entry.ProjectName == "SilkHat.Sample.App");
+        Assert.Contains(solution.TreeEntries, entry => entry.Type == CodeTreeEntryType.File && entry.DisplayPath.Contains("GreetingService.cs", StringComparison.OrdinalIgnoreCase));
 
-        AssertNamedType(workspace, "GreetingService", NamedTypeKind.Class, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "IGreetingProvider", NamedTypeKind.Interface, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "FriendlyGreetingProvider", NamedTypeKind.Class, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "FormalGreetingProvider", NamedTypeKind.Class, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "ComplexitySamples", NamedTypeKind.Class, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "StatusHelper", NamedTypeKind.Class, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "PublicEntry", NamedTypeKind.Class, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "SampleEnum", NamedTypeKind.Enum, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "SampleStruct", NamedTypeKind.Struct, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "SampleRecord", NamedTypeKind.Record, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "SampleRecordStruct", NamedTypeKind.Record, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "SampleDelegate", NamedTypeKind.Delegate, "SilkHat.Sample.App");
-        AssertNamedType(workspace, "IClock", NamedTypeKind.Interface, "SilkHat.Sample.Lib");
-        AssertNamedType(workspace, "SystemClock", NamedTypeKind.Class, "SilkHat.Sample.Lib");
-        AssertNamedType(workspace, "LibConstants", NamedTypeKind.Class, "SilkHat.Sample.Lib");
+        AssertNamedType(solution, "GreetingService", NamedTypeKind.Class, "SilkHat.Sample.App");
+        AssertNamedType(solution, "IGreetingProvider", NamedTypeKind.Interface, "SilkHat.Sample.App");
+        AssertNamedType(solution, "FriendlyGreetingProvider", NamedTypeKind.Class, "SilkHat.Sample.App");
+        AssertNamedType(solution, "FormalGreetingProvider", NamedTypeKind.Class, "SilkHat.Sample.App");
+        AssertNamedType(solution, "ComplexitySamples", NamedTypeKind.Class, "SilkHat.Sample.App");
+        AssertNamedType(solution, "StatusHelper", NamedTypeKind.Class, "SilkHat.Sample.App");
+        AssertNamedType(solution, "PublicEntry", NamedTypeKind.Class, "SilkHat.Sample.App");
+        AssertNamedType(solution, "SampleEnum", NamedTypeKind.Enum, "SilkHat.Sample.App");
+        AssertNamedType(solution, "SampleStruct", NamedTypeKind.Struct, "SilkHat.Sample.App");
+        AssertNamedType(solution, "SampleRecord", NamedTypeKind.Record, "SilkHat.Sample.App");
+        AssertNamedType(solution, "SampleRecordStruct", NamedTypeKind.Record, "SilkHat.Sample.App");
+        AssertNamedType(solution, "SampleDelegate", NamedTypeKind.Delegate, "SilkHat.Sample.App");
+        AssertNamedType(solution, "IClock", NamedTypeKind.Interface, "SilkHat.Sample.Lib");
+        AssertNamedType(solution, "SystemClock", NamedTypeKind.Class, "SilkHat.Sample.Lib");
+        AssertNamedType(solution, "LibConstants", NamedTypeKind.Class, "SilkHat.Sample.Lib");
     }
 
     [Fact]
@@ -51,10 +52,11 @@ public sealed class CodeAnalysisSamplesTests
 
         var workspace = await loader.LoadAsync(
             sampleRoot,
-            new[] { "./SilkHat.Sample.sln" },
+            new[] { new SolutionReference("./SilkHat.Sample.sln", "solution-1") },
             CancellationToken.None);
 
-        var greeting = workspace.NamedTypes.First(type => type.Name == "GreetingService");
+        var solution = Assert.Single(workspace.Solutions.Values);
+        var greeting = solution.NamedTypes.First(type => type.Name == "GreetingService");
         Assert.False(string.IsNullOrWhiteSpace(greeting.FilePath));
         Assert.EndsWith("GreetingService.cs", greeting.FilePath, StringComparison.OrdinalIgnoreCase);
         Assert.True(greeting.FilePath!.Contains("SilkHat.Sample.App", StringComparison.OrdinalIgnoreCase));
@@ -68,11 +70,12 @@ public sealed class CodeAnalysisSamplesTests
 
         var workspace = await loader.LoadAsync(
             sampleRoot,
-            new[] { "./SilkHat.Sample.sln" },
+            new[] { new SolutionReference("./SilkHat.Sample.sln", "solution-1") },
             CancellationToken.None);
 
-        var appProject = workspace.Projects.Values.Single(project => project.Name == "SilkHat.Sample.App");
-        var libProject = workspace.Projects.Values.Single(project => project.Name == "SilkHat.Sample.Lib");
+        var solution = Assert.Single(workspace.Solutions.Values);
+        var appProject = solution.Projects.Values.Single(project => project.Name == "SilkHat.Sample.App");
+        var libProject = solution.Projects.Values.Single(project => project.Name == "SilkHat.Sample.Lib");
 
         Assert.False(string.IsNullOrWhiteSpace(appProject.ProjectKey));
         Assert.Equal("C#", appProject.Language);
@@ -96,24 +99,25 @@ public sealed class CodeAnalysisSamplesTests
 
         var workspace = await loader.LoadAsync(
             sampleRoot,
-            new[] { "./SilkHat.Sample.sln" },
+            new[] { new SolutionReference("./SilkHat.Sample.sln", "solution-1") },
             CancellationToken.None);
 
-        var projectKey = workspace.Projects.Values.Single(project => project.Name == "SilkHat.Sample.App").ProjectKey;
-        Assert.True(workspace.Compilations.TryGetValue(projectKey, out var compilation));
+        var solution = Assert.Single(workspace.Solutions.Values);
+        var projectKey = solution.Projects.Values.Single(project => project.Name == "SilkHat.Sample.App").ProjectKey;
+        Assert.True(solution.Compilations.TryGetValue(projectKey, out var compilation));
 
         var symbol = compilation!.GetTypeByMetadataName("SilkHat.Sample.App.GreetingService");
         Assert.NotNull(symbol);
 
         var key = SymbolKeyUtility.GetSymbolKeyString(symbol!, compilation);
-        Assert.True(workspace.NamedTypesBySymbolKey.TryGetValue(key, out var dto));
+        Assert.True(solution.NamedTypesBySymbolKey.TryGetValue(key, out var dto));
         Assert.Equal("GreetingService", dto!.Name);
         Assert.Equal("SilkHat.Sample.App", dto.Namespace);
     }
 
-    private static void AssertNamedType(CodeRepositoryWorkspace workspace, string name, NamedTypeKind kind, string expectedNamespace)
+    private static void AssertNamedType(CodeSolutionWorkspace solution, string name, NamedTypeKind kind, string expectedNamespace)
     {
-        var match = workspace.NamedTypes.FirstOrDefault(type => type.Name == name && type.Kind == kind);
+        var match = solution.NamedTypes.FirstOrDefault(type => type.Name == name && type.Kind == kind);
         Assert.NotNull(match);
         Assert.Equal(expectedNamespace, match!.Namespace);
     }

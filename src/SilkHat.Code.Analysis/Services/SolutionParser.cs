@@ -22,6 +22,8 @@ public sealed class SolutionParser
             throw new InvalidOperationException($"Solution directory could not be resolved for '{solutionPath}'.");
         }
 
+        var solutionName = Path.GetFileNameWithoutExtension(solutionPath);
+        var solutionGuid = FindSolutionGuid(solutionPath);
         var projects = new List<SolutionProject>();
         foreach (var line in File.ReadLines(solutionPath))
         {
@@ -51,7 +53,7 @@ public sealed class SolutionParser
                 projectId));
         }
 
-        return new ParsedSolution(solutionPath, solutionDirectory, projects);
+        return new ParsedSolution(solutionName, solutionPath, solutionDirectory, solutionGuid, projects);
     }
 
     private static bool TryParseProjectLine(
@@ -125,5 +127,31 @@ public sealed class SolutionParser
         }
 
         return normalized;
+    }
+
+    private static Guid? FindSolutionGuid(string solutionPath)
+    {
+        foreach (var line in File.ReadLines(solutionPath))
+        {
+            var trimmed = line.Trim();
+            if (!trimmed.StartsWith("SolutionGuid", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var parts = trimmed.Split('=', 2, StringSplitOptions.TrimEntries);
+            if (parts.Length != 2)
+            {
+                continue;
+            }
+
+            var raw = parts[1].Trim().Trim('"', '{', '}');
+            if (Guid.TryParse(raw, out var parsed))
+            {
+                return parsed;
+            }
+        }
+
+        return null;
     }
 }

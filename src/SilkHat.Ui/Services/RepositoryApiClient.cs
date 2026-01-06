@@ -94,11 +94,24 @@ public sealed class RepositoryApiClient
         return (await response.Content.ReadFromJsonAsync<RepositoryGroupLoadResultModel>(cancellationToken: cancellationToken))!;
     }
 
-    public async Task<IReadOnlyList<CodeProjectDto>> GetCodeProjectsAsync(Guid repositoryId, string? name = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<CodeSolutionModel>> GetCodeSolutionsAsync(
+        Guid repositoryId,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/{repositoryId}/code/solutions";
+        return await GetFromJsonAsync<List<CodeSolutionModel>>(url, cancellationToken)
+               ?? new List<CodeSolutionModel>();
+    }
+
+    public async Task<IReadOnlyList<CodeProjectDto>> GetCodeProjectsAsync(
+        Guid repositoryId,
+        string solutionId,
+        string? name = null,
+        CancellationToken cancellationToken = default)
     {
         var url = string.IsNullOrWhiteSpace(name)
-            ? $"api/repositories/{repositoryId}/code/projects"
-            : $"api/repositories/{repositoryId}/code/projects?name={Uri.EscapeDataString(name)}";
+            ? $"api/repositories/{repositoryId}/code/solutions/{solutionId}/projects"
+            : $"api/repositories/{repositoryId}/code/solutions/{solutionId}/projects?name={Uri.EscapeDataString(name)}";
 
         return await GetFromJsonAsync<List<CodeProjectDto>>(url, cancellationToken)
                ?? new List<CodeProjectDto>();
@@ -106,9 +119,10 @@ public sealed class RepositoryApiClient
 
     public async Task<IReadOnlyList<CodeTreeEntryModel>> GetCodeTreeAsync(
         Guid repositoryId,
+        string solutionId,
         CancellationToken cancellationToken = default)
     {
-        var url = $"api/repositories/{repositoryId}/code/tree";
+        var url = $"api/repositories/{repositoryId}/code/solutions/{solutionId}/tree";
         return await GetFromJsonAsync<List<CodeTreeEntryModel>>(url, cancellationToken)
                ?? new List<CodeTreeEntryModel>();
     }

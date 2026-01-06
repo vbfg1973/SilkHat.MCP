@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using System.Linq;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Models;
+using SilkHat.Code.Analysis.Services;
 using SilkHat.Core.Dtos;
 
 namespace SilkHat.Analysis.Services;
@@ -9,6 +10,7 @@ namespace SilkHat.Analysis.Services;
 public sealed class RepositoryDiscoveryService : IRepositoryDiscoveryService
 {
     private readonly string? _repoRoot;
+    private readonly SolutionIdentityResolver _solutionIdentityResolver = new();
 
     public RepositoryDiscoveryService(IOptions<RepositoryDiscoveryOptions> options)
     {
@@ -72,7 +74,12 @@ public sealed class RepositoryDiscoveryService : IRepositoryDiscoveryService
 
         var solutions = Directory.EnumerateFiles(fullPath, "*.sln", SearchOption.AllDirectories)
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .Select(path => new AvailableRepositorySolutionDto(NormalizeRelativePath(fullPath, path)))
+            .Select(path =>
+            {
+                var relativePath = NormalizeRelativePath(fullPath, path);
+                var solutionId = _solutionIdentityResolver.ResolveFromRelativePath(fullPath, relativePath);
+                return new AvailableRepositorySolutionDto(relativePath, solutionId);
+            })
             .ToList();
 
         return solutions;

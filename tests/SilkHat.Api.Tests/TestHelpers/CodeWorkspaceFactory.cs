@@ -6,6 +6,8 @@ namespace SilkHat.Api.Tests.TestHelpers;
 
 public static class CodeWorkspaceFactory
 {
+    public const string DefaultSolutionId = "solution-1";
+
     public static CodeRepositoryWorkspace CreateWorkspace()
     {
         var projectAlpha = new ProjectIndex(
@@ -46,14 +48,23 @@ public static class CodeWorkspaceFactory
 
         var namedTypesByKey = namedTypes.ToDictionary(type => type.SymbolKey, type => type);
 
-        return new CodeRepositoryWorkspace(
-            "/repo",
-            new List<Workspace>(),
+        var solution = new CodeSolutionWorkspace(
+            DefaultSolutionId,
+            "Repo",
+            "/repo/Repo.sln",
+            "./Repo.sln",
             projects,
             new List<CodeTreeEntryDto>(),
             namespaces,
             namedTypes,
             namedTypesByKey,
             new Dictionary<string, Compilation>());
+
+        return new CodeRepositoryWorkspace(
+            "/repo",
+            new Dictionary<string, CodeSolutionWorkspace>
+            {
+                [DefaultSolutionId] = solution
+            });
     }
 }

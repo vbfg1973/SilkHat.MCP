@@ -112,6 +112,7 @@ public sealed class RepositoryDiscoveryServiceTests
 
             Assert.Single(solutions);
             Assert.Equal("./src/RepoA.sln", solutions[0].RelativePath);
+            Assert.False(string.IsNullOrWhiteSpace(solutions[0].SolutionId));
         }
         finally
         {

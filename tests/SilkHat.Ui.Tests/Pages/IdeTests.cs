@@ -25,6 +25,7 @@ public sealed class IdeTests
         context.JSInterop.SetupVoid("localStorage.setItem", _ => true);
 
         var configId = Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d");
+        var solutionId = "solution-1";
         var handler = new FakeHttpMessageHandler();
         handler.AddJsonResponse("api/repositories/loaded", $@"[
   {{
@@ -36,15 +37,23 @@ public sealed class IdeTests
     ""solutions"": [
       {{
         ""relativePath"": ""./RepoOne.sln"",
-        ""isEnabled"": true
+        ""isEnabled"": true,
+        ""solutionId"": ""{solutionId}""
       }}
     ],
     ""createdUtc"": ""2024-01-01T00:00:00Z"",
     ""updatedUtc"": ""2024-01-01T00:00:00Z""
   }}
 ]");
-        handler.AddJsonResponse($"api/repositories/{configId}/code/projects", "[]");
-        handler.AddJsonResponse($"api/repositories/{configId}/code/tree", """
+        handler.AddJsonResponse($"api/repositories/{configId}/code/solutions", $@"[
+  {{
+    ""solutionId"": ""{solutionId}"",
+    ""name"": ""RepoOne"",
+    ""relativePath"": ""./RepoOne.sln""
+  }}
+]");
+        handler.AddJsonResponse($"api/repositories/{configId}/code/solutions/{solutionId}/projects", "[]");
+        handler.AddJsonResponse($"api/repositories/{configId}/code/solutions/{solutionId}/tree", """
 [
   {
     "repositoryPath": "./src/Program.cs",
@@ -69,14 +78,18 @@ public sealed class IdeTests
                 })));
 
         var ide = cut.FindComponent<Ide>();
+        var changeMethod = typeof(Ide).GetMethod("OnRepositoryChanged", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(changeMethod);
+        var task = (Task)changeMethod!.Invoke(ide.Instance, new object?[] { configId })!;
+        task.GetAwaiter().GetResult();
+
+        ide.Render();
+
         var treeField = typeof(Ide).GetField("_treeEntries", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(treeField);
 
         var entries = (List<CodeTreeEntryModel>)treeField!.GetValue(ide.Instance)!;
-        entries.Add(new CodeTreeEntryModel("./src/Program.cs", "Repo One/src/Program.cs", "Program.cs", CodeTreeEntryType.File, "alpha", "Repo One"));
-
-        ide.Render();
-
+        Assert.Single(entries);
         cut.WaitForAssertion(() => Assert.Contains("Program.cs", cut.Markup));
     }
 }

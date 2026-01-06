@@ -47,7 +47,7 @@ public sealed class RepositoryLoadControllerTests
             RootPath = "/tmp/repo",
             Solutions = new List<RepositorySolutionConfig>
             {
-                new() { Id = Guid.NewGuid(), RelativePath = "./Repo.sln", IsEnabled = true }
+                new() { Id = Guid.NewGuid(), RelativePath = "./Repo.sln", SolutionId = "solution-1", IsEnabled = true }
             }
         };
         dbContext.RepositoryConfigs.Add(config);
@@ -84,7 +84,7 @@ public sealed class RepositoryLoadControllerTests
             RootPath = "/tmp/repo",
             Solutions = new List<RepositorySolutionConfig>
             {
-                new() { Id = Guid.NewGuid(), RelativePath = "./Repo.sln", IsEnabled = false }
+                new() { Id = Guid.NewGuid(), RelativePath = "./Repo.sln", SolutionId = "solution-1", IsEnabled = false }
             }
         };
         dbContext.RepositoryConfigs.Add(config);

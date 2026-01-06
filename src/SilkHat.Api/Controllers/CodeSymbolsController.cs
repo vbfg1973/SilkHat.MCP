@@ -4,7 +4,7 @@ using SilkHat.Code.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
 
-[Route("api/repositories/{id:guid}/code/symbols")]
+[Route("api/repositories/{id:guid}/code/solutions/{solutionId}/symbols")]
 public sealed class CodeSymbolsController : ApiControllerBase
 {
     private readonly ICodeWorkspaceStore _codeStore;
@@ -15,7 +15,7 @@ public sealed class CodeSymbolsController : ApiControllerBase
     }
 
     [HttpPost("lookup")]
-    public ActionResult<SymbolLookupResultDto> LookupSymbol(Guid id, [FromBody] SymbolLookupRequest request)
+    public ActionResult<SymbolLookupResultDto> LookupSymbol(Guid id, string solutionId, [FromBody] SymbolLookupRequest request)
     {
         var workspace = _codeStore.Get(id);
         if (workspace is null)
@@ -23,7 +23,13 @@ public sealed class CodeSymbolsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
         }
 
-        if (!workspace.NamedTypesBySymbolKey.TryGetValue(request.SymbolKey, out var namedType))
+        var solution = workspace.TryGetSolution(solutionId);
+        if (solution is null)
+        {
+            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+        }
+
+        if (!solution.NamedTypesBySymbolKey.TryGetValue(request.SymbolKey, out var namedType))
         {
             return Ok(new SymbolLookupResultDto(false, request.ExpectedKind, string.Empty, null, null));
         }

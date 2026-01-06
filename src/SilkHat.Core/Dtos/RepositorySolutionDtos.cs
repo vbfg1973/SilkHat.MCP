@@ -2,7 +2,9 @@ namespace SilkHat.Core.Dtos;
 
 public sealed record RepositorySolutionDto(
     string RelativePath,
-    bool IsEnabled);
+    bool IsEnabled,
+    string SolutionId);
 
 public sealed record AvailableRepositorySolutionDto(
-    string RelativePath);
+    string RelativePath,
+    string SolutionId);
