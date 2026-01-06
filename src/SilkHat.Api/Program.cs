@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Serilog;
+using Serilog.Context;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Services;
 using SilkHat.Analysis.Models;
@@ -10,9 +12,28 @@ using SilkHat.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Host.UseSerilog((context, services, configuration) =>
+{
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Enrich.FromLogContext()
+        .WriteTo.Console();
+});
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:10080" };
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("UiCors", policy =>
+    {
+        policy.WithOrigins(corsOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 var connectionString = builder.Configuration.GetConnectionString("SilkHat") ?? "Data Source=./silkhat.db";
 builder.Services.AddDbContext<SilkHatDbContext>(options => options.UseSqlite(connectionString));
@@ -31,8 +52,10 @@ builder.Services.AddSingleton<IGitCli, GitCli>();
 
 var app = builder.Build();
 
+app.UseCors("UiCors");
 app.UseSwagger();
 app.UseSwaggerUI();
+app.UseSerilogRequestLogging();
 
 app.Use(async (context, next) =>
 {
@@ -44,13 +67,17 @@ app.Use(async (context, next) =>
 
     context.Items["CorrelationId"] = correlationId;
     context.Response.Headers["X-Correlation-Id"] = correlationId;
-    await next();
+
+    using (LogContext.PushProperty("CorrelationId", correlationId))
+    {
+        await next();
+    }
 });
 
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<SilkHatDbContext>();
-    dbContext.Database.EnsureCreated();
+    dbContext.Database.Migrate();
 }
 
 app.MapControllers();

@@ -19,6 +19,7 @@ public sealed class IdeTests
         using var context = new TestContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddMudServices();
+        context.Services.AddLogging();
         context.Services.AddScoped<ThemeService>();
         context.JSInterop.Setup<string>("localStorage.getItem", _ => true).SetResult("light");
         context.JSInterop.SetupVoid("localStorage.setItem", _ => true);

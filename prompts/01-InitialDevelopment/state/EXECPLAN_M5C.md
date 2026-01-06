@@ -18,10 +18,41 @@ This milestone replaces the existing repository config/group UI with a dedicated
 - [x] (2026-01-06 16:28Z) Run `dotnet test` and verify all non-infrastructure tests pass.
 - [x] (2026-01-06 16:31Z) Run `docker compose up --build` and confirm API + UI run in Docker.
 - [x] (2026-01-06 16:34Z) Write Milestone Commit Notes for M5c and update milestone state files.
+- [x] (2026-01-06 16:46Z) Add EF Core migrations and switch API startup to `Database.Migrate()` for schema updates.
+- [x] (2026-01-06 17:15Z) Rebuild migrations to split initial schema from solution configs for existing database compatibility.
+- [x] (2026-01-06 17:28Z) Make solution config migration idempotent for existing tables.
+- [x] (2026-01-06 17:33Z) Revert migrations to code-first only (no raw SQL).
+- [ ] (2026-01-06 17:18Z) Re-run `dotnet test` after migration updates (blocked: MSBuild named pipe permission denied in this environment).
+- [ ] (2026-01-06 16:49Z) Re-run `docker compose up --build` after migrations update (blocked: Docker daemon permission denied).
+- [x] (2026-01-06 17:41Z) Add Serilog logging to API and UI to diagnose UI fetch failures.
+- [x] (2026-01-06 17:48Z) Fix UI API base URL resolution to avoid file:// requests in Docker.
+- [x] (2026-01-06 17:53Z) Enforce API base URL (throw on file scheme, no fallback).
+- [x] (2026-01-06 17:59Z) Add CORS policy for UI origin to allow API calls from localhost:10080.
+- [x] (2026-01-06 18:03Z) Move CORS middleware earlier to ensure headers on errors.
+- [x] (2026-01-06 18:08Z) Add Buildalyzer error handling to surface missing analyzer results.
+- [x] (2026-01-06 18:13Z) Fix Buildalyzer error handling for IAnalyzerResults API.
+- [x] (2026-01-06 18:18Z) Iterate analyzer results when loading workspaces to match Buildalyzer API.
+- [x] (2026-01-06 18:26Z) Add Buildalyzer diagnostics logging via TextWriterLogger.
+- [x] (2026-01-06 18:34Z) Resolve Buildalyzer logger type ambiguity.
+- [x] (2026-01-06 18:40Z) Log Buildalyzer build event errors/warnings when results are empty.
+- [x] (2026-01-06 18:48Z) Force Buildalyzer restore/full build and log result/event counts.
+- [x] (2026-01-06 18:54Z) Fix Buildalyzer log call overload resolution for LogDebug.
+- [x] (2026-01-06 19:00Z) Use ILogger.Log with explicit EventId for Buildalyzer summary logging.
+- [x] (2026-01-06 19:05Z) Fix ILogger.Log formatter signature for Buildalyzer summary logging.
+- [x] (2026-01-06 19:12Z) Fix Buildalyzer summary log count call to use Count().
+- [x] (2026-01-06 19:20Z) Add diagnostic MSBuild logging/binlog capture on empty Buildalyzer results.
+- [x] (2026-01-06 19:29Z) Log diagnostic build event summaries and counts after rerun.
+- [x] (2026-01-06 19:18Z) Add sample-solution code analysis tests against samples/solution01.
+- [x] (2026-01-06 19:24Z) Expand sample-solution tests to cover project index and symbol key lookups.
+- [x] (2026-01-06 19:32Z) Extend sample solution with additional type kinds for code analysis coverage.
+- [x] (2026-01-06 19:41Z) Add second sample project and reference coverage for project graph tests.
 
 ## Surprises & Discoveries
 
-None yet.
+- Observation: Docker daemon access can be blocked in this environment when re-running compose.
+  Evidence: `permission denied while trying to connect to the Docker daemon socket`.
+- Observation: `dotnet test` can fail due to MSBuild named pipe permissions in this environment.
+  Evidence: `System.Net.Sockets.SocketException (13): Permission denied`.
 
 ## Decision Log
 
@@ -33,6 +64,9 @@ None yet.
   Date/Author: 2026-01-06 / Codex
 - Decision: Clear loaded repository, workspace, and git cache state before group loads.
   Rationale: Requirement states group loads must rebuild workspaces from a fresh read.
+  Date/Author: 2026-01-06 / Codex
+- Decision: Use EF Core migrations and `Database.Migrate()` instead of `EnsureCreated()` for schema updates.
+  Rationale: Schema changes must be applied to existing databases without manual SQL or dropping data.
   Date/Author: 2026-01-06 / Codex
 
 ## Outcomes & Retrospective
@@ -81,3 +115,29 @@ Add or update bUnit tests in `tests/SilkHat.Ui.Tests` to assert that the new com
 Plan update (2026-01-06 13:05Z): Created M5c ExecPlan for the repository group loader UI overhaul.
 Plan update (2026-01-06 16:31Z): Recorded UI, API, and load workflow changes, plus test and Docker validation.
 Plan update (2026-01-06 16:34Z): Recorded milestone commit notes completion and outcomes.
+Plan update (2026-01-06 16:49Z): Added migrations and noted Docker re-validation blocked by daemon permissions.
+Plan update (2026-01-06 17:18Z): Rebuilt migrations and recorded test re-run blocked by MSBuild named pipe permissions.
+Plan update (2026-01-06 17:28Z): Made the solution config migration idempotent for existing tables.
+Plan update (2026-01-06 17:33Z): Reverted migrations to code-first only; existing databases now require reset.
+Plan update (2026-01-06 17:41Z): Added Serilog logging for API/UI fetch diagnostics.
+Plan update (2026-01-06 17:48Z): Updated UI API base URL defaults and file-scheme fallback.
+Plan update (2026-01-06 17:53Z): Removed file-scheme fallback and enforce API base URL.
+Plan update (2026-01-06 17:59Z): Added CORS policy for UI origin.
+Plan update (2026-01-06 18:03Z): Moved CORS middleware earlier for error responses.
+Plan update (2026-01-06 18:08Z): Added Buildalyzer error handling for null analyzer results.
+Plan update (2026-01-06 18:13Z): Updated Buildalyzer handling to use IAnalyzerResults with project paths.
+Plan update (2026-01-06 18:18Z): Adjusted workspace load to iterate analyzer results.
+Plan update (2026-01-06 18:26Z): Added Buildalyzer diagnostics logging.
+Plan update (2026-01-06 18:34Z): Fixed ILogger ambiguity in Buildalyzer logger wrapper.
+Plan update (2026-01-06 18:40Z): Log MSBuild event errors/warnings when Buildalyzer returns no results.
+Plan update (2026-01-06 18:48Z): Force Buildalyzer restore/full build to obtain analyzer results.
+Plan update (2026-01-06 18:54Z): Fixed LogDebug overload resolution for Buildalyzer diagnostics.
+Plan update (2026-01-06 19:00Z): Switched to ILogger.Log for Buildalyzer summary logging.
+Plan update (2026-01-06 19:05Z): Fixed ILogger.Log formatter signature for Buildalyzer summary logging.
+Plan update (2026-01-06 19:12Z): Fixed BuildEventArguments count logging for Buildalyzer summary.
+Plan update (2026-01-06 19:20Z): Added diagnostic MSBuild logging/binlog capture when results are empty.
+Plan update (2026-01-06 19:29Z): Added diagnostic build event summaries/counts after rerun.
+Plan update (2026-01-06 19:18Z): Added code analysis tests for samples/solution01.
+Plan update (2026-01-06 19:24Z): Expanded sample-solution tests for project index and symbol keys.
+Plan update (2026-01-06 19:32Z): Added enum/struct/record/delegate samples for broader analysis coverage.
+Plan update (2026-01-06 19:41Z): Added sample lib project and reference graph test coverage.

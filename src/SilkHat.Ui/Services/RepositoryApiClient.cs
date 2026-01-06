@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.Logging;
 using SilkHat.Ui.Models;
 
 namespace SilkHat.Ui.Services;
@@ -8,16 +9,18 @@ namespace SilkHat.Ui.Services;
 public sealed class RepositoryApiClient
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<RepositoryApiClient> _logger;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public RepositoryApiClient(HttpClient httpClient)
+    public RepositoryApiClient(HttpClient httpClient, ILogger<RepositoryApiClient> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyList<RepositoryGroupModel>> GetRepositoryGroupsAsync(CancellationToken cancellationToken = default)
     {
-        return await _httpClient.GetFromJsonAsync<List<RepositoryGroupModel>>(
+        return await GetFromJsonAsync<List<RepositoryGroupModel>>(
                    "api/repository-groups",
                    cancellationToken)
                ?? new List<RepositoryGroupModel>();
@@ -39,7 +42,7 @@ public sealed class RepositoryApiClient
 
     public async Task<IReadOnlyList<RepositoryConfigModel>> GetRepositoryConfigsAsync(CancellationToken cancellationToken = default)
     {
-        return await _httpClient.GetFromJsonAsync<List<RepositoryConfigModel>>(
+        return await GetFromJsonAsync<List<RepositoryConfigModel>>(
                    "api/repositories",
                    cancellationToken)
                ?? new List<RepositoryConfigModel>();
@@ -47,7 +50,7 @@ public sealed class RepositoryApiClient
 
     public async Task<IReadOnlyList<RepositoryConfigModel>> GetLoadedRepositoryConfigsAsync(CancellationToken cancellationToken = default)
     {
-        return await _httpClient.GetFromJsonAsync<List<RepositoryConfigModel>>(
+        return await GetFromJsonAsync<List<RepositoryConfigModel>>(
                    "api/repositories/loaded",
                    cancellationToken)
                ?? new List<RepositoryConfigModel>();
@@ -55,7 +58,7 @@ public sealed class RepositoryApiClient
 
     public async Task<IReadOnlyList<AvailableRepositoryModel>> GetAvailableRepositoriesAsync(CancellationToken cancellationToken = default)
     {
-        return await _httpClient.GetFromJsonAsync<List<AvailableRepositoryModel>>(
+        return await GetFromJsonAsync<List<AvailableRepositoryModel>>(
                    "api/repositories/available",
                    cancellationToken)
                ?? new List<AvailableRepositoryModel>();
@@ -66,7 +69,7 @@ public sealed class RepositoryApiClient
         CancellationToken cancellationToken = default)
     {
         var url = $"api/repositories/available/solutions?path={Uri.EscapeDataString(rootPath)}";
-        return await _httpClient.GetFromJsonAsync<List<AvailableRepositorySolutionModel>>(url, cancellationToken)
+        return await GetFromJsonAsync<List<AvailableRepositorySolutionModel>>(url, cancellationToken)
                ?? new List<AvailableRepositorySolutionModel>();
     }
 
@@ -97,7 +100,7 @@ public sealed class RepositoryApiClient
             ? $"api/repositories/{repositoryId}/code/projects"
             : $"api/repositories/{repositoryId}/code/projects?name={Uri.EscapeDataString(name)}";
 
-        return await _httpClient.GetFromJsonAsync<List<CodeProjectDto>>(url, cancellationToken)
+        return await GetFromJsonAsync<List<CodeProjectDto>>(url, cancellationToken)
                ?? new List<CodeProjectDto>();
     }
 
@@ -133,7 +136,7 @@ public sealed class RepositoryApiClient
         var queryString = query.Count > 0 ? "?" + string.Join("&", query) : string.Empty;
         var url = $"api/repositories/{repositoryId}/git/tree{queryString}";
 
-        return await _httpClient.GetFromJsonAsync<List<GitTreeEntryModel>>(url, cancellationToken)
+        return await GetFromJsonAsync<List<GitTreeEntryModel>>(url, cancellationToken)
                ?? new List<GitTreeEntryModel>();
     }
 
@@ -143,7 +146,7 @@ public sealed class RepositoryApiClient
         CancellationToken cancellationToken = default)
     {
         var url = $"api/repositories/{repositoryId}/git/files/{Uri.EscapeDataString(path)}/history";
-        return (await _httpClient.GetFromJsonAsync<GitFileHistoryModel>(url, cancellationToken))!;
+        return (await GetFromJsonAsync<GitFileHistoryModel>(url, cancellationToken))!;
     }
 
     public async Task<GitCoChangeStatsModel> GetGitCoChangesAsync(
@@ -152,7 +155,7 @@ public sealed class RepositoryApiClient
         CancellationToken cancellationToken = default)
     {
         var url = $"api/repositories/{repositoryId}/git/files/{Uri.EscapeDataString(path)}/cochanges";
-        return (await _httpClient.GetFromJsonAsync<GitCoChangeStatsModel>(url, cancellationToken))!;
+        return (await GetFromJsonAsync<GitCoChangeStatsModel>(url, cancellationToken))!;
     }
 
     public async IAsyncEnumerable<RepoEventModel> LoadRepositoryAsync(
@@ -192,6 +195,20 @@ public sealed class RepositoryApiClient
             {
                 yield return item;
             }
+        }
+    }
+
+    private async Task<T?> GetFromJsonAsync<T>(string url, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogDebug("GET {Url}", url);
+            return await _httpClient.GetFromJsonAsync<T>(url, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GET {Url} failed", url);
+            throw;
         }
     }
 }

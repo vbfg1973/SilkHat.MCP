@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SilkHat.Sample.App", "SilkHat.Sample.App\SilkHat.Sample.App.csproj", "{63914B81-659F-4D49-BC34-0EEAC9894A2F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SilkHat.Sample.Lib", "SilkHat.Sample.Lib\SilkHat.Sample.Lib.csproj", "{D2E0E1D1-7E6D-4D4C-8F91-3C5D0D998C5E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{63914B81-659F-4D49-BC34-0EEAC9894A2F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{63914B81-659F-4D49-BC34-0EEAC9894A2F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{63914B81-659F-4D49-BC34-0EEAC9894A2F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{63914B81-659F-4D49-BC34-0EEAC9894A2F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D2E0E1D1-7E6D-4D4C-8F91-3C5D0D998C5E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D2E0E1D1-7E6D-4D4C-8F91-3C5D0D998C5E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D2E0E1D1-7E6D-4D4C-8F91-3C5D0D998C5E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D2E0E1D1-7E6D-4D4C-8F91-3C5D0D998C5E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

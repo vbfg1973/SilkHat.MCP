@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using SilkHat.Code.Analysis.Services;
 
 namespace SilkHat.Tests.Services;
@@ -7,7 +8,7 @@ public sealed class CodeWorkspaceLoaderTests
     [Fact]
     public async Task LoadAsync_Throws_WhenNoSolutionFiles()
     {
-        var loader = new CodeWorkspaceLoader();
+        var loader = new CodeWorkspaceLoader(NullLogger<CodeWorkspaceLoader>.Instance);
         var tempRoot = Path.Combine(Path.GetTempPath(), $"silkhat-empty-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempRoot);
 
@@ -26,7 +27,7 @@ public sealed class CodeWorkspaceLoaderTests
     [Fact]
     public async Task LoadAsync_LoadsMinimalSolution()
     {
-        var loader = new CodeWorkspaceLoader();
+        var loader = new CodeWorkspaceLoader(NullLogger<CodeWorkspaceLoader>.Instance);
         var tempRoot = Path.Combine(Path.GetTempPath(), $"silkhat-sln-{Guid.NewGuid():N}");
         Directory.CreateDirectory(tempRoot);
 

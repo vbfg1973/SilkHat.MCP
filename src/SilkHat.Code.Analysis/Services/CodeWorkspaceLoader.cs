@@ -1,6 +1,10 @@
 using Buildalyzer;
+using Buildalyzer.Environment;
 using Buildalyzer.Workspaces;
+using Microsoft.Build.Framework;
+using Microsoft.Build.Logging;
 using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.Logging;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
@@ -9,6 +13,13 @@ namespace SilkHat.Code.Analysis.Services;
 
 public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 {
+    private readonly ILogger<CodeWorkspaceLoader> _logger;
+
+    public CodeWorkspaceLoader(ILogger<CodeWorkspaceLoader> logger)
+    {
+        _logger = logger;
+    }
+
     public async Task<CodeRepositoryWorkspace> LoadAsync(
         string rootPath,
         IReadOnlyList<string> solutionPaths,
@@ -43,9 +54,95 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             var manager = new AnalyzerManager(solutionPath);
             var workspace = new AdhocWorkspace();
 
-            foreach (var analyzer in manager.Projects.Values)
+            foreach (var entry in manager.Projects)
             {
-                analyzer.AddToWorkspace(workspace);
+                var projectPath = entry.Key;
+                var analyzer = entry.Value;
+                IAnalyzerResults? results;
+                var buildLogger = new SerilogBuildLogger(_logger, projectPath);
+                var options = new EnvironmentOptions
+                {
+                    DesignTime = false,
+                    Restore = true
+                };
+                try
+                {
+                    analyzer.AddBuildLogger(buildLogger);
+                    results = analyzer.Build(options);
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Buildalyzer failed for project '{projectPath}' in solution '{solutionPath}'.",
+                        ex);
+                }
+                finally
+                {
+                    analyzer.RemoveBuildLogger(buildLogger);
+                }
+
+                if (results is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Buildalyzer returned null for project '{projectPath}' in solution '{solutionPath}'.");
+                }
+
+                var analyzerResults = results.ToList();
+                var summary = $"Buildalyzer {projectPath}: {analyzerResults.Count} results, {results.BuildEventArguments.Count()} build events";
+                _logger.Log(
+                    LogLevel.Debug,
+                    new EventId(0, "Buildalyzer"),
+                    (object)summary,
+                    null,
+                    (state, _) => state?.ToString() ?? string.Empty);
+                if (analyzerResults.Count == 0)
+                {
+                    var errors = results.BuildEventArguments
+                        .OfType<BuildErrorEventArgs>()
+                        .Select(error => error.Message)
+                        .Where(message => !string.IsNullOrWhiteSpace(message))
+                        .ToList();
+                    var warnings = results.BuildEventArguments
+                        .OfType<BuildWarningEventArgs>()
+                        .Select(warning => warning.Message)
+                        .Where(message => !string.IsNullOrWhiteSpace(message))
+                        .ToList();
+
+                    foreach (var message in errors)
+                    {
+                        _logger.LogError("Buildalyzer {Project}: {Message}", projectPath, message);
+                    }
+
+                    foreach (var message in warnings)
+                    {
+                        _logger.LogWarning("Buildalyzer {Project}: {Message}", projectPath, message);
+                    }
+
+                    _logger.LogWarning(
+                        "Buildalyzer {Project}: no analyzer results; re-running build with MSBuild console logging.",
+                        projectPath);
+
+                    var diagnosticResults = RunDiagnosticsBuild(analyzer, options, projectPath);
+                    LogBuildEventSummary(diagnosticResults, projectPath, "diagnostic");
+                    analyzerResults = diagnosticResults.ToList();
+                    if (analyzerResults.Count == 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"Buildalyzer returned no analyzer results for project '{projectPath}' in solution '{solutionPath}'.");
+                    }
+
+                    results = diagnosticResults;
+                }
+
+                foreach (var analyzerResult in analyzerResults)
+                {
+                    if (analyzerResult is null)
+                    {
+                        continue;
+                    }
+
+                    analyzerResult.AddToWorkspace(workspace);
+                }
             }
 
             workspaces.Add(workspace);
@@ -156,6 +253,97 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             namedTypes,
             namedTypeByKey,
             compilations);
+    }
+
+    private IAnalyzerResults RunDiagnosticsBuild(
+        IProjectAnalyzer analyzer,
+        EnvironmentOptions options,
+        string projectPath)
+    {
+        var consoleLogger = new ConsoleLogger(LoggerVerbosity.Normal);
+        var binlogPath = Path.Combine(
+            Path.GetTempPath(),
+            $"silkhat-buildalyzer-{Guid.NewGuid():N}.binlog");
+        var binaryLogger = new BinaryLogger { Parameters = binlogPath };
+
+        analyzer.AddBuildLogger(consoleLogger);
+        analyzer.AddBuildLogger(binaryLogger);
+        try
+        {
+            var results = analyzer.Build(options);
+            _logger.LogWarning("Buildalyzer {Project}: MSBuild binlog written to {Path}", projectPath, binlogPath);
+            _logger.Log(
+                LogLevel.Information,
+                new EventId(0, "BuildalyzerDiagnostics"),
+                (object)$"Buildalyzer {projectPath}: diagnostic results {results.Count()} with {results.BuildEventArguments.Count()} build events",
+                null,
+                (state, _) => state?.ToString() ?? string.Empty);
+            return results;
+        }
+        finally
+        {
+            analyzer.RemoveBuildLogger(consoleLogger);
+            analyzer.RemoveBuildLogger(binaryLogger);
+        }
+    }
+
+    private void LogBuildEventSummary(IAnalyzerResults results, string projectPath, string label)
+    {
+        var errors = results.BuildEventArguments
+            .OfType<BuildErrorEventArgs>()
+            .Select(error => error.Message)
+            .Where(message => !string.IsNullOrWhiteSpace(message))
+            .ToList();
+        var warnings = results.BuildEventArguments
+            .OfType<BuildWarningEventArgs>()
+            .Select(warning => warning.Message)
+            .Where(message => !string.IsNullOrWhiteSpace(message))
+            .ToList();
+
+        foreach (var message in errors)
+        {
+            _logger.LogError("Buildalyzer {Project} ({Label}): {Message}", projectPath, label, message);
+        }
+
+        foreach (var message in warnings)
+        {
+            _logger.LogWarning("Buildalyzer {Project} ({Label}): {Message}", projectPath, label, message);
+        }
+    }
+
+    private sealed class SerilogBuildLogger : Microsoft.Build.Framework.ILogger
+    {
+        private readonly Microsoft.Extensions.Logging.ILogger _logger;
+        private readonly string _projectPath;
+
+        public SerilogBuildLogger(Microsoft.Extensions.Logging.ILogger logger, string projectPath)
+        {
+            _logger = logger;
+            _projectPath = projectPath;
+            Verbosity = LoggerVerbosity.Minimal;
+        }
+
+        public LoggerVerbosity Verbosity { get; set; }
+        public string? Parameters { get; set; }
+
+        public void Initialize(IEventSource eventSource)
+        {
+            eventSource.ErrorRaised += (_, args) =>
+                _logger.LogError("Buildalyzer {Project}: {Message}", _projectPath, args.Message);
+            eventSource.WarningRaised += (_, args) =>
+                _logger.LogWarning("Buildalyzer {Project}: {Message}", _projectPath, args.Message);
+            eventSource.MessageRaised += (_, args) =>
+            {
+                if (!string.IsNullOrWhiteSpace(args.Message))
+                {
+                    _logger.LogDebug("Buildalyzer {Project}: {Message}", _projectPath, args.Message.Trim());
+                }
+            };
+        }
+
+        public void Shutdown()
+        {
+        }
     }
 
     private static string ResolveSolutionPath(string rootPath, string solutionPath)
