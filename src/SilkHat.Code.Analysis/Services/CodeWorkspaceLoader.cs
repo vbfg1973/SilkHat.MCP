@@ -1,9 +1,6 @@
-using Buildalyzer;
-using Buildalyzer.Environment;
-using Buildalyzer.Workspaces;
-using Microsoft.Build.Framework;
-using Microsoft.Build.Logging;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
@@ -13,7 +10,10 @@ namespace SilkHat.Code.Analysis.Services;
 
 public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 {
+    private static readonly IReadOnlyList<MetadataReference> DefaultReferences = BuildDefaultReferences();
     private readonly ILogger<CodeWorkspaceLoader> _logger;
+    private readonly SolutionParser _solutionParser = new();
+    private readonly ProjectParser _projectParser = new();
 
     public CodeWorkspaceLoader(ILogger<CodeWorkspaceLoader> logger)
     {
@@ -41,135 +41,29 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             throw new InvalidOperationException("No solution files selected for loading.");
         }
 
-        var workspaces = new List<Workspace>();
-        var projectsByPath = new Dictionary<string, Project>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var solutionPath in resolvedSolutions)
+        var projects = LoadProjects(resolvedSolutions);
+        if (projects.Count == 0)
         {
-            if (!File.Exists(solutionPath))
-            {
-                throw new InvalidOperationException($"Solution file not found: {solutionPath}");
-            }
-
-            var manager = new AnalyzerManager(solutionPath);
-            var workspace = new AdhocWorkspace();
-
-            foreach (var entry in manager.Projects)
-            {
-                var projectPath = entry.Key;
-                var analyzer = entry.Value;
-                IAnalyzerResults? results;
-                var buildLogger = new SerilogBuildLogger(_logger, projectPath);
-                var options = new EnvironmentOptions
-                {
-                    DesignTime = false,
-                    Restore = true
-                };
-                try
-                {
-                    analyzer.AddBuildLogger(buildLogger);
-                    results = analyzer.Build(options);
-                }
-                catch (Exception ex)
-                {
-                    throw new InvalidOperationException(
-                        $"Buildalyzer failed for project '{projectPath}' in solution '{solutionPath}'.",
-                        ex);
-                }
-                finally
-                {
-                    analyzer.RemoveBuildLogger(buildLogger);
-                }
-
-                if (results is null)
-                {
-                    throw new InvalidOperationException(
-                        $"Buildalyzer returned null for project '{projectPath}' in solution '{solutionPath}'.");
-                }
-
-                var analyzerResults = results.ToList();
-                var summary = $"Buildalyzer {projectPath}: {analyzerResults.Count} results, {results.BuildEventArguments.Count()} build events";
-                _logger.Log(
-                    LogLevel.Debug,
-                    new EventId(0, "Buildalyzer"),
-                    (object)summary,
-                    null,
-                    (state, _) => state?.ToString() ?? string.Empty);
-                if (analyzerResults.Count == 0)
-                {
-                    var errors = results.BuildEventArguments
-                        .OfType<BuildErrorEventArgs>()
-                        .Select(error => error.Message)
-                        .Where(message => !string.IsNullOrWhiteSpace(message))
-                        .ToList();
-                    var warnings = results.BuildEventArguments
-                        .OfType<BuildWarningEventArgs>()
-                        .Select(warning => warning.Message)
-                        .Where(message => !string.IsNullOrWhiteSpace(message))
-                        .ToList();
-
-                    foreach (var message in errors)
-                    {
-                        _logger.LogError("Buildalyzer {Project}: {Message}", projectPath, message);
-                    }
-
-                    foreach (var message in warnings)
-                    {
-                        _logger.LogWarning("Buildalyzer {Project}: {Message}", projectPath, message);
-                    }
-
-                    _logger.LogWarning(
-                        "Buildalyzer {Project}: no analyzer results; re-running build with MSBuild console logging.",
-                        projectPath);
-
-                    var diagnosticResults = RunDiagnosticsBuild(analyzer, options, projectPath);
-                    LogBuildEventSummary(diagnosticResults, projectPath, "diagnostic");
-                    analyzerResults = diagnosticResults.ToList();
-                    if (analyzerResults.Count == 0)
-                    {
-                        throw new InvalidOperationException(
-                            $"Buildalyzer returned no analyzer results for project '{projectPath}' in solution '{solutionPath}'.");
-                    }
-
-                    results = diagnosticResults;
-                }
-
-                foreach (var analyzerResult in analyzerResults)
-                {
-                    if (analyzerResult is null)
-                    {
-                        continue;
-                    }
-
-                    analyzerResult.AddToWorkspace(workspace);
-                }
-            }
-
-            workspaces.Add(workspace);
-
-            foreach (var project in workspace.CurrentSolution.Projects)
-            {
-                if (string.IsNullOrWhiteSpace(project.FilePath))
-                {
-                    continue;
-                }
-
-                projectsByPath[project.FilePath] = project;
-            }
+            throw new InvalidOperationException("No C# projects were found in the selected solutions.");
         }
 
-        var projects = projectsByPath.Values.ToList();
-        var projectKeyMap = projects.ToDictionary(p => p.Id, p => p.Id.Id.ToString("N"));
-        var projectNameMap = projects.ToDictionary(p => p.Id, p => p.Name);
-        var projectKeyToName = projects.ToDictionary(p => projectKeyMap[p.Id], p => p.Name);
+        var workspace = BuildWorkspace(projects);
+        var workspaceProjects = workspace.CurrentSolution.Projects
+            .Where(project => !string.IsNullOrWhiteSpace(project.FilePath))
+            .ToList();
+
+        var projectKeyMap = workspaceProjects.ToDictionary(p => p.Id, p => p.Id.Id.ToString("N"));
+        var projectNameMap = workspaceProjects.ToDictionary(p => p.Id, p => p.Name);
+        var projectKeyToName = workspaceProjects.ToDictionary(p => projectKeyMap[p.Id], p => p.Name);
 
         var compilations = new Dictionary<string, Compilation>();
-        foreach (var project in projects)
+        foreach (var project in workspaceProjects)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var compilation = await project.GetCompilationAsync(cancellationToken);
             if (compilation is null)
             {
+                _logger.LogWarning("Roslyn compilation was null for project {ProjectName}.", project.Name);
                 continue;
             }
 
@@ -179,14 +73,14 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         var referenceMap = new Dictionary<string, HashSet<string>>();
         var referencedByMap = new Dictionary<string, HashSet<string>>();
 
-        foreach (var project in projects)
+        foreach (var project in workspaceProjects)
         {
             var projectKey = projectKeyMap[project.Id];
             referenceMap[projectKey] = new HashSet<string>();
             referencedByMap[projectKey] = new HashSet<string>();
         }
 
-        foreach (var project in projects)
+        foreach (var project in workspaceProjects)
         {
             var projectKey = projectKeyMap[project.Id];
             foreach (var reference in project.ProjectReferences)
@@ -202,14 +96,18 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         }
 
         var projectIndex = new Dictionary<string, ProjectIndex>();
-        foreach (var project in projects)
+        foreach (var project in workspaceProjects)
         {
             var projectKey = projectKeyMap[project.Id];
             var references = referenceMap[projectKey]
-                .Select(key => new CodeProjectReferenceDto(key, projectKeyToName.TryGetValue(key, out var name) ? name : key))
+                .Select(key => new CodeProjectReferenceDto(
+                    key,
+                    projectKeyToName.TryGetValue(key, out var name) ? name : key))
                 .ToList();
             var referencedBy = referencedByMap[projectKey]
-                .Select(key => new CodeProjectReferenceDto(key, projectKeyToName.TryGetValue(key, out var name) ? name : key))
+                .Select(key => new CodeProjectReferenceDto(
+                    key,
+                    projectKeyToName.TryGetValue(key, out var name) ? name : key))
                 .ToList();
 
             projectIndex[projectKey] = new ProjectIndex(
@@ -245,105 +143,171 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             }
         }
 
+        var treeEntries = BuildCodeTreeEntries(workspace, rootPath, projectKeyMap);
+
         return new CodeRepositoryWorkspace(
             rootPath,
-            workspaces,
+            new List<Workspace> { workspace },
             projectIndex,
+            treeEntries,
             namespaces.OrderBy(ns => ns, StringComparer.OrdinalIgnoreCase).ToList(),
             namedTypes,
             namedTypeByKey,
             compilations);
     }
 
-    private IAnalyzerResults RunDiagnosticsBuild(
-        IProjectAnalyzer analyzer,
-        EnvironmentOptions options,
-        string projectPath)
+    private Dictionary<string, ParsedProject> LoadProjects(IReadOnlyList<string> solutionPaths)
     {
-        var consoleLogger = new ConsoleLogger(LoggerVerbosity.Normal);
-        var binlogPath = Path.Combine(
-            Path.GetTempPath(),
-            $"silkhat-buildalyzer-{Guid.NewGuid():N}.binlog");
-        var binaryLogger = new BinaryLogger { Parameters = binlogPath };
-
-        analyzer.AddBuildLogger(consoleLogger);
-        analyzer.AddBuildLogger(binaryLogger);
-        try
+        var solutions = new Dictionary<string, ParsedSolution>(StringComparer.OrdinalIgnoreCase);
+        foreach (var solutionPath in solutionPaths)
         {
-            var results = analyzer.Build(options);
-            _logger.LogWarning("Buildalyzer {Project}: MSBuild binlog written to {Path}", projectPath, binlogPath);
-            _logger.Log(
-                LogLevel.Information,
-                new EventId(0, "BuildalyzerDiagnostics"),
-                (object)$"Buildalyzer {projectPath}: diagnostic results {results.Count()} with {results.BuildEventArguments.Count()} build events",
-                null,
-                (state, _) => state?.ToString() ?? string.Empty);
-            return results;
-        }
-        finally
-        {
-            analyzer.RemoveBuildLogger(consoleLogger);
-            analyzer.RemoveBuildLogger(binaryLogger);
-        }
-    }
-
-    private void LogBuildEventSummary(IAnalyzerResults results, string projectPath, string label)
-    {
-        var errors = results.BuildEventArguments
-            .OfType<BuildErrorEventArgs>()
-            .Select(error => error.Message)
-            .Where(message => !string.IsNullOrWhiteSpace(message))
-            .ToList();
-        var warnings = results.BuildEventArguments
-            .OfType<BuildWarningEventArgs>()
-            .Select(warning => warning.Message)
-            .Where(message => !string.IsNullOrWhiteSpace(message))
-            .ToList();
-
-        foreach (var message in errors)
-        {
-            _logger.LogError("Buildalyzer {Project} ({Label}): {Message}", projectPath, label, message);
-        }
-
-        foreach (var message in warnings)
-        {
-            _logger.LogWarning("Buildalyzer {Project} ({Label}): {Message}", projectPath, label, message);
-        }
-    }
-
-    private sealed class SerilogBuildLogger : Microsoft.Build.Framework.ILogger
-    {
-        private readonly Microsoft.Extensions.Logging.ILogger _logger;
-        private readonly string _projectPath;
-
-        public SerilogBuildLogger(Microsoft.Extensions.Logging.ILogger logger, string projectPath)
-        {
-            _logger = logger;
-            _projectPath = projectPath;
-            Verbosity = LoggerVerbosity.Minimal;
-        }
-
-        public LoggerVerbosity Verbosity { get; set; }
-        public string? Parameters { get; set; }
-
-        public void Initialize(IEventSource eventSource)
-        {
-            eventSource.ErrorRaised += (_, args) =>
-                _logger.LogError("Buildalyzer {Project}: {Message}", _projectPath, args.Message);
-            eventSource.WarningRaised += (_, args) =>
-                _logger.LogWarning("Buildalyzer {Project}: {Message}", _projectPath, args.Message);
-            eventSource.MessageRaised += (_, args) =>
+            if (!File.Exists(solutionPath))
             {
-                if (!string.IsNullOrWhiteSpace(args.Message))
-                {
-                    _logger.LogDebug("Buildalyzer {Project}: {Message}", _projectPath, args.Message.Trim());
-                }
-            };
+                throw new InvalidOperationException($"Solution file not found: {solutionPath}");
+            }
+
+            solutions[solutionPath] = _solutionParser.Parse(solutionPath);
         }
 
-        public void Shutdown()
+        var projectsByPath = new Dictionary<string, SolutionProject>(StringComparer.OrdinalIgnoreCase);
+        foreach (var solution in solutions.Values)
         {
+            foreach (var project in solution.Projects)
+            {
+                if (!projectsByPath.ContainsKey(project.FullPath))
+                {
+                    projectsByPath[project.FullPath] = project;
+                }
+            }
         }
+
+        var parsedProjects = new Dictionary<string, ParsedProject>(StringComparer.OrdinalIgnoreCase);
+        foreach (var project in projectsByPath.Values)
+        {
+            if (!File.Exists(project.FullPath))
+            {
+                throw new InvalidOperationException($"Project file not found: {project.FullPath}");
+            }
+
+            parsedProjects[project.FullPath] = _projectParser.Parse(project.FullPath);
+        }
+
+        return parsedProjects;
+    }
+
+    private static Workspace BuildWorkspace(IReadOnlyDictionary<string, ParsedProject> projects)
+    {
+        var workspace = new AdhocWorkspace();
+        var solution = workspace.CurrentSolution;
+        var projectIds = projects.ToDictionary(entry => entry.Key, _ => ProjectId.CreateNewId(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var project in projects.Values)
+        {
+            var projectId = projectIds[project.ProjectPath];
+            var projectInfo = CreateProjectInfo(project, projectId);
+            solution = solution.AddProject(projectInfo);
+        }
+
+        foreach (var project in projects.Values)
+        {
+            var projectId = projectIds[project.ProjectPath];
+            foreach (var document in CreateDocuments(projectId, project))
+            {
+                solution = solution.AddDocument(document);
+            }
+
+            foreach (var reference in project.ProjectReferences)
+            {
+                if (!projectIds.TryGetValue(reference.FullPath, out var referencedId))
+                {
+                    continue;
+                }
+
+                solution = solution.AddProjectReference(projectId, new ProjectReference(referencedId));
+            }
+        }
+
+        workspace.TryApplyChanges(solution);
+        return workspace;
+    }
+
+    private static ProjectInfo CreateProjectInfo(ParsedProject project, ProjectId projectId)
+    {
+        var parseOptions = CreateParseOptions(project);
+        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary);
+
+        return ProjectInfo.Create(
+                projectId,
+                VersionStamp.Create(),
+                project.ProjectName,
+                project.AssemblyName,
+                LanguageNames.CSharp,
+                filePath: project.ProjectPath)
+            .WithCompilationOptions(compilationOptions)
+            .WithParseOptions(parseOptions)
+            .WithMetadataReferences(DefaultReferences);
+    }
+
+    private static IEnumerable<DocumentInfo> CreateDocuments(ProjectId projectId, ParsedProject project)
+    {
+        foreach (var filePath in project.CompileItems)
+        {
+            if (!File.Exists(filePath))
+            {
+                continue;
+            }
+
+            var name = Path.GetFileName(filePath);
+            var text = SourceText.From(File.ReadAllText(filePath));
+            var loader = TextLoader.From(TextAndVersion.Create(text, VersionStamp.Create(), filePath));
+            yield return DocumentInfo.Create(DocumentId.CreateNewId(projectId), name, filePath: filePath, loader: loader);
+        }
+    }
+
+    private static CSharpParseOptions CreateParseOptions(ParsedProject project)
+    {
+        var languageVersion = LanguageVersion.Latest;
+        if (!string.IsNullOrWhiteSpace(project.LangVersion)
+            && LanguageVersionFacts.TryParse(project.LangVersion, out var parsedVersion))
+        {
+            languageVersion = parsedVersion;
+        }
+
+        return new CSharpParseOptions(languageVersion, preprocessorSymbols: project.DefineConstants);
+    }
+
+    private static IReadOnlyList<MetadataReference> BuildDefaultReferences()
+    {
+        var references = new List<MetadataReference>();
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var seedAssemblies = new[]
+        {
+            typeof(object).Assembly,
+            typeof(Enumerable).Assembly,
+            typeof(Task).Assembly
+        };
+
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().Concat(seedAssemblies))
+        {
+            if (assembly.IsDynamic)
+            {
+                continue;
+            }
+
+            var location = assembly.Location;
+            if (string.IsNullOrWhiteSpace(location))
+            {
+                continue;
+            }
+
+            if (paths.Add(location))
+            {
+                references.Add(MetadataReference.CreateFromFile(location));
+            }
+        }
+
+        return references;
     }
 
     private static string ResolveSolutionPath(string rootPath, string solutionPath)
@@ -396,7 +360,11 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         }
     }
 
-    private static NamedTypeDto ToNamedTypeDto(INamedTypeSymbol symbol, Compilation compilation, string projectKey, string rootPath)
+    private static NamedTypeDto ToNamedTypeDto(
+        INamedTypeSymbol symbol,
+        Compilation compilation,
+        string projectKey,
+        string rootPath)
     {
         var kind = symbol.IsRecord
             ? NamedTypeKind.Record
@@ -447,5 +415,144 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         }
 
         return relative;
+    }
+
+    private static IReadOnlyList<CodeTreeEntryDto> BuildCodeTreeEntries(
+        Workspace workspace,
+        string rootPath,
+        IReadOnlyDictionary<ProjectId, string> projectKeyMap)
+    {
+        var entries = new List<CodeTreeEntryDto>();
+        var entryKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var project in workspace.CurrentSolution.Projects)
+        {
+            if (string.IsNullOrWhiteSpace(project.FilePath))
+            {
+                continue;
+            }
+
+            if (!projectKeyMap.TryGetValue(project.Id, out var projectKey))
+            {
+                continue;
+            }
+
+            var projectRoot = Path.GetDirectoryName(project.FilePath);
+            if (string.IsNullOrWhiteSpace(projectRoot))
+            {
+                continue;
+            }
+
+            var projectRootRepoPath = NormalizeRelativePath(rootPath, projectRoot);
+            var projectDisplayPath = project.Name;
+
+            AddEntry(
+                entries,
+                entryKeys,
+                projectRootRepoPath,
+                projectDisplayPath,
+                project.Name,
+                CodeTreeEntryType.Project,
+                projectKey,
+                project.Name);
+
+            var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var document in project.Documents)
+            {
+                if (string.IsNullOrWhiteSpace(document.FilePath))
+                {
+                    continue;
+                }
+
+                var relativeToProject = NormalizePathKey(Path.GetRelativePath(projectRoot, document.FilePath));
+                if (relativeToProject.StartsWith("..", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var repositoryPath = NormalizeRelativePath(rootPath, document.FilePath);
+                var displayPath = $"{projectDisplayPath}/{relativeToProject}";
+                AddEntry(
+                    entries,
+                    entryKeys,
+                    repositoryPath,
+                    displayPath,
+                    Path.GetFileName(document.FilePath),
+                    CodeTreeEntryType.File,
+                    projectKey,
+                    project.Name);
+
+                var folder = Path.GetDirectoryName(relativeToProject);
+                if (string.IsNullOrWhiteSpace(folder))
+                {
+                    continue;
+                }
+
+                var parts = NormalizePathKey(folder).Split('/', StringSplitOptions.RemoveEmptyEntries);
+                var current = string.Empty;
+                foreach (var part in parts)
+                {
+                    current = string.IsNullOrEmpty(current) ? part : $"{current}/{part}";
+                    directories.Add(current);
+                }
+            }
+
+            foreach (var directory in directories.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
+            {
+                var directoryFullPath = Path.Combine(projectRoot, directory.Replace('/', Path.DirectorySeparatorChar));
+                var repositoryPath = NormalizeRelativePath(rootPath, directoryFullPath);
+                var displayPath = $"{projectDisplayPath}/{directory}";
+                AddEntry(
+                    entries,
+                    entryKeys,
+                    repositoryPath,
+                    displayPath,
+                    Path.GetFileName(directory),
+                    CodeTreeEntryType.Directory,
+                    projectKey,
+                    project.Name);
+            }
+        }
+
+        return entries
+            .OrderBy(entry => entry.DisplayPath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static void AddEntry(
+        ICollection<CodeTreeEntryDto> entries,
+        ISet<string> keys,
+        string repositoryPath,
+        string displayPath,
+        string name,
+        CodeTreeEntryType type,
+        string projectKey,
+        string projectName)
+    {
+        var key = $"{type}:{repositoryPath}:{projectKey}";
+        if (!keys.Add(key))
+        {
+            return;
+        }
+
+        entries.Add(new CodeTreeEntryDto(
+            repositoryPath,
+            displayPath,
+            name,
+            type,
+            projectKey,
+            projectName));
+    }
+
+    private static string NormalizePathKey(string path)
+    {
+        var normalized = path.Replace('\\', '/').TrimStart('/');
+        if (normalized.StartsWith("./", StringComparison.Ordinal))
+        {
+            normalized = normalized[2..];
+        }
+
+        return normalized;
     }
 }

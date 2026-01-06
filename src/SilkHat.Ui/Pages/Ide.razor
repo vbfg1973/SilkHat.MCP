@@ -30,12 +30,12 @@
             {
                 <MudAlert Severity="Severity.Error" Class="mb-2">@_treeError</MudAlert>
             }
-            <MudList T="GitTreeEntryModel" Dense="true">
+            <MudList T="CodeTreeEntryModel" Dense="true">
                 @foreach (var entry in _treeEntries)
                 {
-                    <MudListItem T="GitTreeEntryModel" OnClick="@(() => OnTreeEntrySelected(entry))">
+                    <MudListItem T="CodeTreeEntryModel" OnClick="@(() => OnTreeEntrySelected(entry))">
                         <MudText Typo="Typo.body2">
-                            @if (entry.Type == GitTreeEntryType.Directory)
+                            @if (entry.Type == CodeTreeEntryType.Directory || entry.Type == CodeTreeEntryType.Project)
                             {
                                 <MudIcon Icon="@Icons.Material.Filled.Folder" Class="me-1" />
                             }
@@ -43,7 +43,7 @@
                             {
                                 <MudIcon Icon="@Icons.Material.Filled.Description" Class="me-1" />
                             }
-                            @entry.Path
+                            @entry.DisplayPath
                         </MudText>
                     </MudListItem>
                 }
@@ -96,7 +96,7 @@
 @code {
     private readonly List<RepositoryConfigModel> _configs = new();
     private readonly List<CodeProjectDto> _projects = new();
-    private readonly List<GitTreeEntryModel> _treeEntries = new();
+    private readonly List<CodeTreeEntryModel> _treeEntries = new();
     private readonly List<GitFileHistoryEntryModel> _historyEntries = new();
     private Guid? _selectedConfigId;
     private string? _projectError;
@@ -137,8 +137,8 @@
 
         try
         {
-            var tree = await Api.GetGitTreeAsync(configId.Value);
-            _treeEntries.AddRange(tree.OrderBy(entry => entry.Path, StringComparer.OrdinalIgnoreCase));
+            var tree = await Api.GetCodeTreeAsync(configId.Value);
+            _treeEntries.AddRange(tree.OrderBy(entry => entry.DisplayPath, StringComparer.OrdinalIgnoreCase));
         }
         catch (Exception ex)
         {
@@ -146,9 +146,9 @@
         }
     }
 
-    private async Task OnTreeEntrySelected(GitTreeEntryModel entry)
+    private async Task OnTreeEntrySelected(CodeTreeEntryModel entry)
     {
-        if (entry.Type != GitTreeEntryType.File || !_selectedConfigId.HasValue)
+        if (entry.Type != CodeTreeEntryType.File || !_selectedConfigId.HasValue)
         {
             return;
         }
@@ -156,10 +156,10 @@
         _historyBusy = true;
         _historyError = null;
         _historyEntries.Clear();
-        _selectedPath = entry.Path;
+        _selectedPath = entry.DisplayPath;
         try
         {
-            var history = await Api.GetGitFileHistoryAsync(_selectedConfigId.Value, entry.Path);
+            var history = await Api.GetGitFileHistoryAsync(_selectedConfigId.Value, entry.RepositoryPath);
             _historyEntries.AddRange(history.Entries);
         }
         catch (Exception ex)

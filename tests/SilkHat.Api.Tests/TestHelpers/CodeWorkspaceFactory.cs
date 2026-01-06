@@ -50,6 +50,7 @@ public static class CodeWorkspaceFactory
             "/repo",
             new List<Workspace>(),
             projects,
+            new List<CodeTreeEntryDto>(),
             namespaces,
             namedTypes,
             namedTypesByKey,

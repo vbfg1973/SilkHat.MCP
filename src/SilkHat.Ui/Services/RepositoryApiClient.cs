@@ -104,6 +104,15 @@ public sealed class RepositoryApiClient
                ?? new List<CodeProjectDto>();
     }
 
+    public async Task<IReadOnlyList<CodeTreeEntryModel>> GetCodeTreeAsync(
+        Guid repositoryId,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/{repositoryId}/code/tree";
+        return await GetFromJsonAsync<List<CodeTreeEntryModel>>(url, cancellationToken)
+               ?? new List<CodeTreeEntryModel>();
+    }
+
     public async Task<IReadOnlyList<GitTreeEntryModel>> GetGitTreeAsync(
         Guid repositoryId,
         string? name = null,

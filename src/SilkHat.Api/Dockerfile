@@ -18,6 +18,9 @@ RUN dotnet publish -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 EXPOSE 8080
 
