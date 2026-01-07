@@ -49,6 +49,7 @@ builder.Services.AddSingleton<IRepoCommandProcessor, RepoCommandProcessor>();
 builder.Services.AddSingleton<ICodeWorkspaceStore, CodeWorkspaceStore>();
 builder.Services.AddSingleton<ICodeWorkspaceLoader, CodeWorkspaceLoader>();
 builder.Services.AddSingleton<ICodeTreeService, CodeTreeService>();
+builder.Services.AddSingleton<ICodeFileService, CodeFileService>();
 builder.Services.Configure<RepositoryDiscoveryOptions>(options =>
 {
     options.RepoRoot = builder.Configuration["REPO_ROOT"];

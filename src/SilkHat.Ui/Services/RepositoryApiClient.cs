@@ -133,6 +133,17 @@ public sealed class RepositoryApiClient
                ?? new List<CodeTreeEntryModel>();
     }
 
+    public async Task<CodeFileContentModel> GetCodeFileAsync(
+        Guid repositoryId,
+        string solutionId,
+        string displayPath,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/{repositoryId}/code/solutions/{solutionId}/files?path={Uri.EscapeDataString(displayPath)}";
+        return await GetFromJsonAsync<CodeFileContentModel>(url, cancellationToken)
+               ?? new CodeFileContentModel(displayPath, displayPath, string.Empty);
+    }
+
     public async Task<IReadOnlyList<GitTreeEntryModel>> GetGitTreeAsync(
         Guid repositoryId,
         string? name = null,
