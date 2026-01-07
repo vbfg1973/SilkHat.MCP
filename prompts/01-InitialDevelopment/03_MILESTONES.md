@@ -105,6 +105,12 @@ Each milestone must end with:
 - Ensure code tree, projects, namespaces, named types, symbol lookup, and any other solution-derived data are scoped to a specific solution.
 - Update UI/API clients and tests to use solution-scoped routes.
 
+## M5g: IDE File Tabs + Fast File Content
+- When selecting a file in the IDE tree, open the file content in a new tab in the center panel.
+- Remove the welcome tab and allow the tab area to grow to fit file content.
+- Serve file contents directly from the repository filesystem using repository + solution context for fast lookup.
+- Add API/UI tests for file content retrieval and tab behavior.
+
 ## M6: Hardening + Docs + Scripts
 - Scripts: build/test/run + docker convenience scripts
 - Docs: architecture overview, API notes, troubleshooting

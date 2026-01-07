@@ -6,245 +6,243 @@
 <MudText Typo="Typo.h4" Class="mb-4">IDE View</MudText>
 
 <MudPaper Elevation="1" Class="pa-4 mb-4">
-    <MudSelect T="Guid?"
-               Label="Repository Config"
-               Value="_selectedConfigId"
-               ValueChanged="OnRepositoryChanged">
-        <MudSelectItem T="Guid?" Value="@(default(Guid?))">Select a repository</MudSelectItem>
-        @foreach (var config in _configs)
-        {
-            <MudSelectItem T="Guid?" Value="@config.Id">@config.Name</MudSelectItem>
-        }
-    </MudSelect>
     <MudSelect T="string"
                Label="Solution"
                Value="_selectedSolutionId"
                ValueChanged="OnSolutionChanged"
-               Disabled="@(!_selectedConfigId.HasValue)"
-               Class="mt-3">
-        @foreach (var solution in _solutions)
+               Disabled="@(_availableSolutions.Count == 0)">
+        @foreach (var solution in _availableSolutions)
         {
-            <MudSelectItem T="string" Value="@solution.SolutionId">@solution.Name</MudSelectItem>
+            <MudSelectItem T="string" Value="@solution.SolutionId">@solution.DisplayName</MudSelectItem>
         }
     </MudSelect>
-    @if (!string.IsNullOrWhiteSpace(_projectError))
-    {
-        <MudAlert Severity="Severity.Error" Class="mt-3">@_projectError</MudAlert>
-    }
     @if (!string.IsNullOrWhiteSpace(_solutionError))
     {
         <MudAlert Severity="Severity.Error" Class="mt-3">@_solutionError</MudAlert>
     }
 </MudPaper>
 
-<MudGrid>
-    <MudItem xs="12" md="3">
-        <MudPaper Elevation="1" Class="pa-3">
+<div style="width: 90vw; margin-left: 5vw; margin-right: 5vw;">
+    <div class="d-flex gap-4">
+        <MudPaper Elevation="1" Class="pa-3" Style="width: 320px; flex-shrink: 0;">
             <MudText Typo="Typo.subtitle1" Class="mb-2">Repository Tree</MudText>
-            @if (!string.IsNullOrWhiteSpace(_treeError))
+            @if (!string.IsNullOrWhiteSpace(_currentState?.TreeError))
             {
-                <MudAlert Severity="Severity.Error" Class="mb-2">@_treeError</MudAlert>
+                <MudAlert Severity="Severity.Error" Class="mb-2">@_currentState!.TreeError</MudAlert>
             }
-            <MudTreeView T="CodeTreeEntryModel" ServerData="LoadTreeChildrenAsync" Items="_treeItems">
+            <MudTreeView T="CodeTreeEntryModel" ServerData="LoadTreeChildrenAsync" Items="_currentState?.TreeItems">
                 <ItemTemplate>
                     <MudTreeViewItem T="CodeTreeEntryModel"
                                      Value="@context.Value"
                                      Text="@context.Text"
-                                    Items="@context.Children"
-                                    ItemsChanged="@(new Action<IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>>>(items => OnItemsLoaded(context, items)))"
-                                    @bind-Expanded="context.Expanded"
-                                    CanExpand="@context.Expandable"
-                                    Icon="@context.Icon"
-                                    LoadingIconColor="Color.Info"
+                                     Items="@context.Children"
+                                     ItemsChanged="@(new Action<IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>>>(items => OnItemsLoaded(context, items)))"
+                                     @bind-Expanded="context.Expanded"
+                                     CanExpand="@context.Expandable"
+                                     Icon="@context.Icon"
+                                     LoadingIconColor="Color.Info"
                                      OnClick="@(async (MouseEventArgs _) => await OnTreeEntrySelected(context.Value))" />
                 </ItemTemplate>
             </MudTreeView>
         </MudPaper>
-    </MudItem>
-    <MudItem xs="12" md="6">
-        <MudPaper Elevation="1" Class="pa-3">
-            <MudTabs Rounded="true" Elevation="0">
-                <MudTabPanel Text="Welcome">
-                    <MudText Typo="Typo.body2">
-                        Select a repository and use this area for file tabs. Syntax highlighting and file viewing will follow.
-                    </MudText>
-                </MudTabPanel>
-            </MudTabs>
+        <MudPaper Elevation="1" Class="pa-3 d-flex flex-column flex-grow-1" Style="min-width: 0;">
+            @if (_currentState?.OpenFiles.Count > 0)
+            {
+                <MudStack Row="true" Justify="Justify.FlexEnd" Class="mb-2">
+                    <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="CloseAllTabs">Close all tabs</MudButton>
+                </MudStack>
+                <MudTabs Rounded="true" Elevation="0" @bind-ActivePanelIndex="_currentState.ActiveTabIndex" Class="flex-grow-1">
+                    @for (var index = 0; index < _currentState.OpenFiles.Count; index++)
+                    {
+                        var file = _currentState.OpenFiles[index];
+                        var tabIndex = index;
+                        <MudTabPanel>
+                            <TabContent>
+                                <div class="d-flex align-items-center gap-2">
+                                    <MudText Typo="Typo.body2">@file.Name</MudText>
+                                    <span @onclick:stopPropagation="true">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                                       Size="Size.Small"
+                                                       Color="Color.Default"
+                                                       OnClick="@(async (MouseEventArgs _) => await CloseTabAsync(tabIndex))" />
+                                    </span>
+                                </div>
+                            </TabContent>
+                            <ChildContent>
+                                <MudPaper Elevation="0" Class="pa-3" Style="height: 100%; overflow: auto;">
+                                    <pre style="margin: 0; white-space: pre; font-family: Consolas, 'Courier New', monospace; font-size: 0.85rem;">@file.Content</pre>
+                                </MudPaper>
+                            </ChildContent>
+                        </MudTabPanel>
+                    }
+                </MudTabs>
+            }
         </MudPaper>
-    </MudItem>
-    <MudItem xs="12" md="3">
-        <MudPaper Elevation="1" Class="pa-3">
-            <MudText Typo="Typo.subtitle1" Class="mb-2">File History</MudText>
-            @if (_historyBusy)
-            {
-                <MudProgressCircular Indeterminate="true" Size="Size.Small" Class="mb-2" />
-            }
-            @if (!string.IsNullOrWhiteSpace(_historyError))
-            {
-                <MudAlert Severity="Severity.Error" Class="mb-2">@_historyError</MudAlert>
-            }
-            @if (!string.IsNullOrWhiteSpace(_selectedPath))
-            {
-                <MudText Typo="Typo.caption" Class="mb-2">@_selectedPath</MudText>
-            }
-            <MudList T="GitFileHistoryEntryModel" Dense="true">
-                @foreach (var entry in _historyEntries)
-                {
-                    <MudListItem T="GitFileHistoryEntryModel">
-                        <MudText Typo="Typo.body2">
-                            @entry.CommitSha[..Math.Min(7, entry.CommitSha.Length)] - @entry.Message
-                        </MudText>
-                        <MudText Typo="Typo.caption">
-                            @entry.Author | @entry.CommitDateUtc.ToLocalTime().ToString("g")
-                        </MudText>
-                    </MudListItem>
-                }
-            </MudList>
-        </MudPaper>
-    </MudItem>
-</MudGrid>
+    </div>
+</div>
 
 @code {
-    private readonly List<RepositoryConfigModel> _configs = new();
-    private readonly List<CodeSolutionModel> _solutions = new();
-    private readonly List<CodeProjectDto> _projects = new();
-    private readonly List<TreeItemData<CodeTreeEntryModel>> _treeItems = new();
-    private readonly List<GitFileHistoryEntryModel> _historyEntries = new();
-    private Guid? _selectedConfigId;
+    private readonly List<SolutionEntry> _availableSolutions = new();
+    private readonly Dictionary<string, SolutionViewState> _solutionStates = new(StringComparer.OrdinalIgnoreCase);
     private string? _selectedSolutionId;
-    private string? _projectError;
+    private SolutionViewState? _currentState;
     private string? _solutionError;
-    private string? _treeError;
-    private string? _historyError;
-    private bool _historyBusy;
-    private string? _selectedPath;
 
     protected override async Task OnInitializedAsync()
     {
-        _configs.AddRange(await Api.GetLoadedRepositoryConfigsAsync());
-        _configs.Sort((left, right) => string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase));
-        if (_configs.Count > 0)
+        var configs = await Api.GetLoadedRepositoryConfigsAsync();
+        foreach (var config in configs)
         {
-            await OnRepositoryChanged(_configs[0].Id);
-        }
-    }
-
-    private async Task OnRepositoryChanged(Guid? configId)
-    {
-        _selectedConfigId = configId;
-        _selectedSolutionId = null;
-        _solutions.Clear();
-        _projects.Clear();
-        _treeItems.Clear();
-        _historyEntries.Clear();
-        _projectError = null;
-        _solutionError = null;
-        _treeError = null;
-        _historyError = null;
-        _selectedPath = null;
-        if (!configId.HasValue)
-        {
-            return;
-        }
-
-        try
-        {
-            var solutions = await Api.GetCodeSolutionsAsync(configId.Value);
-            if (solutions.Count == 0)
+            foreach (var solution in config.Solutions.Where(item => item.IsEnabled))
             {
-                _solutionError = "No solutions are loaded for this repository.";
-                return;
+                _availableSolutions.Add(new SolutionEntry(
+                    solution.SolutionId,
+                    solution.RelativePath,
+                    solution.RelativePath,
+                    config.Id,
+                    $"{solution.RelativePath} ({config.Name})"));
+            }
+        }
+
+        _availableSolutions.Sort((left, right) =>
+        {
+            var nameComparison = string.Compare(left.DisplayName, right.DisplayName, StringComparison.OrdinalIgnoreCase);
+            if (nameComparison != 0)
+            {
+                return nameComparison;
             }
 
-            _solutions.AddRange(solutions);
-            _solutions.Sort((left, right) =>
-            {
-                var nameComparison = string.Compare(left.Name, right.Name, StringComparison.OrdinalIgnoreCase);
-                if (nameComparison != 0)
-                {
-                    return nameComparison;
-                }
+            return string.Compare(left.SolutionId, right.SolutionId, StringComparison.OrdinalIgnoreCase);
+        });
 
-                return string.Compare(left.RelativePath, right.RelativePath, StringComparison.OrdinalIgnoreCase);
-            });
-            _selectedSolutionId = _solutions[0].SolutionId;
-        }
-        catch (Exception ex)
+        if (_availableSolutions.Count == 0)
         {
-            _solutionError = ex.Message;
+            _solutionError = "No solutions are loaded.";
             return;
         }
 
-        await LoadSolutionDataAsync(configId.Value, _selectedSolutionId);
+        await OnSolutionChanged(_availableSolutions[0].SolutionId);
     }
 
     private async Task OnSolutionChanged(string? solutionId)
     {
         _selectedSolutionId = solutionId;
-        _projects.Clear();
-        _treeItems.Clear();
-        _projectError = null;
-        _treeError = null;
-        if (!_selectedConfigId.HasValue || string.IsNullOrWhiteSpace(_selectedSolutionId))
+        _solutionError = null;
+        if (string.IsNullOrWhiteSpace(_selectedSolutionId))
         {
             return;
         }
 
-        await LoadSolutionDataAsync(_selectedConfigId.Value, _selectedSolutionId);
+        if (_solutionStates.TryGetValue(_selectedSolutionId, out var existing))
+        {
+            _currentState = existing;
+            return;
+        }
+
+        var entry = _availableSolutions.FirstOrDefault(solution =>
+            string.Equals(solution.SolutionId, _selectedSolutionId, StringComparison.OrdinalIgnoreCase));
+        if (entry is null)
+        {
+            _solutionError = "Solution not found.";
+            return;
+        }
+
+        var state = new SolutionViewState(entry.ConfigId, entry.SolutionId);
+        _solutionStates[entry.SolutionId] = state;
+        _currentState = state;
+        await LoadSolutionDataAsync(state, entry);
     }
 
-    private async Task LoadSolutionDataAsync(Guid configId, string? solutionId)
+    private async Task LoadSolutionDataAsync(SolutionViewState state, SolutionEntry entry)
     {
-        if (string.IsNullOrWhiteSpace(solutionId))
+        if (state.TreeLoaded)
         {
             return;
         }
 
         try
         {
-            var projects = await Api.GetCodeProjectsAsync(configId, solutionId);
-            _projects.AddRange(projects);
+            var tree = await Api.GetCodeTreeAsync(entry.ConfigId, entry.SolutionId);
+            state.TreeItems.AddRange(tree.Select(BuildTreeItem));
+            state.TreeLoaded = true;
         }
         catch (Exception ex)
         {
-            _projectError = ex.Message;
-        }
-
-        try
-        {
-            var tree = await Api.GetCodeTreeAsync(configId, solutionId);
-            _treeItems.AddRange(tree.Select(BuildTreeItem));
-        }
-        catch (Exception ex)
-        {
-            _treeError = ex.Message;
+            state.TreeError = ex.Message;
         }
     }
 
     private async Task OnTreeEntrySelected(CodeTreeEntryModel? entry)
     {
-        if (entry is null || entry.Type != CodeTreeEntryType.File || !_selectedConfigId.HasValue)
+        if (entry is null || entry.Type != CodeTreeEntryType.File || _currentState is null)
         {
             return;
         }
 
-        _historyBusy = true;
-        _historyError = null;
-        _historyEntries.Clear();
-        _selectedPath = entry.DisplayPath;
+        var existingIndex = _currentState.OpenFiles.FindIndex(file =>
+            string.Equals(file.RepositoryPath, entry.RepositoryPath, StringComparison.OrdinalIgnoreCase));
+        if (existingIndex >= 0)
+        {
+            _currentState.ActiveTabIndex = existingIndex;
+            return;
+        }
+
         try
         {
-            var history = await Api.GetGitFileHistoryAsync(_selectedConfigId.Value, entry.RepositoryPath);
-            _historyEntries.AddRange(history.Entries);
+            var fileContent = await Api.GetCodeFileAsync(_currentState.ConfigId, _currentState.SolutionId, entry.DisplayPath);
+            _currentState.OpenFiles.Add(new OpenFileTab(
+                entry.RepositoryPath,
+                entry.DisplayPath,
+                entry.Name,
+                fileContent.Content));
+            _currentState.ActiveTabIndex = _currentState.OpenFiles.Count - 1;
         }
         catch (Exception ex)
         {
-            _historyError = ex.Message;
+            _currentState.TreeError = ex.Message;
         }
-        finally
+    }
+
+    private Task CloseTabAsync(int index)
+    {
+        if (_currentState is null)
         {
-            _historyBusy = false;
+            return Task.CompletedTask;
         }
+
+        if (index < 0 || index >= _currentState.OpenFiles.Count)
+        {
+            return Task.CompletedTask;
+        }
+
+        _currentState.OpenFiles.RemoveAt(index);
+        if (_currentState.OpenFiles.Count == 0)
+        {
+            _currentState.ActiveTabIndex = 0;
+            return Task.CompletedTask;
+        }
+
+        if (_currentState.ActiveTabIndex >= _currentState.OpenFiles.Count)
+        {
+            _currentState.ActiveTabIndex = _currentState.OpenFiles.Count - 1;
+        }
+        else if (_currentState.ActiveTabIndex > index)
+        {
+            _currentState.ActiveTabIndex -= 1;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void CloseAllTabs()
+    {
+        if (_currentState is null)
+        {
+            return;
+        }
+
+        _currentState.OpenFiles.Clear();
+        _currentState.ActiveTabIndex = 0;
     }
 
     private async Task<IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>>> LoadTreeChildrenAsync(
@@ -252,24 +250,24 @@
     {
         if (parent is null)
         {
-            return _treeItems;
+            return _currentState?.TreeItems ?? new List<TreeItemData<CodeTreeEntryModel>>();
         }
 
-        if (!_selectedConfigId.HasValue || string.IsNullOrWhiteSpace(_selectedSolutionId))
+        if (_currentState is null)
         {
             return Array.Empty<TreeItemData<CodeTreeEntryModel>>();
         }
 
         try
         {
-            var children = await Api.GetCodeTreeAsync(_selectedConfigId.Value, _selectedSolutionId, parent.DisplayPath);
+            var children = await Api.GetCodeTreeAsync(_currentState.ConfigId, _currentState.SolutionId, parent.DisplayPath);
             return children
                 .Select(BuildTreeItem)
                 .ToList();
         }
         catch (Exception ex)
         {
-            _treeError = ex.Message;
+            _currentState.TreeError = ex.Message;
             return Array.Empty<TreeItemData<CodeTreeEntryModel>>();
         }
     }
@@ -301,5 +299,35 @@
             CodeTreeEntryType.Directory => Icons.Material.Filled.Folder,
             _ => Icons.Material.Filled.Description
         };
+    }
+
+    private sealed record OpenFileTab(
+        string RepositoryPath,
+        string DisplayPath,
+        string Name,
+        string Content);
+
+    private sealed record SolutionEntry(
+        string SolutionId,
+        string RelativePath,
+        string Name,
+        Guid ConfigId,
+        string DisplayName);
+
+    private sealed class SolutionViewState
+    {
+        public SolutionViewState(Guid configId, string solutionId)
+        {
+            ConfigId = configId;
+            SolutionId = solutionId;
+        }
+
+        public Guid ConfigId { get; }
+        public string SolutionId { get; }
+        public List<TreeItemData<CodeTreeEntryModel>> TreeItems { get; } = new();
+        public List<OpenFileTab> OpenFiles { get; } = new();
+        public int ActiveTabIndex { get; set; }
+        public string? TreeError { get; set; }
+        public bool TreeLoaded { get; set; }
     }
 }
