@@ -57,6 +57,7 @@ public sealed class CodeTreeServiceTests
             new List<string>(),
             new List<NamedTypeDto>(),
             new Dictionary<string, NamedTypeDto>(),
+            new Dictionary<string, NamedTypeDto>(),
             new Dictionary<string, Microsoft.CodeAnalysis.Compilation>());
     }
 

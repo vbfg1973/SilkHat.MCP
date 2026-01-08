@@ -3,16 +3,16 @@ using SilkHat.Ui.State.Ide.Models;
 
 namespace SilkHat.Ui.State.Ide.Actions;
 
-public sealed record OpenCallStackPopupAction(string SolutionId, string SymbolKey);
+public sealed record OpenCallStackPopupAction(string SolutionId, string? DocumentationId, string SymbolKey);
 public sealed record CloseCallStackPopupAction(string SolutionId);
 
-public sealed record LoadCallStackAction(string SolutionId, Guid ConfigId, string SymbolKey, int? MaxDepth);
-public sealed record LoadCallStackSuccessAction(string SolutionId, string SymbolKey, IReadOnlyList<MethodCallStackNodeModel> Nodes);
-public sealed record LoadCallStackFailureAction(string SolutionId, string SymbolKey, string Error);
+public sealed record LoadCallStackAction(string SolutionId, Guid ConfigId, string? DocumentationId, string SymbolKey, int? MaxDepth);
+public sealed record LoadCallStackSuccessAction(string SolutionId, string? DocumentationId, string SymbolKey, IReadOnlyList<MethodCallStackNodeModel> Nodes);
+public sealed record LoadCallStackFailureAction(string SolutionId, string? DocumentationId, string SymbolKey, string Error);
 
-public sealed record LoadCallStackMermaidAction(string SolutionId, Guid ConfigId, string SymbolKey, int? MaxDepth);
-public sealed record LoadCallStackMermaidSuccessAction(string SolutionId, string SymbolKey, string Diagram);
-public sealed record LoadCallStackMermaidFailureAction(string SolutionId, string SymbolKey, string Error);
+public sealed record LoadCallStackMermaidAction(string SolutionId, Guid ConfigId, string? DocumentationId, string SymbolKey, int? MaxDepth);
+public sealed record LoadCallStackMermaidSuccessAction(string SolutionId, string? DocumentationId, string SymbolKey, string Diagram);
+public sealed record LoadCallStackMermaidFailureAction(string SolutionId, string? DocumentationId, string SymbolKey, string Error);
 
 public sealed record SaveCallStackDecisionAction(
     string SolutionId,

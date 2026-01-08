@@ -1,6 +1,7 @@
 namespace SilkHat.Code.Core.Dtos;
 
 public sealed record MethodCallStackRequestDto(
+    string? DocumentationId,
     string SymbolKey,
     int? MaxDepth);
 

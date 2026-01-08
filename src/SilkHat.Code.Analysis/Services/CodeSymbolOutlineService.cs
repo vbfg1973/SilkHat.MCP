@@ -148,6 +148,7 @@ public sealed class CodeSymbolOutlineService : ICodeSymbolOutlineService
 
         return new SymbolOutlineNodeDto(
             SymbolKeyUtility.GetSymbolKeyString(symbol, compilation),
+            DocumentationIdUtility.GetDocumentationId(symbol),
             symbol.Name,
             symbol.Kind.ToString(),
             GetRealType(symbol),
@@ -158,6 +159,7 @@ public sealed class CodeSymbolOutlineService : ICodeSymbolOutlineService
     {
         return new SymbolOutlineNodeDto(
             SymbolKeyUtility.GetSymbolKeyString(symbol, compilation),
+            DocumentationIdUtility.GetDocumentationId(symbol),
             symbol.Name,
             symbol.Kind.ToString(),
             GetRealType(symbol),

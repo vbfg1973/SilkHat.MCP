@@ -18,6 +18,7 @@ public static class IdeCallStackReducers
             IsOpen = true,
             Error = null,
             MermaidError = null,
+            DocumentationId = action.DocumentationId,
             SymbolKey = action.SymbolKey
         };
 
@@ -56,6 +57,7 @@ public static class IdeCallStackReducers
         {
             IsLoading = true,
             Error = null,
+            DocumentationId = action.DocumentationId,
             SymbolKey = action.SymbolKey
         };
 
@@ -74,6 +76,7 @@ public static class IdeCallStackReducers
         {
             IsLoading = false,
             Error = null,
+            DocumentationId = action.DocumentationId,
             SymbolKey = action.SymbolKey,
             Nodes = action.Nodes
         };
@@ -110,6 +113,7 @@ public static class IdeCallStackReducers
         {
             IsMermaidLoading = true,
             MermaidError = null,
+            DocumentationId = action.DocumentationId,
             SymbolKey = action.SymbolKey
         };
 
@@ -128,6 +132,7 @@ public static class IdeCallStackReducers
         {
             IsMermaidLoading = false,
             MermaidError = null,
+            DocumentationId = action.DocumentationId,
             MermaidDiagram = action.Diagram
         };
 

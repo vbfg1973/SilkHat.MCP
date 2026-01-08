@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Services;
 using SilkHat.Code.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
@@ -29,15 +30,45 @@ public sealed class CodeSymbolsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
         }
 
-        if (!solution.NamedTypesBySymbolKey.TryGetValue(request.SymbolKey, out var namedType))
+        NamedTypeDto? namedType = null;
+
+        if (!string.IsNullOrWhiteSpace(request.DocumentationId)
+            && solution.NamedTypesByDocId.TryGetValue(request.DocumentationId, out var byDocId))
         {
-            return Ok(new SymbolLookupResultDto(false, request.ExpectedKind, string.Empty, null, null));
+            namedType = byDocId;
+        }
+        else if (!string.IsNullOrWhiteSpace(request.DocumentationId))
+        {
+            var resolved = DocumentationIdUtility.FindTypeByDocumentationId(solution, request.DocumentationId);
+            if (resolved is not null)
+            {
+                namedType = solution.NamedTypes.FirstOrDefault(dto =>
+                    string.Equals(dto.FullName, resolved.ToDisplayString(), StringComparison.Ordinal));
+            }
+        }
+
+        if (namedType is null
+            && !string.IsNullOrWhiteSpace(request.SymbolKey)
+            && solution.NamedTypesBySymbolKey.TryGetValue(request.SymbolKey, out var bySymbolKey))
+        {
+            namedType = bySymbolKey;
+        }
+
+        if (namedType is null)
+        {
+            return Ok(new SymbolLookupResultDto(false, request.ExpectedKind, string.Empty, null, null, request.DocumentationId));
         }
 
         var kind = namedType.Kind.ToString();
         var expectedMatches = ExpectedKindMatches(request.ExpectedKind, namedType.Kind);
 
-        return Ok(new SymbolLookupResultDto(expectedMatches, kind, namedType.Name, namedType.Namespace, namedType.AssemblyName));
+        return Ok(new SymbolLookupResultDto(
+            expectedMatches,
+            kind,
+            namedType.Name,
+            namedType.Namespace,
+            namedType.AssemblyName,
+            namedType.DocumentationId));
     }
 
     private static bool ExpectedKindMatches(string expectedKind, NamedTypeKind actualKind)

@@ -31,50 +31,50 @@ public sealed class IdeCallStackEffects
         var configId = GetConfigId(action.SolutionId);
         if (configId is null)
         {
-            dispatcher.Dispatch(new LoadCallStackFailureAction(action.SolutionId, action.SymbolKey, "Solution not found."));
+            dispatcher.Dispatch(new LoadCallStackFailureAction(action.SolutionId, action.DocumentationId, action.SymbolKey, "Solution not found."));
             return Task.CompletedTask;
         }
 
-        dispatcher.Dispatch(new LoadCallStackAction(action.SolutionId, configId.Value, action.SymbolKey, null));
-        dispatcher.Dispatch(new LoadCallStackMermaidAction(action.SolutionId, configId.Value, action.SymbolKey, null));
+        dispatcher.Dispatch(new LoadCallStackAction(action.SolutionId, configId.Value, action.DocumentationId, action.SymbolKey, null));
+        dispatcher.Dispatch(new LoadCallStackMermaidAction(action.SolutionId, configId.Value, action.DocumentationId, action.SymbolKey, null));
         return Task.CompletedTask;
     }
 
     [EffectMethod]
     public async Task HandleLoadCallStack(LoadCallStackAction action, IDispatcher dispatcher)
     {
-        _logger.LogDebug("IDE: loading call stack for {SymbolKey}", action.SymbolKey);
+        _logger.LogDebug("IDE: loading call stack for docId {DocumentationId} symbolKey {SymbolKey}", action.DocumentationId, action.SymbolKey);
         try
         {
             var response = await _api.GetMethodCallStackAsync(
                 action.ConfigId,
                 action.SolutionId,
-                new MethodCallStackRequestModel(action.SymbolKey, action.MaxDepth));
-            dispatcher.Dispatch(new LoadCallStackSuccessAction(action.SolutionId, action.SymbolKey, response.Nodes));
+                new MethodCallStackRequestModel(action.DocumentationId, action.SymbolKey, action.MaxDepth));
+            dispatcher.Dispatch(new LoadCallStackSuccessAction(action.SolutionId, action.DocumentationId, action.SymbolKey, response.Nodes));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "IDE: failed to load call stack for {SymbolKey}", action.SymbolKey);
-            dispatcher.Dispatch(new LoadCallStackFailureAction(action.SolutionId, action.SymbolKey, ex.Message));
+            _logger.LogError(ex, "IDE: failed to load call stack for docId {DocumentationId} symbolKey {SymbolKey}", action.DocumentationId, action.SymbolKey);
+            dispatcher.Dispatch(new LoadCallStackFailureAction(action.SolutionId, action.DocumentationId, action.SymbolKey, ex.Message));
         }
     }
 
     [EffectMethod]
     public async Task HandleLoadMermaid(LoadCallStackMermaidAction action, IDispatcher dispatcher)
     {
-        _logger.LogDebug("IDE: loading call stack mermaid for {SymbolKey}", action.SymbolKey);
+        _logger.LogDebug("IDE: loading call stack mermaid for docId {DocumentationId} symbolKey {SymbolKey}", action.DocumentationId, action.SymbolKey);
         try
         {
             var response = await _api.GetMethodCallStackMermaidAsync(
                 action.ConfigId,
                 action.SolutionId,
-                new MethodCallStackRequestModel(action.SymbolKey, action.MaxDepth));
-            dispatcher.Dispatch(new LoadCallStackMermaidSuccessAction(action.SolutionId, action.SymbolKey, response.Diagram));
+                new MethodCallStackRequestModel(action.DocumentationId, action.SymbolKey, action.MaxDepth));
+            dispatcher.Dispatch(new LoadCallStackMermaidSuccessAction(action.SolutionId, action.DocumentationId, action.SymbolKey, response.Diagram));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "IDE: failed to load call stack mermaid for {SymbolKey}", action.SymbolKey);
-            dispatcher.Dispatch(new LoadCallStackMermaidFailureAction(action.SolutionId, action.SymbolKey, ex.Message));
+            _logger.LogError(ex, "IDE: failed to load call stack mermaid for docId {DocumentationId} symbolKey {SymbolKey}", action.DocumentationId, action.SymbolKey);
+            dispatcher.Dispatch(new LoadCallStackMermaidFailureAction(action.SolutionId, action.DocumentationId, action.SymbolKey, ex.Message));
         }
     }
 
@@ -100,10 +100,10 @@ public sealed class IdeCallStackEffects
             var view = _callStackState.Value.Views.TryGetValue(action.SolutionId, out var current)
                 ? current
                 : null;
-            if (!string.IsNullOrWhiteSpace(view?.SymbolKey))
+            if (!string.IsNullOrWhiteSpace(view?.DocumentationId) || !string.IsNullOrWhiteSpace(view?.SymbolKey))
             {
-                dispatcher.Dispatch(new LoadCallStackAction(action.SolutionId, action.ConfigId, view!.SymbolKey!, null));
-                dispatcher.Dispatch(new LoadCallStackMermaidAction(action.SolutionId, action.ConfigId, view!.SymbolKey!, null));
+                dispatcher.Dispatch(new LoadCallStackAction(action.SolutionId, action.ConfigId, view!.DocumentationId, view.SymbolKey ?? string.Empty, null));
+                dispatcher.Dispatch(new LoadCallStackMermaidAction(action.SolutionId, action.ConfigId, view.DocumentationId, view.SymbolKey ?? string.Empty, null));
             }
         }
         catch (Exception ex)

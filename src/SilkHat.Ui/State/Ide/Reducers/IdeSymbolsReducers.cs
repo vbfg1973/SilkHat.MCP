@@ -86,7 +86,11 @@ public static class IdeSymbolsReducers
         var view = views.TryGetValue(action.SolutionId, out var existing)
             ? existing
             : IdeSymbolsViewState.Empty;
-        views[action.SolutionId] = view with { SelectedSymbolKey = action.SymbolKey };
+        views[action.SolutionId] = view with
+        {
+            SelectedDocumentationId = action.DocumentationId,
+            SelectedSymbolKey = action.SymbolKey
+        };
         return new IdeSymbolsState(views);
     }
 }

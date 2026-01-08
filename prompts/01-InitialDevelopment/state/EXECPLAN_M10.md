@@ -29,6 +29,7 @@ After this change, a user can select a method in the IDE symbol popup and open a
 - [x] (2026-01-08 20:40Z) Added cross-namespace signature fallback when interface-scoped lookup returns no candidates.
 - [x] (2026-01-09 11:05Z) Added Roslyn documentation ID support to persist stable interface/implementation identities.
 - [x] (2026-01-09 11:05Z) Added documentation ID resolution tests that reload the sample solution and re-resolve symbols by doc ID.
+- [ ] (2026-01-08 22:05Z) Extend M10 with DocID-first symbol identification (DTOs, indexing, API, UI, tests).
 - [ ] (2026-01-08 20:10Z) Run `dotnet test` (blocked: MSBuild named pipe socket permission denied).
 - [ ] (2026-01-08 19:34Z) Run `docker compose up --build` (blocked: Docker daemon socket permission denied).
 - [ ] (2026-01-09 10:40Z) Add unit, integration, controller, and UI tests per testing standard (completed: new tests added; remaining: run/verify).
@@ -78,6 +79,9 @@ After this change, a user can select a method in the IDE symbol popup and open a
 - Decision: Persist Roslyn documentation IDs (DocID) for interface/implementation symbols and prefer them during decision resolution.
   Rationale: DocIDs remain stable across workspace reloads and allow decisions to survive compilation boundaries.
   Date/Author: 2026-01-09 / Codex
+- Decision: Migrate to DocID-first symbol identity with SymbolKey fallback in APIs, DTOs, workspace indexing, and UI state/actions.
+  Rationale: DocIDs are stable across reloads; SymbolKey covers locals/anonymous/lambdas where DocIDs do not exist.
+  Date/Author: 2026-01-08 / Codex
 
 ## Outcomes & Retrospective
 
@@ -94,6 +98,11 @@ We also need a decision system that resolves interface calls to concrete impleme
 Decisions should also persist Roslyn documentation IDs for interface and implementation symbols. These documentation IDs (DocID) are stable across workspace reloads and allow decision resolution to survive compilation boundaries. Response models should expose documentation IDs for candidate methods so the UI can persist/round-trip stable identifiers.
 
 This milestone may add new tests, but existing test files are not to be modified. If a change would otherwise require updating an existing test, the implementation must be adjusted to keep current tests passing.
+
+DocID-first migration rules:
+- DocID is primary where available; SymbolKey remains as a fallback only for symbols without DocIDs (locals/anonymous/lambdas).
+- All DTOs that carry symbol identity must include DocID and SymbolKey during the transition.
+- APIs should accept DocID first, and use SymbolKey only when DocID is missing or not resolvable.
 
 ## Plan of Work
 
@@ -178,6 +187,7 @@ Work from `/home/vbfg/RiderProjects/SilkHat.MCP`.
    - Service tests for decision resolution rules (single impl, only non-test impl, multiple impls -> decision required).
    - Controller tests in `tests/SilkHat.Api.Tests` for call stack and Mermaid endpoints.
    - UI tests in `tests/SilkHat.Ui.Tests` for call stack popup rendering and for the “open call stack” button in symbol popup dispatching actions.
+   - DocID-first tests: ensure lookups succeed by DocID and fall back to SymbolKey where DocID is missing.
 
 ## Validation and Acceptance
 
@@ -211,7 +221,7 @@ Capture:
 
 Define in `src/SilkHat.Code.Core/Dtos`:
 
-    public sealed record MethodCallStackRequestDto(string SymbolKey, int? MaxDepth);
+    public sealed record MethodCallStackRequestDto(string? DocumentationId, string SymbolKey, int? MaxDepth);
 
     public sealed record MethodCallStackNodeDto(
         string NodeId,

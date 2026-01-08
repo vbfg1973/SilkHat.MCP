@@ -51,6 +51,7 @@ public sealed class MethodCallStackController : ApiControllerBase
             workspace,
             solution,
             id,
+            request.DocumentationId,
             request.SymbolKey,
             request.MaxDepth,
             cancellationToken);
@@ -98,6 +99,7 @@ public sealed class MethodCallStackController : ApiControllerBase
             workspace,
             solution,
             id,
+            request.DocumentationId,
             request.SymbolKey,
             request.MaxDepth,
             cancellationToken);

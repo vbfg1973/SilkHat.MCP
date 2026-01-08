@@ -38,6 +38,7 @@ public sealed class MethodCallStackServiceTests
             workspace,
             solution,
             Guid.NewGuid(),
+            null,
             symbolKey,
             null,
             CancellationToken.None);
@@ -84,6 +85,7 @@ public sealed class MethodCallStackServiceTests
             workspace,
             solution,
             Guid.NewGuid(),
+            null,
             symbolKey,
             null,
             CancellationToken.None);

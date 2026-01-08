@@ -23,11 +23,11 @@ public sealed class IdeSymbolPopupCallStackTests
         var solutionId = "solution-1";
         var nodes = new List<CodeSymbolOutlineNodeModel>
         {
-            new("symbol-key", "Run", "Method", "Method", Array.Empty<CodeSymbolOutlineNodeModel>())
+            new("symbol-key", "M:Samples.Program.Run", "Run", "Method", "Method", Array.Empty<CodeSymbolOutlineNodeModel>())
         };
         var symbolsState = new IdeSymbolsState(new Dictionary<string, IdeSymbolsViewState>(StringComparer.OrdinalIgnoreCase)
         {
-            [solutionId] = new IdeSymbolsViewState(true, false, null, "./Program.cs", nodes, "symbol-key")
+            [solutionId] = new IdeSymbolsViewState(true, false, null, "./Program.cs", nodes, "M:Samples.Program.Run", "symbol-key")
         });
         var solutionsState = new IdeSolutionsState(
             false,
@@ -63,6 +63,7 @@ public sealed class IdeSymbolPopupCallStackTests
 
         var action = Assert.IsType<OpenCallStackPopupAction>(dispatcher.Actions.Last());
         Assert.Equal(solutionId, action.SolutionId);
+        Assert.Equal("M:Samples.Program.Run", action.DocumentationId);
         Assert.Equal("symbol-key", action.SymbolKey);
     }
 }

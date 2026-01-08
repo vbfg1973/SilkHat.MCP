@@ -72,6 +72,7 @@ public sealed class IdeCallStackPopupTests
                 false,
                 null,
                 null,
+                null,
                 "symbol-key",
                 nodes,
                 "sequenceDiagram",

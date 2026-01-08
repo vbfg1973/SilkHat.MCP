@@ -152,6 +152,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             var namedTypes = new List<NamedTypeDto>();
             var namespaces = new HashSet<string>(StringComparer.Ordinal);
             var namedTypeByKey = new Dictionary<string, NamedTypeDto>(StringComparer.Ordinal);
+            var namedTypeByDocId = new Dictionary<string, NamedTypeDto>(StringComparer.Ordinal);
 
             foreach (var compilationEntry in compilations)
             {
@@ -169,6 +170,12 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                     if (!namedTypeByKey.ContainsKey(dto.SymbolKey))
                     {
                         namedTypeByKey[dto.SymbolKey] = dto;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(dto.DocumentationId)
+                        && !namedTypeByDocId.ContainsKey(dto.DocumentationId))
+                    {
+                        namedTypeByDocId[dto.DocumentationId] = dto;
                     }
                 }
             }
@@ -188,6 +195,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 namespaces.OrderBy(ns => ns, StringComparer.OrdinalIgnoreCase).ToList(),
                 namedTypes,
                 namedTypeByKey,
+                namedTypeByDocId,
                 compilations);
         }
 
@@ -401,8 +409,11 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         var symbolKey = SymbolKeyUtility.GetSymbolKeyString(symbol, compilation);
         var isExternal = !symbol.Locations.Any(location => location.IsInSource);
 
+        var documentationId = DocumentationIdUtility.GetDocumentationId(symbol);
+
         return new NamedTypeDto(
             symbolKey,
+            documentationId,
             name,
             ns,
             fullName,

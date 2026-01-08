@@ -79,9 +79,9 @@
         CurrentView is null ? Array.Empty<TreeItemData<CodeSymbolOutlineNodeModel>>() : BuildTree(CurrentView.Nodes);
 
     private CodeSymbolOutlineNodeModel? SelectedSymbolNode
-        => CurrentView is null || string.IsNullOrWhiteSpace(CurrentView.SelectedSymbolKey)
+        => CurrentView is null
             ? null
-            : FindNode(CurrentView.Nodes, CurrentView.SelectedSymbolKey);
+            : FindNode(CurrentView.Nodes, CurrentView.SelectedDocumentationId, CurrentView.SelectedSymbolKey);
 
     private bool CanOpenCallStack => SelectedSymbolNode is not null && IsMethodNode(SelectedSymbolNode);
 
@@ -113,7 +113,7 @@
             return;
         }
 
-        Dispatcher.Dispatch(new SelectSymbolNodeAction(SelectedSolutionId, node.SymbolKey));
+        Dispatcher.Dispatch(new SelectSymbolNodeAction(SelectedSolutionId, node.DocumentationId, node.SymbolKey));
     }
 
     private async Task OpenCallStack()
@@ -128,7 +128,10 @@
             return;
         }
 
-        Dispatcher.Dispatch(new OpenCallStackPopupAction(SelectedSolutionId, SelectedSymbolNode.SymbolKey));
+        Dispatcher.Dispatch(new OpenCallStackPopupAction(
+            SelectedSolutionId,
+            SelectedSymbolNode.DocumentationId,
+            SelectedSymbolNode.SymbolKey));
         if (_callStackDialog is not null)
         {
             return;
@@ -160,8 +163,23 @@
 
     private static CodeSymbolOutlineNodeModel? FindNode(
         IReadOnlyList<CodeSymbolOutlineNodeModel> nodes,
-        string symbolKey)
+        string? documentationId,
+        string? symbolKey)
     {
+        if (!string.IsNullOrWhiteSpace(documentationId))
+        {
+            var docMatch = FindNodeByDocId(nodes, documentationId);
+            if (docMatch is not null)
+            {
+                return docMatch;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(symbolKey))
+        {
+            return null;
+        }
+
         foreach (var node in nodes)
         {
             if (string.Equals(node.SymbolKey, symbolKey, StringComparison.Ordinal))
@@ -169,7 +187,28 @@
                 return node;
             }
 
-            var child = FindNode(node.Children, symbolKey);
+            var child = FindNode(node.Children, documentationId, symbolKey);
+            if (child is not null)
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
+    private static CodeSymbolOutlineNodeModel? FindNodeByDocId(
+        IReadOnlyList<CodeSymbolOutlineNodeModel> nodes,
+        string documentationId)
+    {
+        foreach (var node in nodes)
+        {
+            if (string.Equals(node.DocumentationId, documentationId, StringComparison.Ordinal))
+            {
+                return node;
+            }
+
+            var child = FindNodeByDocId(node.Children, documentationId);
             if (child is not null)
             {
                 return child;

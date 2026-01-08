@@ -18,6 +18,7 @@ public sealed class MethodCallStackService : IMethodCallStackService
         CodeRepositoryWorkspace workspace,
         CodeSolutionWorkspace solution,
         Guid repositoryConfigId,
+        string? documentationId,
         string methodSymbolKey,
         int? maxDepth,
         CancellationToken cancellationToken)
@@ -32,20 +33,22 @@ public sealed class MethodCallStackService : IMethodCallStackService
             throw new ArgumentNullException(nameof(solution));
         }
 
-        if (string.IsNullOrWhiteSpace(methodSymbolKey))
+        if (string.IsNullOrWhiteSpace(documentationId)
+            && string.IsNullOrWhiteSpace(methodSymbolKey))
         {
-            return new MethodCallStackResult(Array.Empty<MethodCallStackNode>(), true, "SymbolKey is required.");
+            return new MethodCallStackResult(Array.Empty<MethodCallStackNode>(), true, "DocumentationId or SymbolKey is required.");
         }
 
-        if (!TryResolveMethodSymbol(solution, methodSymbolKey, out var rootMethod, out var rootCompilation))
+        if (!TryResolveMethodSymbol(solution, documentationId, methodSymbolKey, out var rootMethod, out var rootCompilation))
         {
             return new MethodCallStackResult(Array.Empty<MethodCallStackNode>(), true, "Method symbol not found.");
         }
 
         var nodes = new List<MethodCallStackNode>();
         var path = new HashSet<string>(StringComparer.Ordinal);
-        var rootKey = SymbolKeyUtility.GetSymbolKeyString(rootMethod, rootCompilation);
-        path.Add(rootKey);
+        var rootIdentifier = DocumentationIdUtility.GetDocumentationId(rootMethod)
+            ?? SymbolKeyUtility.GetSymbolKeyString(rootMethod, rootCompilation);
+        path.Add(rootIdentifier);
 
         await TraverseMethodAsync(
             workspace,
@@ -180,8 +183,9 @@ public sealed class MethodCallStackService : IMethodCallStackService
             }
 
             var nextCompilation = GetCompilationForSymbol(solution, resolvedMethod) ?? compilation;
-            var nextKey = SymbolKeyUtility.GetSymbolKeyString(resolvedMethod, nextCompilation);
-            if (!path.Add(nextKey))
+            var nextIdentifier = DocumentationIdUtility.GetDocumentationId(resolvedMethod)
+                ?? SymbolKeyUtility.GetSymbolKeyString(resolvedMethod, nextCompilation);
+            if (!path.Add(nextIdentifier))
             {
                 continue;
             }
@@ -199,7 +203,7 @@ public sealed class MethodCallStackService : IMethodCallStackService
                 maxDepth,
                 cancellationToken);
 
-            path.Remove(nextKey);
+            path.Remove(nextIdentifier);
         }
     }
 
@@ -244,10 +248,33 @@ public sealed class MethodCallStackService : IMethodCallStackService
 
     private static bool TryResolveMethodSymbol(
         CodeSolutionWorkspace solution,
+        string? documentationId,
         string methodSymbolKey,
         out IMethodSymbol methodSymbol,
         out Compilation compilation)
     {
+        if (!string.IsNullOrWhiteSpace(documentationId))
+        {
+            var docResolved = DocumentationIdUtility.FindMethodByDocumentationId(solution, documentationId);
+            if (docResolved is not null)
+            {
+                var docCompilation = GetCompilationForSymbol(solution, docResolved);
+                if (docCompilation is not null)
+                {
+                    methodSymbol = docResolved;
+                    compilation = docCompilation;
+                    return true;
+                }
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(methodSymbolKey))
+        {
+            methodSymbol = null!;
+            compilation = null!;
+            return false;
+        }
+
         foreach (var compilationEntry in solution.Compilations)
         {
             var candidateCompilation = compilationEntry.Value;

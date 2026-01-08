@@ -7,9 +7,15 @@ public sealed class MethodCallStackRequestValidator : AbstractValidator<MethodCa
 {
     public MethodCallStackRequestValidator()
     {
+        RuleFor(request => request)
+            .Must(request =>
+                !string.IsNullOrWhiteSpace(request.DocumentationId)
+                || !string.IsNullOrWhiteSpace(request.SymbolKey))
+            .WithMessage("DocumentationId or SymbolKey must be provided.");
         RuleFor(request => request.SymbolKey)
             .NotEmpty()
-            .WithMessage("SymbolKey cannot be empty.");
+            .When(request => string.IsNullOrWhiteSpace(request.DocumentationId))
+            .WithMessage("SymbolKey cannot be empty when DocumentationId is not provided.");
         RuleFor(request => request.MaxDepth)
             .GreaterThanOrEqualTo(0)
             .When(request => request.MaxDepth.HasValue)

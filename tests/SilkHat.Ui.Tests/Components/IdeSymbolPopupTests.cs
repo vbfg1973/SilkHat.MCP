@@ -34,18 +34,19 @@ public sealed class IdeSymbolPopupTests
         {
             new(
                 "sym-1",
+                "T:Samples.ComplexitySamples",
                 "ComplexitySamples",
                 "NamedType",
                 "Class",
                 new List<CodeSymbolOutlineNodeModel>
                 {
-                    new("sym-2", "CalculateScore", "Method", "Method", Array.Empty<CodeSymbolOutlineNodeModel>())
+                    new("sym-2", "M:Samples.ComplexitySamples.CalculateScore(System.Int32)", "CalculateScore", "Method", "Method", Array.Empty<CodeSymbolOutlineNodeModel>())
                 })
         };
 
         var symbols = new IdeSymbolsState(new Dictionary<string, IdeSymbolsViewState>(StringComparer.OrdinalIgnoreCase)
         {
-            [solutionId] = new IdeSymbolsViewState(true, false, null, "./AnalysisSamples.cs", nodes, null)
+            [solutionId] = new IdeSymbolsViewState(true, false, null, "./AnalysisSamples.cs", nodes, null, null)
         });
 
         context.Services.AddScoped<IState<IdeSolutionsState>>(_ => new StateWrapper<IdeSolutionsState>(solutions));

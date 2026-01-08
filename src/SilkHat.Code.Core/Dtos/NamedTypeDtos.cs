@@ -13,6 +13,7 @@ public enum NamedTypeKind
 
 public sealed record NamedTypeDto(
     string SymbolKey,
+    string? DocumentationId,
     string Name,
     string Namespace,
     string FullName,

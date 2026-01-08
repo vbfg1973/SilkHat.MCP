@@ -8,6 +8,7 @@ public interface IMethodCallStackService
         CodeRepositoryWorkspace workspace,
         CodeSolutionWorkspace solution,
         Guid repositoryConfigId,
+        string? documentationId,
         string methodSymbolKey,
         int? maxDepth,
         CancellationToken cancellationToken);

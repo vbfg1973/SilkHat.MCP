@@ -59,6 +59,7 @@ public sealed class MethodCallStackControllerTests
                 workspace,
                 solution,
                 repositoryId,
+                null,
                 "symbol-key",
                 null,
                 It.IsAny<CancellationToken>()))
@@ -72,7 +73,7 @@ public sealed class MethodCallStackControllerTests
         var result = await controller.GetCallStack(
             repositoryId,
             solutionId,
-            new MethodCallStackRequestDto("symbol-key", null),
+            new MethodCallStackRequestDto(null, "symbol-key", null),
             CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
@@ -84,6 +85,7 @@ public sealed class MethodCallStackControllerTests
             workspace,
             solution,
             repositoryId,
+            null,
             "symbol-key",
             null,
             It.IsAny<CancellationToken>()), Times.Once);
@@ -102,7 +104,7 @@ public sealed class MethodCallStackControllerTests
         var result = await controller.GetCallStack(
             Guid.NewGuid(),
             "solution-1",
-            new MethodCallStackRequestDto("symbol-key", null),
+            new MethodCallStackRequestDto(null, "symbol-key", null),
             CancellationToken.None);
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
@@ -156,6 +158,7 @@ public sealed class MethodCallStackControllerTests
                 workspace,
                 solution,
                 repositoryId,
+                null,
                 "symbol-key",
                 null,
                 It.IsAny<CancellationToken>()))
@@ -169,7 +172,7 @@ public sealed class MethodCallStackControllerTests
         var result = await controller.GetCallStackMermaid(
             repositoryId,
             solutionId,
-            new MethodCallStackRequestDto("symbol-key", null),
+            new MethodCallStackRequestDto(null, "symbol-key", null),
             CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
@@ -179,6 +182,7 @@ public sealed class MethodCallStackControllerTests
             workspace,
             solution,
             repositoryId,
+            null,
             "symbol-key",
             null,
             It.IsAny<CancellationToken>()), Times.Once);
@@ -196,6 +200,7 @@ public sealed class MethodCallStackControllerTests
             new Dictionary<string, IReadOnlyList<CodeTreeEntryDto>>(),
             Array.Empty<string>(),
             Array.Empty<NamedTypeDto>(),
+            new Dictionary<string, NamedTypeDto>(),
             new Dictionary<string, NamedTypeDto>(),
             new Dictionary<string, Compilation>());
     }

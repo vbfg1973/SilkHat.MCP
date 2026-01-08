@@ -21,7 +21,10 @@ public sealed class CodeSymbolsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.LookupSymbol(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, new SymbolLookupRequest("sym", "NamedType"));
+        var result = controller.LookupSymbol(
+            Guid.NewGuid(),
+            CodeWorkspaceFactory.DefaultSolutionId,
+            new SymbolLookupRequest(null, "sym", "NamedType"));
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
@@ -39,7 +42,10 @@ public sealed class CodeSymbolsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.LookupSymbol(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, new SymbolLookupRequest("sym-alpha", "Class"));
+        var result = controller.LookupSymbol(
+            Guid.NewGuid(),
+            CodeWorkspaceFactory.DefaultSolutionId,
+            new SymbolLookupRequest(null, "sym-alpha", "Class"));
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<SymbolLookupResultDto>(ok.Value);

@@ -341,6 +341,7 @@ public sealed class FakeProbe : IProbe
             Array.Empty<string>(),
             Array.Empty<NamedTypeDto>(),
             new Dictionary<string, NamedTypeDto>(),
+            new Dictionary<string, NamedTypeDto>(),
             new Dictionary<string, Compilation>
             {
                 ["app"] = appCompilation,

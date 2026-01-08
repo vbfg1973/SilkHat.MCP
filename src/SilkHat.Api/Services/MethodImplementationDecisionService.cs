@@ -26,7 +26,9 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
         IMethodSymbol interfaceMethod,
         CancellationToken cancellationToken)
     {
-        if (interfaceMethod.ContainingType.TypeKind != TypeKind.Interface)
+        if (interfaceMethod.ContainingType.TypeKind != TypeKind.Interface
+            && interfaceMethod.ContainingType.TypeKind != TypeKind.Error
+            && interfaceMethod.ContainingType.TypeKind != TypeKind.Unknown)
         {
             return new MethodImplementationResolution(null, null, false, Array.Empty<string>(), Array.Empty<string?>());
         }
@@ -69,18 +71,26 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
             }
         }
 
-        var candidates = ResolveCandidates(solution, interfaceMethod, interfaceMetadataName, interfaceTypeName).ToList();
+        var candidates = DeduplicateCandidates(ResolveCandidates(
+            solution,
+            interfaceMethod,
+            interfaceMetadataName,
+            interfaceTypeName,
+            interfaceTypeDocId)).ToList();
         if (candidates.Count == 0)
         {
-            candidates = ResolveCandidatesBySignature(solution, interfaceMethod, interfaceNamespace).ToList();
+            candidates = DeduplicateCandidates(
+                ResolveCandidatesBySignature(solution, interfaceMethod, interfaceNamespace)).ToList();
         }
         if (candidates.Count == 0 && !string.IsNullOrWhiteSpace(interfaceNamespace))
         {
-            candidates = ResolveCandidatesBySignature(solution, interfaceMethod, string.Empty).ToList();
+            candidates = DeduplicateCandidates(
+                ResolveCandidatesBySignature(solution, interfaceMethod, string.Empty)).ToList();
         }
         if (candidates.Count == 0)
         {
-            candidates = ResolveCandidatesByLooseSignature(solution, interfaceMethod).ToList();
+            candidates = DeduplicateCandidates(
+                ResolveCandidatesByLooseSignature(solution, interfaceMethod)).ToList();
         }
         if (candidates.Count == 0)
         {
@@ -163,7 +173,8 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
         CodeSolutionWorkspace solution,
         IMethodSymbol interfaceMethod,
         string interfaceMetadataName,
-        string interfaceTypeName)
+        string interfaceTypeName,
+        string? interfaceTypeDocId)
     {
         var testAssemblyNames = solution.Projects.Values
             .Where(project => IsTestProject(project.Name))
@@ -183,7 +194,7 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
                     continue;
                 }
 
-                if (!ImplementsInterface(candidate, interfaceType, interfaceTypeName))
+                if (!ImplementsInterface(candidate, interfaceType, interfaceTypeName, interfaceTypeDocId))
                 {
                     continue;
                 }
@@ -334,12 +345,26 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
     private static bool ImplementsInterface(
         INamedTypeSymbol candidate,
         INamedTypeSymbol? interfaceType,
-        string interfaceTypeName)
+        string interfaceTypeName,
+        string? interfaceTypeDocId)
     {
         if (interfaceType is not null
             && candidate.AllInterfaces.Contains(interfaceType, SymbolEqualityComparer.Default))
         {
             return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(interfaceTypeDocId))
+        {
+            var matchesDocId = candidate.AllInterfaces.Any(iface =>
+                string.Equals(
+                    DocumentationIdUtility.GetDocumentationId(iface),
+                    interfaceTypeDocId,
+                    StringComparison.Ordinal));
+            if (matchesDocId)
+            {
+                return true;
+            }
         }
 
         return candidate.AllInterfaces.Any(iface =>
@@ -378,7 +403,7 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
         {
             if (seenAssemblies.Add(compilation.Assembly))
             {
-                yield return (compilation, compilation.Assembly.GlobalNamespace);
+                yield return (compilation, compilation.GlobalNamespace);
             }
         }
 
@@ -546,6 +571,12 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
             }
         }
 
+        var explicitDocIdMatch = FindExplicitImplementationByDocId(candidate, interfaceMember, interfaceMethod);
+        if (explicitDocIdMatch is not null)
+        {
+            return explicitDocIdMatch;
+        }
+
         if (interfaceMethod.MethodKind is MethodKind.PropertyGet or MethodKind.PropertySet)
         {
             var propertyName = GetPropertyTargetName(interfaceMethod);
@@ -584,6 +615,90 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
         }
 
         return MatchImplementationBySignature(candidate, interfaceMethod);
+    }
+
+    private static IMethodSymbol? FindExplicitImplementationByDocId(
+        INamedTypeSymbol candidate,
+        ISymbol? interfaceMember,
+        IMethodSymbol interfaceMethod)
+    {
+        if (interfaceMember is IMethodSymbol interfaceMethodSymbol)
+        {
+            var interfaceDocId = DocumentationIdUtility.GetDocumentationId(interfaceMethodSymbol);
+            if (!string.IsNullOrWhiteSpace(interfaceDocId))
+            {
+                return candidate.GetMembers()
+                    .OfType<IMethodSymbol>()
+                    .FirstOrDefault(method => method.ExplicitInterfaceImplementations.Any(impl =>
+                        string.Equals(
+                            DocumentationIdUtility.GetDocumentationId(impl),
+                            interfaceDocId,
+                            StringComparison.Ordinal)));
+            }
+        }
+
+        if (interfaceMember is IPropertySymbol interfaceProperty)
+        {
+            var interfaceDocId = DocumentationIdUtility.GetDocumentationId(interfaceProperty);
+            if (!string.IsNullOrWhiteSpace(interfaceDocId))
+            {
+                var match = candidate.GetMembers()
+                    .OfType<IPropertySymbol>()
+                    .FirstOrDefault(property => property.ExplicitInterfaceImplementations.Any(impl =>
+                        string.Equals(
+                            DocumentationIdUtility.GetDocumentationId(impl),
+                            interfaceDocId,
+                            StringComparison.Ordinal)));
+                if (match is not null)
+                {
+                    return interfaceMethod.MethodKind == MethodKind.PropertySet
+                        ? match.SetMethod
+                        : match.GetMethod ?? match.SetMethod;
+                }
+            }
+        }
+
+        if (interfaceMember is IEventSymbol interfaceEvent)
+        {
+            var interfaceDocId = DocumentationIdUtility.GetDocumentationId(interfaceEvent);
+            if (!string.IsNullOrWhiteSpace(interfaceDocId))
+            {
+                var match = candidate.GetMembers()
+                    .OfType<IEventSymbol>()
+                    .FirstOrDefault(@event => @event.ExplicitInterfaceImplementations.Any(impl =>
+                        string.Equals(
+                            DocumentationIdUtility.GetDocumentationId(impl),
+                            interfaceDocId,
+                            StringComparison.Ordinal)));
+                if (match is not null)
+                {
+                    return interfaceMethod.MethodKind switch
+                    {
+                        MethodKind.EventAdd => match.AddMethod,
+                        MethodKind.EventRemove => match.RemoveMethod,
+                        _ => match.AddMethod ?? match.RemoveMethod
+                    };
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<ImplementationCandidate> DeduplicateCandidates(
+        IEnumerable<ImplementationCandidate> candidates)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var candidate in candidates)
+        {
+            var methodIdentity = candidate.MethodDocumentationId
+                ?? candidate.Method.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var key = $"{candidate.TypeName}|{methodIdentity}";
+            if (seen.Add(key))
+            {
+                yield return candidate;
+            }
+        }
     }
 
     private static IMethodSymbol? MatchImplementationBySignature(
