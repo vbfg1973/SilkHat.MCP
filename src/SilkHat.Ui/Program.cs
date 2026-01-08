@@ -1,9 +1,13 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Fluxor;
 using MudBlazor.Services;
 using Serilog;
 using SilkHat.Ui;
+using SilkHat.Ui.State;
+using SilkHat.Ui.Services.Http;
 using SilkHat.Ui.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -20,7 +24,11 @@ builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
 builder.Services.AddMudServices();
 builder.Services.AddScoped<ThemeService>();
-builder.Services.AddScoped<RepositoryApiClient>();
+builder.Services.AddFluxor(options =>
+{
+    options.ScanAssemblies(typeof(Program).Assembly);
+    options.AddMiddleware<FluxorLoggingMiddleware>();
+});
 
 var apiBaseUrl = builder.Configuration["ApiBaseUrl"];
 var baseAddress = string.IsNullOrWhiteSpace(apiBaseUrl)
@@ -36,6 +44,11 @@ if (baseAddress.Scheme == Uri.UriSchemeFile)
 
 Log.Logger.Information("Resolved API base address: {BaseAddress}", baseAddress);
 
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = baseAddress });
+builder.Services.AddScoped<CorrelationIdHandler>();
+builder.Services.AddHttpClient<RepositoryApiClient>(client =>
+    {
+        client.BaseAddress = baseAddress;
+    })
+    .AddHttpMessageHandler<CorrelationIdHandler>();
 
 await builder.Build().RunAsync();

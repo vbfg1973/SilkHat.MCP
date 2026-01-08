@@ -1,0 +1,35 @@
+@using Fluxor
+@using Fluxor.Blazor.Web.Components
+@using SilkHat.Ui.State.Ide
+@using SilkHat.Ui.State.Ide.Actions
+@inherits FluxorComponent
+@inject IState<IdeSolutionsState> SolutionsState
+@inject IDispatcher Dispatcher
+
+<MudSelect T="string"
+           Label="Solution"
+           Value="@SolutionsState.Value.SelectedSolutionId"
+           ValueChanged="OnSolutionChanged"
+           Disabled="@(SolutionsState.Value.Solutions.Count == 0)">
+    @foreach (var solution in SolutionsState.Value.Solutions)
+    {
+        <MudSelectItem T="string" Value="@solution.SolutionId">@solution.DisplayName</MudSelectItem>
+    }
+</MudSelect>
+
+@if (!string.IsNullOrWhiteSpace(SolutionsState.Value.Error))
+{
+    <MudAlert Severity="Severity.Error" Class="mt-3">@SolutionsState.Value.Error</MudAlert>
+}
+
+@code {
+    private void OnSolutionChanged(string? solutionId)
+    {
+        if (string.IsNullOrWhiteSpace(solutionId))
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SelectSolutionAction(solutionId));
+    }
+}

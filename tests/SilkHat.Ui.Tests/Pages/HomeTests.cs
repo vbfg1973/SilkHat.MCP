@@ -81,8 +81,10 @@ public sealed class HomeTests
 }
 """);
 
-        context.Services.AddScoped(_ => new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
-        context.Services.AddScoped<RepositoryApiClient>();
+        context.Services.AddScoped(sp =>
+            new RepositoryApiClient(
+                new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") },
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RepositoryApiClient>>()));
 
         var cut = context.RenderComponent<MainLayout>(parameters =>
             parameters.Add(p => p.Body,
@@ -161,8 +163,10 @@ public sealed class HomeTests
 }
 """);
 
-        context.Services.AddScoped(_ => new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
-        context.Services.AddScoped<RepositoryApiClient>();
+        context.Services.AddScoped(sp =>
+            new RepositoryApiClient(
+                new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") },
+                sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<RepositoryApiClient>>()));
 
         var cut = context.RenderComponent<MainLayout>(parameters =>
             parameters.Add(p => p.Body,

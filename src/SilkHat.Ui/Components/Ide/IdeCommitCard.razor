@@ -1,0 +1,81 @@
+@using Fluxor
+@using Fluxor.Blazor.Web.Components
+@using SilkHat.Ui.State.Ide
+@using SilkHat.Ui.State.Ide.Actions
+@using SilkHat.Ui.State.Ide.Models
+@inherits FluxorComponent
+@inject IState<IdeSolutionsState> SolutionsState
+@inject IState<IdeTabsState> TabsState
+@inject IDispatcher Dispatcher
+
+<MudCard Elevation="0" Class="pa-2" Style="min-width: 260px;">
+    <MudCardContent Class="pa-0">
+        @if (ActiveTab is null || !ActiveTab.HasCommitInfo)
+        {
+            <MudText Typo="Typo.body2">Last commit: unavailable</MudText>
+        }
+        else
+        {
+            <MudText Typo="Typo.subtitle2">@ActiveTab.AbbreviatedSha</MudText>
+            <MudText Typo="Typo.body2">@FormatCommitDate(ActiveTab.LastCommitDateUtc)</MudText>
+            <MudText Typo="Typo.body2">@ActiveTab.LastCommitAuthor</MudText>
+            <MudText Typo="Typo.body2">@ActiveTab.LastCommitAuthorEmail</MudText>
+        }
+        <MudCheckBox T="bool"
+                     Label="Show diff"
+                     @bind-Value="ActiveShowDiff"
+                     Disabled="@(ActiveTab is null)" />
+    </MudCardContent>
+</MudCard>
+
+@code {
+    private IdeOpenFileTab? ActiveTab
+    {
+        get
+        {
+            if (SelectedSolutionId is null)
+            {
+                return null;
+            }
+
+            if (!TabsState.Value.Tabs.TryGetValue(SelectedSolutionId, out var view))
+            {
+                return null;
+            }
+
+            if (view.ActiveTabIndex < 0 || view.ActiveTabIndex >= view.OpenFiles.Count)
+            {
+                return null;
+            }
+
+            return view.OpenFiles[view.ActiveTabIndex];
+        }
+    }
+
+    private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
+    private bool ActiveShowDiff
+    {
+        get => ActiveTab?.ShowDiff ?? false;
+        set
+        {
+            if (SelectedSolutionId is null)
+            {
+                return;
+            }
+
+            Dispatcher.Dispatch(new ToggleDiffAction(SelectedSolutionId, value));
+        }
+    }
+
+    private static string FormatCommitDate(DateTimeOffset? timestamp)
+    {
+        if (timestamp is null)
+        {
+            return string.Empty;
+        }
+
+        var utc = timestamp.Value.UtcDateTime;
+        return utc.ToString("yyyy-MM-dd HH:mm:ss");
+    }
+}

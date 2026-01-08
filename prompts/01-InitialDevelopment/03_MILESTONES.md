@@ -125,4 +125,12 @@ Each milestone must end with:
 - Add generic paging (pageNumber/pageSize) across all list-returning endpoints, with shared result models and updated clients/tests.
 - IDE file tabs show last commit metadata (author + ISO date) and a diff toggle that annotates added (green) and deleted (red) lines from the last commit.
 
+## M8: IDE-Only Fluxor State Management (Phase 1)
+- Introduce Fluxor in the UI project and register it in the Blazor app.
+- Migrate IDE state to Fluxor only; leave all other pages on their existing state management.
+- Split the IDE into reusable components (solution selector, tree, tabs, commit card).
+- Model IDE state slices for solutions, tree, and tabs (including diff toggle and last-commit metadata).
+- Implement actions/reducers/effects for IDE flows (load solutions, select solution, load tree nodes, open tabs, toggle diff, close tabs).
+- Update bUnit tests for the IDE to use the Fluxor store and to validate state-driven rendering.
+
 At the end of each milestone, STOP and emit Milestone Commit Notes.
