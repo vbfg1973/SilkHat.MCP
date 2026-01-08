@@ -109,4 +109,45 @@ public sealed class IdeEffectsTests
         Assert.Equal("alice", success.Tab.LastCommitAuthor);
         Assert.Equal("sha1", success.Tab.AbbreviatedSha);
     }
+
+    [Fact]
+    public void OpenSymbolPopup_DispatchesLoadForActiveFile()
+    {
+        var configId = Guid.NewGuid();
+        var handler = new FakeHttpMessageHandler();
+        var api = new RepositoryApiClient(new HttpClient(handler)
+        {
+            BaseAddress = new Uri("http://localhost/")
+        }, NullLogger<RepositoryApiClient>.Instance);
+
+        var solutions = new StateWrapper<IdeSolutionsState>(
+            new IdeSolutionsState(
+                false,
+                null,
+                new List<IdeSolutionEntry>
+                {
+                    new("solution-1", "./RepoOne.sln", "./RepoOne.sln", configId, "./RepoOne.sln (Repo One)")
+                },
+                "solution-1"));
+
+        var tabs = new StateWrapper<IdeTabsState>(new IdeTabsState(new Dictionary<string, IdeTabsViewState>
+        {
+            ["solution-1"] = new IdeTabsViewState(
+                new List<IdeOpenFileTab>
+                {
+                    new("./Program.cs", "Repo One/Program.cs", "Program.cs", "class Program {}")
+                },
+                0,
+                null)
+        }));
+
+        var symbols = new StateWrapper<IdeSymbolsState>(new IdeSymbolsState());
+        var dispatcher = new RecordingDispatcher();
+        var effects = new IdeSymbolsEffects(api, solutions, tabs, symbols, NullLogger<IdeSymbolsEffects>.Instance);
+
+        effects.HandleOpenPopup(new OpenSymbolPopupAction("solution-1"), dispatcher);
+
+        var load = dispatcher.Actions.OfType<LoadFileSymbolsAction>().Single();
+        Assert.Equal("./Program.cs", load.RepositoryPath);
+    }
 }

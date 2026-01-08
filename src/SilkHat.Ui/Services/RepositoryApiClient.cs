@@ -150,6 +150,17 @@ public sealed class RepositoryApiClient
                ?? new CodeFileContentModel(displayPath, displayPath, string.Empty);
     }
 
+    public async Task<IReadOnlyList<CodeSymbolOutlineNodeModel>> GetCodeFileSymbolsAsync(
+        Guid repositoryId,
+        string solutionId,
+        string repositoryPath,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/{repositoryId}/code/solutions/{solutionId}/files/symbols?path={Uri.EscapeDataString(repositoryPath)}";
+        return await GetFromJsonAsync<IReadOnlyList<CodeSymbolOutlineNodeModel>>(url, cancellationToken)
+               ?? Array.Empty<CodeSymbolOutlineNodeModel>();
+    }
+
     public async Task<PagedResultModel<GitTreeEntryModel>> GetGitTreeAsync(
         Guid repositoryId,
         string? name = null,

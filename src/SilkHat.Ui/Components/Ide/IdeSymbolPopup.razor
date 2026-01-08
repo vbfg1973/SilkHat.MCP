@@ -1,0 +1,112 @@
+@using Fluxor
+@using Fluxor.Blazor.Web.Components
+@using MudBlazor
+@using SilkHat.Ui.Models
+@using SilkHat.Ui.State.Ide
+@using SilkHat.Ui.State.Ide.Actions
+@inherits FluxorComponent
+@inject IState<IdeSolutionsState> SolutionsState
+@inject IState<IdeSymbolsState> SymbolsState
+@inject IDispatcher Dispatcher
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">File Symbols</MudText>
+            @if (!string.IsNullOrWhiteSpace(CurrentView?.Error))
+            {
+                <MudAlert Severity="Severity.Error">@CurrentView!.Error</MudAlert>
+            }
+            else if (CurrentView?.IsLoading == true)
+            {
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
+            }
+            else if (CurrentView is null || CurrentView.Nodes.Count == 0)
+            {
+                <MudText Typo="Typo.body2">No symbols available for the current file.</MudText>
+            }
+            else
+            {
+                <MudTreeView T="CodeSymbolOutlineNodeModel" Items="@TreeItems">
+                    <ItemTemplate>
+                        <MudTreeViewItem T="CodeSymbolOutlineNodeModel"
+                                         Value="@context.Value"
+                                         Items="@context.Children"
+                                         Text="@context.Text"
+                                         Expanded="false"
+                                         CanExpand="@context.Expandable"
+                                         OnClick="@(() => OnSymbolSelected(context.Value!))">
+                            <BodyContent Context="item">
+                                <MudCard Elevation="0" Class="pa-2">
+                                    <MudText Typo="Typo.subtitle2">@item.Value!.Name</MudText>
+                                    <MudText Typo="Typo.caption">@item.Value!.SymbolKind</MudText>
+                                    <MudText Typo="Typo.caption">@item.Value!.RealType</MudText>
+                                </MudCard>
+                            </BodyContent>
+                        </MudTreeViewItem>
+                    </ItemTemplate>
+                </MudTreeView>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? Dialog { get; set; }
+
+    private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
+    private IdeSymbolsViewState? CurrentView => SelectedSolutionId is null
+        ? null
+        : SymbolsState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
+            ? view
+            : IdeSymbolsViewState.Empty;
+
+    private IReadOnlyList<TreeItemData<CodeSymbolOutlineNodeModel>> TreeItems =>
+        CurrentView is null ? Array.Empty<TreeItemData<CodeSymbolOutlineNodeModel>>() : BuildTree(CurrentView.Nodes);
+
+    private static IReadOnlyList<TreeItemData<CodeSymbolOutlineNodeModel>> BuildTree(
+        IReadOnlyList<CodeSymbolOutlineNodeModel> nodes)
+    {
+        return nodes.Select(BuildNode).ToList();
+    }
+
+    private static TreeItemData<CodeSymbolOutlineNodeModel> BuildNode(CodeSymbolOutlineNodeModel node)
+    {
+        var children = node.Children.Count == 0
+            ? new List<TreeItemData<CodeSymbolOutlineNodeModel>>()
+            : node.Children.Select(BuildNode).ToList();
+
+        return new TreeItemData<CodeSymbolOutlineNodeModel>
+        {
+            Value = node,
+            Text = node.Name,
+            Expandable = children.Count > 0,
+            Children = children
+        };
+    }
+
+    private void OnSymbolSelected(CodeSymbolOutlineNodeModel node)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SelectSymbolNodeAction(SelectedSolutionId, node.SymbolKey));
+    }
+
+    private void Close()
+    {
+        if (SelectedSolutionId is not null)
+        {
+            Dispatcher.Dispatch(new CloseSymbolPopupAction(SelectedSolutionId));
+        }
+
+        Dialog?.Close();
+    }
+}

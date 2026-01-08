@@ -1,19 +1,26 @@
 @using Fluxor
 @using Fluxor.Blazor.Web.Components
+@using MudBlazor
 @using Microsoft.AspNetCore.Components.Web
+@using SilkHat.Ui.Components.Ide
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
 @using SilkHat.Ui.State.Ide.Models
 @inherits FluxorComponent
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeTabsState> TabsState
+@inject IState<IdeSymbolsState> SymbolsState
 @inject IDispatcher Dispatcher
+@inject IDialogService DialogService
 
 @if (TabsView?.OpenFiles.Count > 0)
 {
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
         <IdeCommitCard />
-        <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="CloseAllTabs">Close all tabs</MudButton>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="OpenSymbolsPopup">Symbols</MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="CloseAllTabs">Close all tabs</MudButton>
+        </MudStack>
     </MudStack>
     <MudTabs Rounded="true"
              Elevation="0"
@@ -55,6 +62,8 @@
 }
 
 @code {
+    private IDialogReference? _symbolDialog;
+
     private IdeTabsViewState? TabsView
     {
         get
@@ -71,6 +80,30 @@
     }
 
     private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
+    private IdeSymbolsViewState? SymbolsView
+    {
+        get
+        {
+            if (SelectedSolutionId is null)
+            {
+                return null;
+            }
+
+            return SymbolsState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
+                ? view
+                : IdeSymbolsViewState.Empty;
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (SymbolsView?.IsOpen != true && _symbolDialog is not null)
+        {
+            _symbolDialog.Close();
+            _symbolDialog = null;
+        }
+    }
 
     private Task CloseTabAsync(int index)
     {
@@ -101,6 +134,32 @@
         }
 
         Dispatcher.Dispatch(new SetActiveTabAction(SelectedSolutionId, index));
+    }
+
+    private async Task OpenSymbolsPopup()
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        if (SymbolsView?.IsOpen == true)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new OpenSymbolPopupAction(SelectedSolutionId));
+        _symbolDialog = await DialogService.ShowAsync<IdeSymbolPopup>(
+            "File Symbols",
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var dialogRef = _symbolDialog;
+        _ = dialogRef.Result.ContinueWith(_ => InvokeAsync(() =>
+        {
+            if (SelectedSolutionId is not null)
+            {
+                Dispatcher.Dispatch(new CloseSymbolPopupAction(SelectedSolutionId));
+            }
+        }));
     }
 
     private static string GetLineStyle(IdeAnnotatedLine line)
