@@ -5,9 +5,17 @@ namespace SilkHat.Ui.State.Ide.Actions;
 
 public sealed record OpenFileTabAction(string SolutionId, Guid ConfigId, CodeTreeEntryModel Entry);
 
+public sealed record OpenFileTabByPathAction(
+    string SolutionId,
+    Guid ConfigId,
+    string RepositoryPath,
+    int? HighlightLine);
+
 public sealed record OpenFileTabSuccessAction(string SolutionId, IdeOpenFileTab Tab);
 
 public sealed record OpenFileTabFailureAction(string SolutionId, string Error);
+
+public sealed record FocusFileTabAction(string SolutionId, int Index, int? HighlightLine);
 
 public sealed record CloseFileTabAction(string SolutionId, int Index);
 

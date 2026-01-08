@@ -32,7 +32,8 @@ public sealed class CodeFileService : ICodeFileService
 
         var entry = solution.TreeEntries.FirstOrDefault(item =>
             item.Type == CodeTreeEntryType.File &&
-            string.Equals(item.DisplayPath, displayPath, StringComparison.OrdinalIgnoreCase));
+            (string.Equals(item.DisplayPath, displayPath, StringComparison.OrdinalIgnoreCase)
+             || string.Equals(item.RepositoryPath, displayPath, StringComparison.OrdinalIgnoreCase)));
         if (entry is null)
         {
             return new CodeFileContentResult(

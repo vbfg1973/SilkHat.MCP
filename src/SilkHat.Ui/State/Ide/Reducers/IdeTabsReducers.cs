@@ -111,6 +111,31 @@ public static class IdeTabsReducers
     }
 
     [ReducerMethod]
+    public static IdeTabsState ReduceFocusFileTab(
+        IdeTabsState state,
+        FocusFileTabAction action)
+    {
+        var tabs = new Dictionary<string, IdeTabsViewState>(state.Tabs, StringComparer.OrdinalIgnoreCase);
+        if (!tabs.TryGetValue(action.SolutionId, out var view))
+        {
+            return state;
+        }
+
+        if (action.Index < 0 || action.Index >= view.OpenFiles.Count)
+        {
+            return state;
+        }
+
+        var files = view.OpenFiles.ToList();
+        var file = files[action.Index];
+        file.HighlightLine = action.HighlightLine;
+        file.RenderLines = IdeTabHelpers.BuildAnnotatedLines(file.Content, file.DiffLines, file.ShowDiff, file.HighlightLine);
+        files[action.Index] = file;
+        tabs[action.SolutionId] = view with { OpenFiles = files, ActiveTabIndex = action.Index };
+        return new IdeTabsState(tabs);
+    }
+
+    [ReducerMethod]
     public static IdeTabsState ReduceToggleDiff(
         IdeTabsState state,
         ToggleDiffAction action)
@@ -130,7 +155,7 @@ public static class IdeTabsReducers
 
         var file = files[index];
         file.ShowDiff = action.Enabled;
-        file.RenderLines = IdeTabHelpers.BuildAnnotatedLines(file.Content, file.DiffLines, file.ShowDiff);
+        file.RenderLines = IdeTabHelpers.BuildAnnotatedLines(file.Content, file.DiffLines, file.ShowDiff, file.HighlightLine);
         tabs[action.SolutionId] = view with { OpenFiles = files };
         return new IdeTabsState(tabs);
     }

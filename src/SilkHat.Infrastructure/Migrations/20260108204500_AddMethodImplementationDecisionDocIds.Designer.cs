@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SilkHat.Infrastructure;
 
@@ -10,9 +11,10 @@ using SilkHat.Infrastructure;
 namespace SilkHat.Infrastructure.Migrations
 {
     [DbContext(typeof(SilkHatDbContext))]
-    partial class SilkHatDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260108204500_AddMethodImplementationDecisionDocIds")]
+    partial class AddMethodImplementationDecisionDocIds
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.0");

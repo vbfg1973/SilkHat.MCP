@@ -7,7 +7,8 @@ public static class IdeTabHelpers
     public static List<IdeAnnotatedLine> BuildAnnotatedLines(
         string content,
         IReadOnlyList<GitFileDiffLineModel> diffLines,
-        bool showDiff)
+        bool showDiff,
+        int? highlightLine)
     {
         var normalized = content.Replace("\r\n", "\n").Replace('\r', '\n');
         var rawLines = normalized.Split('\n', StringSplitOptions.None);
@@ -47,6 +48,10 @@ public static class IdeTabHelpers
             }
 
             var decoration = additions.Contains(lineNumber) ? IdeLineDecoration.Added : IdeLineDecoration.None;
+            if (highlightLine.HasValue && highlightLine.Value == lineNumber && decoration == IdeLineDecoration.None)
+            {
+                decoration = IdeLineDecoration.Highlight;
+            }
             result.Add(new IdeAnnotatedLine(lineNumber, rawLines[index], decoration));
         }
 

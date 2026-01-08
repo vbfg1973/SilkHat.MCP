@@ -2,7 +2,7 @@ using Fluxor;
 using Microsoft.Extensions.Logging;
 using SilkHat.Ui.Services;
 using SilkHat.Ui.State.Ide.Actions;
-using SilkHat.Ui.State.Ide.Models;
+using SilkHat.Ui.State.Ide;
 
 namespace SilkHat.Ui.State.Ide.Effects;
 

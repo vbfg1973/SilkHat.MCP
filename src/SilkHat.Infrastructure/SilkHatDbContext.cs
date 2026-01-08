@@ -13,6 +13,7 @@ public sealed class SilkHatDbContext : DbContext
     public DbSet<RepositoryConfig> RepositoryConfigs => Set<RepositoryConfig>();
     public DbSet<RepositoryGroup> RepositoryGroups => Set<RepositoryGroup>();
     public DbSet<RepositorySolutionConfig> RepositorySolutionConfigs => Set<RepositorySolutionConfig>();
+    public DbSet<MethodImplementationDecision> MethodImplementationDecisions => Set<MethodImplementationDecision>();
 
     public override int SaveChanges()
     {
@@ -55,6 +56,23 @@ public sealed class SilkHatDbContext : DbContext
             entity.Property(solution => solution.RelativePath).IsRequired();
             entity.Property(solution => solution.SolutionId).IsRequired();
         });
+
+        modelBuilder.Entity<MethodImplementationDecision>(entity =>
+        {
+            entity.HasKey(decision => decision.Id);
+            entity.Property(decision => decision.RepositoryConfigId).IsRequired();
+            entity.Property(decision => decision.SolutionId).IsRequired();
+            entity.Property(decision => decision.InterfaceTypeName).IsRequired();
+            entity.Property(decision => decision.InterfaceMethodSignature).IsRequired();
+            entity.Property(decision => decision.ImplementationTypeName).IsRequired();
+            entity.HasIndex(decision => new
+                {
+                    decision.RepositoryConfigId,
+                    decision.SolutionId,
+                    decision.InterfaceMethodSignature
+                })
+                .IsUnique();
+        });
     }
 
     private void UpdateTimestamps()
@@ -85,6 +103,19 @@ public sealed class SilkHatDbContext : DbContext
                 else if (entry.State == EntityState.Modified)
                 {
                     group.UpdatedUtc = now;
+                }
+            }
+
+            if (entry.Entity is MethodImplementationDecision decision)
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    decision.CreatedUtc = now;
+                    decision.UpdatedUtc = now;
+                }
+                else if (entry.State == EntityState.Modified)
+                {
+                    decision.UpdatedUtc = now;
                 }
             }
         }

@@ -14,7 +14,7 @@ public sealed class IdeOpenFileTab
         DisplayPath = displayPath;
         Name = name;
         Content = content;
-        RenderLines = IdeTabHelpers.BuildAnnotatedLines(content, Array.Empty<GitFileDiffLineModel>(), false);
+        RenderLines = IdeTabHelpers.BuildAnnotatedLines(content, Array.Empty<GitFileDiffLineModel>(), false, null);
     }
 
     public string RepositoryPath { get; }
@@ -30,6 +30,7 @@ public sealed class IdeOpenFileTab
     public bool DiffLoaded { get; set; }
     public List<GitFileDiffLineModel> DiffLines { get; set; } = new();
     public List<IdeAnnotatedLine> RenderLines { get; set; }
+    public int? HighlightLine { get; set; }
 
     public bool HasCommitInfo =>
         LastCommitDateUtc.HasValue
