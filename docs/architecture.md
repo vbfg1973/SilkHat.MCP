@@ -38,15 +38,18 @@ State:
 - Solutions: available solutions, selected solution id (`IdeSolutionsState`).
 - Tree: per-solution tree roots and lazy children (`IdeTreeState`).
 - Tabs: per-solution open files, active tab index, diff toggle state, commit metadata (`IdeTabsState`).
+- Symbols: per-solution symbol popup state, active file, and symbol outline tree (`IdeSymbolsState`).
 
 Actions and effects:
 - Load solutions, select solution, load tree root/children, open file tab, close tabs, toggle diff.
 - Effects call API endpoints: `/api/repositories/loaded`, `/api/repositories/{id}/code/solutions/{solutionId}/tree`, `/api/repositories/{id}/code/solutions/{solutionId}/files`.
+- Symbol popup effects call `/api/repositories/{id}/code/solutions/{solutionId}/files/symbols?path=...` and reload when the active tab changes while the popup is open.
 
 Components:
 - `IdeSolutionSelector` uses solutions state and dispatches selection actions.
 - `IdeTree` uses solutions + tree state and dispatches tree load and open-file actions.
 - `IdeTabs` uses tabs state and dispatches close/toggle actions.
+- `IdeSymbolPopup` renders the named type/member outline for the active file and dispatches symbol selection.
 
 ### Git Domain
 
