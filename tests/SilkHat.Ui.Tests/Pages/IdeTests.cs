@@ -1,13 +1,12 @@
-using System.Reflection;
-using System.Linq;
 using Bunit;
+using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
+using MudBlazor;
 using MudBlazor.Services;
-using Microsoft.AspNetCore.Components;
-using SilkHat.Ui.Layout;
+using SilkHat.Ui.Components.Ide;
+using SilkHat.Ui.State.Ide;
+using SilkHat.Ui.State.Ide.Models;
 using SilkHat.Ui.Models;
-using SilkHat.Ui.Pages;
-using SilkHat.Ui.Services;
 using SilkHat.Ui.Tests.TestHelpers;
 
 namespace SilkHat.Ui.Tests.Pages;
@@ -21,184 +20,72 @@ public sealed class IdeTests
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddMudServices();
         context.Services.AddLogging();
-        context.Services.AddScoped<ThemeService>();
-        context.JSInterop.Setup<string>("localStorage.getItem", _ => true).SetResult("light");
-        context.JSInterop.SetupVoid("localStorage.setItem", _ => true);
-
-        var configId = Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d");
         var solutionId = "solution-1";
-        var handler = new FakeHttpMessageHandler();
-        handler.AddJsonResponse("api/repositories/loaded", $@"{{
-  ""items"": [
-    {{
-      ""id"": ""{configId}"",
-      ""name"": ""Repo One"",
-      ""rootPath"": ""/repo"",
-      ""description"": null,
-      ""groupId"": null,
-      ""solutions"": [
-        {{
-          ""relativePath"": ""./RepoOne.sln"",
-          ""isEnabled"": true,
-          ""solutionId"": ""{solutionId}""
-        }}
-      ],
-      ""createdUtc"": ""2024-01-01T00:00:00Z"",
-      ""updatedUtc"": ""2024-01-01T00:00:00Z""
-    }}
-  ],
-  ""pageNumber"": 1,
-  ""pageSize"": 50,
-  ""totalCount"": 1
-}}");
-        handler.AddJsonResponse($"api/repositories/{configId}/code/solutions/{solutionId}/tree", """
-{
-  "items": [
-    {
-      "repositoryPath": "./RepoOne",
-      "displayPath": "Repo One",
-      "name": "Repo One",
-      "type": 0,
-      "projectKey": "alpha",
-      "projectName": "Repo One"
-    }
-  ],
-  "pageNumber": 1,
-  "pageSize": 50,
-  "totalCount": 1
-}
-""");
-
-        context.Services.AddScoped(_ => new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
-        context.Services.AddScoped<RepositoryApiClient>();
-
-        var cut = context.RenderComponent<MainLayout>(parameters =>
-            parameters.Add(p => p.Body,
-                (RenderFragment)(builder =>
+        var solutionsState = new IdeSolutionsState(
+            false,
+            null,
+            new List<IdeSolutionEntry>
+            {
+                new(solutionId, "./RepoOne.sln", "./RepoOne.sln", Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d"), "./RepoOne.sln (Repo One)")
+            },
+            solutionId);
+        var treeState = new IdeTreeState(new Dictionary<string, IdeTreeViewState>(StringComparer.OrdinalIgnoreCase)
+        {
+            [solutionId] = new IdeTreeViewState(false, true, null, new List<TreeItemData<CodeTreeEntryModel>>
+            {
+                new()
                 {
-                    builder.OpenComponent<Ide>(0);
-                    builder.CloseComponent();
-                })));
+                    Value = new CodeTreeEntryModel("./RepoOne", "Repo One", "Repo One", CodeTreeEntryType.Project, "alpha", "Repo One"),
+                    Text = "Repo One"
+                }
+            })
+        });
 
-        var stateField = typeof(Ide).GetField("_currentState", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(stateField);
+        context.Services.AddScoped<IState<IdeSolutionsState>>(_ => new StateWrapper<IdeSolutionsState>(solutionsState));
+        context.Services.AddScoped<IState<IdeTreeState>>(_ => new StateWrapper<IdeTreeState>(treeState));
+        context.Services.AddScoped<IDispatcher>(_ => new RecordingDispatcher());
+        context.Services.AddScoped<IActionSubscriber>(_ => new NoOpActionSubscriber());
 
-        var state = stateField!.GetValue(cut.FindComponent<Ide>().Instance);
-        var treeField = state!.GetType().GetProperty("TreeItems");
-        Assert.NotNull(treeField);
+        var cut = context.RenderComponent<IdeTree>();
 
-        var nodes = (System.Collections.IList)treeField!.GetValue(state)!;
-        Assert.Single(nodes.Cast<object>());
         cut.WaitForAssertion(() => Assert.Contains("Repo One", cut.Markup));
     }
 
     [Fact]
-    public async Task Ide_OpensFileTab_WhenFileSelected()
+    public void Ide_OpensFileTab_WhenFileSelected()
     {
         using var context = new TestContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddMudServices();
         context.Services.AddLogging();
-        context.Services.AddScoped<ThemeService>();
-        context.JSInterop.Setup<string>("localStorage.getItem", _ => true).SetResult("light");
-        context.JSInterop.SetupVoid("localStorage.setItem", _ => true);
-
-        var configId = Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d");
         var solutionId = "solution-1";
-        var handler = new FakeHttpMessageHandler();
-        handler.AddJsonResponse("api/repositories/loaded", $@"{{
-  ""items"": [
-    {{
-      ""id"": ""{configId}"",
-      ""name"": ""Repo One"",
-      ""rootPath"": ""/repo"",
-      ""description"": null,
-      ""groupId"": null,
-      ""solutions"": [
-        {{
-          ""relativePath"": ""./RepoOne.sln"",
-          ""isEnabled"": true,
-          ""solutionId"": ""{solutionId}""
-        }}
-      ],
-      ""createdUtc"": ""2024-01-01T00:00:00Z"",
-      ""updatedUtc"": ""2024-01-01T00:00:00Z""
-    }}
-  ],
-  ""pageNumber"": 1,
-  ""pageSize"": 50,
-  ""totalCount"": 1
-}}");
-        handler.AddJsonResponse($"api/repositories/{configId}/code/solutions/{solutionId}/tree", """
-{
-  "items": [
-    {
-      "repositoryPath": "./Program.cs",
-      "displayPath": "Repo One/Program.cs",
-      "name": "Program.cs",
-      "type": 2,
-      "projectKey": "alpha",
-      "projectName": "Repo One"
-    }
-  ],
-  "pageNumber": 1,
-  "pageSize": 50,
-  "totalCount": 1
-}
-""");
-        handler.AddJsonResponse(
-            $"api/repositories/{configId}/code/solutions/{solutionId}/files?path=Repo%20One%2FProgram.cs",
-            """
-{
-  "repositoryPath": "./Program.cs",
-  "displayPath": "Repo One/Program.cs",
-  "content": "class Program {}"
-}
-""");
-        handler.AddJsonResponse(
-            $"api/repositories/{configId}/git/files/.%2FProgram.cs/last-change?includeDiff=false",
-            """
-{
-  "path": "./Program.cs",
-  "commitSha": "sha1",
-  "abbreviatedSha": "sha1",
-  "author": "alice",
-  "authorEmail": "alice@example.com",
-  "commitDateUtc": "2024-01-01T00:00:00Z",
-  "subject": "Update",
-  "diffLines": []
-}
-""");
-        context.Services.AddScoped(_ => new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
-        context.Services.AddScoped<RepositoryApiClient>();
-
-        var cut = context.RenderComponent<MainLayout>(parameters =>
-            parameters.Add(p => p.Body,
-                (RenderFragment)(builder =>
-                {
-                    builder.OpenComponent<Ide>(0);
-                    builder.CloseComponent();
-                })));
-
-        var ide = cut.FindComponent<Ide>().Instance;
-        var method = typeof(Ide).GetMethod("OnTreeEntrySelected", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(method);
-        var stateField = typeof(Ide).GetField("_currentState", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(stateField);
-        cut.WaitForAssertion(() => Assert.NotNull(stateField!.GetValue(ide)));
-        var entry = new CodeTreeEntryModel(
-            "./Program.cs",
-            "Repo One/Program.cs",
-            "Program.cs",
-            CodeTreeEntryType.File,
-            "alpha",
-            "Repo One");
-
-        await cut.InvokeAsync(async () =>
+        var solutionsState = new IdeSolutionsState(
+            false,
+            null,
+            new List<IdeSolutionEntry>
+            {
+                new(solutionId, "./RepoOne.sln", "./RepoOne.sln", Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d"), "./RepoOne.sln (Repo One)")
+            },
+            solutionId);
+        var tab = new IdeOpenFileTab("./Program.cs", "Repo One/Program.cs", "Program.cs", "  class Program {}")
         {
-            var task = (Task)method!.Invoke(ide, new object?[] { entry })!;
-            await task;
+            LastCommitAuthor = "alice",
+            LastCommitAuthorEmail = "alice@example.com",
+            LastCommitDateUtc = DateTimeOffset.Parse("2024-01-01T00:00:00Z"),
+            AbbreviatedSha = "sha1",
+            LastCommitSubject = "Update"
+        };
+        var tabsState = new IdeTabsState(new Dictionary<string, IdeTabsViewState>(StringComparer.OrdinalIgnoreCase)
+        {
+            [solutionId] = new IdeTabsViewState(new List<IdeOpenFileTab> { tab }, 0, null)
         });
+
+        context.Services.AddScoped<IState<IdeSolutionsState>>(_ => new StateWrapper<IdeSolutionsState>(solutionsState));
+        context.Services.AddScoped<IState<IdeTabsState>>(_ => new StateWrapper<IdeTabsState>(tabsState));
+        context.Services.AddScoped<IDispatcher>(_ => new RecordingDispatcher());
+        context.Services.AddScoped<IActionSubscriber>(_ => new NoOpActionSubscriber());
+
+        var cut = context.RenderComponent<IdeTabs>();
 
         cut.WaitForAssertion(() =>
         {
@@ -207,20 +94,10 @@ public sealed class IdeTests
             Assert.Contains("alice@example.com", cut.Markup);
             Assert.Contains("2024-01-01 00:00:00", cut.Markup);
         });
-
-        var state = stateField!.GetValue(ide);
-        var tabsField = state!.GetType().GetProperty("OpenFiles");
-        Assert.NotNull(tabsField);
         cut.WaitForAssertion(() =>
         {
-            var tabs = (System.Collections.IList)tabsField!.GetValue(state)!;
-            Assert.Single(tabs);
+            var lineSpan = cut.Find("span[style*='white-space: pre']");
+            Assert.StartsWith("  class Program {}", lineSpan.TextContent);
         });
-
-        var tabs = (System.Collections.IList)tabsField!.GetValue(state)!;
-        var tab = tabs[0]!;
-        var contentProperty = tab.GetType().GetProperty("Content");
-        Assert.NotNull(contentProperty);
-        Assert.Equal("class Program {}", contentProperty!.GetValue(tab));
     }
 }

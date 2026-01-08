@@ -27,3 +27,50 @@ SilkHat analyzes .NET repositories by loading repository groups, parsing solutio
 ## Command Streaming
 
 Repository load operations use channels and NDJSON streaming. The API exposes a load endpoint that emits progress and data events to the UI while work proceeds.
+
+## UI Architecture (Fluxor)
+
+The IDE view uses Fluxor for state management. Other UI pages remain on local component state until their redesign.
+
+### Code (Roslyn) Domain
+
+State:
+- Solutions: available solutions, selected solution id (`IdeSolutionsState`).
+- Tree: per-solution tree roots and lazy children (`IdeTreeState`).
+- Tabs: per-solution open files, active tab index, diff toggle state, commit metadata (`IdeTabsState`).
+
+Actions and effects:
+- Load solutions, select solution, load tree root/children, open file tab, close tabs, toggle diff.
+- Effects call API endpoints: `/api/repositories/loaded`, `/api/repositories/{id}/code/solutions/{solutionId}/tree`, `/api/repositories/{id}/code/solutions/{solutionId}/files`.
+
+Components:
+- `IdeSolutionSelector` uses solutions state and dispatches selection actions.
+- `IdeTree` uses solutions + tree state and dispatches tree load and open-file actions.
+- `IdeTabs` uses tabs state and dispatches close/toggle actions.
+
+### Git Domain
+
+State:
+- Commit metadata and diff lines stored on each open file tab (`IdeTabsState`).
+
+Actions and effects:
+- Toggle diff triggers `/api/repositories/{id}/git/files/{path}/last-change?includeDiff=true`.
+- Initial tab open triggers `/api/repositories/{id}/git/files/{path}/last-change?includeDiff=false`.
+
+Components:
+- `IdeCommitCard` renders short SHA, date (UTC), author, author email, and diff toggle.
+- `IdeTabs` renders annotated lines based on diff state.
+
+### Logging and Correlation
+
+Client-side logging:
+- Fluxor action dispatch is logged at Debug via `FluxorLoggingMiddleware`.
+- Effects log Debug for start/end, Warning for recoverable failures, Error for terminal failures.
+
+Correlation:
+- All UI API calls include `X-Correlation-Id` (GUID) and log both the local id and response header value.
+- API middleware echoes or creates `X-Correlation-Id` and decorates server logs with it.
+
+## Documentation Maintenance
+
+Whenever UI state, actions, effects, or components change, update the UI Architecture section above to reflect the current state structure, API endpoints, logging, and component usage.

@@ -1,0 +1,94 @@
+@using Fluxor
+@using Fluxor.Blazor.Web.Components
+@using Microsoft.AspNetCore.Components.Web
+@using MudBlazor
+@using SilkHat.Ui.Models
+@using SilkHat.Ui.State.Ide
+@using SilkHat.Ui.State.Ide.Actions
+@inherits FluxorComponent
+@inject IState<IdeSolutionsState> SolutionsState
+@inject IState<IdeTreeState> TreeState
+@inject IDispatcher Dispatcher
+
+<MudText Typo="Typo.subtitle1" Class="mb-2">Repository Tree</MudText>
+
+@if (!string.IsNullOrWhiteSpace(CurrentTree?.Error))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-2">@CurrentTree!.Error</MudAlert>
+}
+
+<MudTreeView T="CodeTreeEntryModel" ServerData="LoadTreeChildrenAsync" Items="CurrentTree?.Items">
+    <ItemTemplate>
+        <MudTreeViewItem T="CodeTreeEntryModel"
+                         Value="@context.Value"
+                         Text="@context.Text"
+                         Items="@context.Children"
+                         ItemsChanged="@(new Action<IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>>>(items => OnItemsLoaded(context, items)))"
+                         @bind-Expanded="context.Expanded"
+                         CanExpand="@context.Expandable"
+                         Icon="@context.Icon"
+                         LoadingIconColor="Color.Info"
+                         OnClick="@(async (MouseEventArgs _) => await OnTreeEntrySelected(context.Value))" />
+    </ItemTemplate>
+</MudTreeView>
+
+@code {
+    private IdeTreeViewState? CurrentTree => SelectedSolutionId is null
+        ? null
+        : TreeState.Value.Trees.TryGetValue(SelectedSolutionId, out var tree)
+            ? tree
+            : IdeTreeViewState.Empty;
+
+    private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
+    private Guid? CurrentConfigId
+    {
+        get
+        {
+            var solution = SolutionsState.Value.Solutions
+                .FirstOrDefault(item => string.Equals(item.SolutionId, SelectedSolutionId, StringComparison.OrdinalIgnoreCase));
+            return solution?.ConfigId;
+        }
+    }
+
+    private async Task<IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>>> LoadTreeChildrenAsync(
+        CodeTreeEntryModel? parent)
+    {
+        if (SelectedSolutionId is null || CurrentConfigId is null)
+        {
+            return Array.Empty<TreeItemData<CodeTreeEntryModel>>();
+        }
+
+        if (parent is null)
+        {
+            return CurrentTree?.Items ?? new List<TreeItemData<CodeTreeEntryModel>>();
+        }
+
+        var completion = new TaskCompletionSource<IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>>>();
+        Dispatcher.Dispatch(new LoadTreeChildrenAction(
+            SelectedSolutionId,
+            CurrentConfigId.Value,
+            parent.DisplayPath,
+            completion));
+
+        return await completion.Task;
+    }
+
+    private Task OnTreeEntrySelected(CodeTreeEntryModel? entry)
+    {
+        if (entry is null || SelectedSolutionId is null || CurrentConfigId is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        Dispatcher.Dispatch(new OpenFileTabAction(SelectedSolutionId, CurrentConfigId.Value, entry));
+        return Task.CompletedTask;
+    }
+
+    private static void OnItemsLoaded(
+        TreeItemData<CodeTreeEntryModel> treeItemData,
+        IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>> children)
+    {
+        treeItemData.Children = children?.ToList() ?? new List<TreeItemData<CodeTreeEntryModel>>();
+    }
+}

@@ -1,0 +1,121 @@
+@using Fluxor
+@using Fluxor.Blazor.Web.Components
+@using Microsoft.AspNetCore.Components.Web
+@using SilkHat.Ui.State.Ide
+@using SilkHat.Ui.State.Ide.Actions
+@using SilkHat.Ui.State.Ide.Models
+@inherits FluxorComponent
+@inject IState<IdeSolutionsState> SolutionsState
+@inject IState<IdeTabsState> TabsState
+@inject IDispatcher Dispatcher
+
+@if (TabsView?.OpenFiles.Count > 0)
+{
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+        <IdeCommitCard />
+        <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="CloseAllTabs">Close all tabs</MudButton>
+    </MudStack>
+    <MudTabs Rounded="true"
+             Elevation="0"
+             ActivePanelIndex="@TabsView!.ActiveTabIndex"
+             ActivePanelIndexChanged="OnActiveTabChanged"
+             Class="flex-grow-1">
+        @for (var index = 0; index < TabsView.OpenFiles.Count; index++)
+        {
+            var file = TabsView.OpenFiles[index];
+            var tabIndex = index;
+            <MudTabPanel>
+                <TabContent>
+                    <div class="d-flex align-items-center gap-2">
+                        <MudText Typo="Typo.body2">@file.Name</MudText>
+                        <span @onclick:stopPropagation="true">
+                            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                           Size="Size.Small"
+                                           Color="Color.Default"
+                                           OnClick="@(async (MouseEventArgs _) => await CloseTabAsync(tabIndex))" />
+                        </span>
+                    </div>
+                </TabContent>
+                <ChildContent>
+                    <MudPaper Elevation="0" Class="pa-3" Style="height: 100%; overflow: auto;">
+                        <div style="font-family: Consolas, 'Courier New', monospace; font-size: 0.85rem; line-height: 1.4;">
+                            @foreach (var line in file.RenderLines)
+                            {
+                                <div style="@GetLineStyle(line)">
+                                    <span style="display: inline-block; width: 3.5rem; color: #888;">@GetLineNumber(line)</span>
+                                    <span style="white-space: pre;">@line.Text</span>
+                                </div>
+                            }
+                        </div>
+                    </MudPaper>
+                </ChildContent>
+            </MudTabPanel>
+        }
+    </MudTabs>
+}
+
+@code {
+    private IdeTabsViewState? TabsView
+    {
+        get
+        {
+            if (SelectedSolutionId is null)
+            {
+                return null;
+            }
+
+            return TabsState.Value.Tabs.TryGetValue(SelectedSolutionId, out var view)
+                ? view
+                : IdeTabsViewState.Empty;
+        }
+    }
+
+    private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
+    private Task CloseTabAsync(int index)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        Dispatcher.Dispatch(new CloseFileTabAction(SelectedSolutionId, index));
+        return Task.CompletedTask;
+    }
+
+    private void CloseAllTabs()
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new CloseAllTabsAction(SelectedSolutionId));
+    }
+
+    private void OnActiveTabChanged(int index)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SetActiveTabAction(SelectedSolutionId, index));
+    }
+
+    private static string GetLineStyle(IdeAnnotatedLine line)
+    {
+        return line.Decoration switch
+        {
+            IdeLineDecoration.Added => "background-color: #e6f4ea;",
+            IdeLineDecoration.Deleted => "background-color: #fce8e6;",
+            IdeLineDecoration.Highlight => "background-color: #f1f3f4;",
+            _ => string.Empty
+        };
+    }
+
+    private static string GetLineNumber(IdeAnnotatedLine line)
+    {
+        return line.LineNumber?.ToString() ?? string.Empty;
+    }
+}
