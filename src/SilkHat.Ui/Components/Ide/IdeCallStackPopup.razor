@@ -52,44 +52,48 @@
                                                      CanExpand="@context.Expandable"
                                                      OnClick="@(() => OnNodeSelected(context.Value!))">
                                         <BodyContent Context="item">
-                                            <MudCard Elevation="0" Class="pa-2">
-                                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                                                    <MudStack Spacing="0">
-                                                        <MudText Typo="Typo.subtitle2">@($"{item.Value!.TypeName}.{item.Value!.MethodName}")</MudText>
-                                                        <MudText Typo="Typo.caption">@item.Value!.Namespace</MudText>
-                                                        <MudText Typo="Typo.caption">Line @item.Value!.CallSite.LineSpan.StartLine</MudText>
-                                                        @if (item.Value.DecisionRequired)
-                                                        {
-                                                            <MudText Typo="Typo.caption" Color="Color.Warning">Decision required</MudText>
-                                                        }
-                                                    </MudStack>
-                                                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
-                                                                   Size="Size.Small"
-                                                                   Color="Color.Primary"
-                                                                   OnClick="@(() => JumpToCallSite(item.Value!))" />
-                                                </MudStack>
-                                                @if (item.Value.DecisionRequired && item.Value.CandidateTypeNames.Count > 0)
-                                                {
-                                                    <MudStack Spacing="1" Class="mt-2">
-                                                        <MudSelect T="string"
-                                                                   Dense="true"
-                                                                   Value="@GetDecisionSelection(item.Value.NodeId)"
-                                                                   ValueChanged="value => OnDecisionSelected(item.Value.NodeId, value)"
-                                                                   Label="Implementation">
-                                                            @foreach (var candidate in item.Value.CandidateTypeNames)
+                                            @if (item.Value is not null)
+                                            {
+                                                var node = item.Value;
+                                                <MudCard Elevation="0" Class="pa-2">
+                                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                                        <MudStack Spacing="0">
+                                                            <MudText Typo="Typo.subtitle2">@($"{node.TypeName}.{node.MethodName}")</MudText>
+                                                            <MudText Typo="Typo.caption">@node.Namespace</MudText>
+                                                            <MudText Typo="Typo.caption">Line @node.CallSite.LineSpan.StartLine</MudText>
+                                                            @if (node.DecisionRequired)
                                                             {
-                                                                <MudSelectItem Value="@candidate">@candidate</MudSelectItem>
+                                                                <MudText Typo="Typo.caption" Color="Color.Warning">Decision required</MudText>
                                                             }
-                                                        </MudSelect>
-                                                        <MudButton Variant="Variant.Outlined"
-                                                                   Color="Color.Default"
-                                                                   Disabled="@string.IsNullOrWhiteSpace(GetDecisionSelection(item.Value.NodeId))"
-                                                                   OnClick="@(() => SaveDecision(item.Value))">
-                                                            Save decision
-                                                        </MudButton>
+                                                        </MudStack>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                                                       Size="Size.Small"
+                                                                       Color="Color.Primary"
+                                                                       OnClick="@(() => JumpToCallSite(node))" />
                                                     </MudStack>
-                                                }
-                                            </MudCard>
+                                                    @if (node.DecisionRequired && node.CandidateTypeNames.Count > 0)
+                                                    {
+                                                        <MudStack Spacing="1" Class="mt-2">
+                                                            <MudSelect T="string"
+                                                                       Dense="true"
+                                                                       Value="@GetDecisionSelection(node.NodeId)"
+                                                                       ValueChanged="value => OnDecisionSelected(node.NodeId, value)"
+                                                                       Label="Implementation">
+                                                                @foreach (var candidate in node.CandidateTypeNames)
+                                                                {
+                                                                    <MudSelectItem Value="@candidate">@candidate</MudSelectItem>
+                                                                }
+                                                            </MudSelect>
+                                                            <MudButton Variant="Variant.Outlined"
+                                                                       Color="Color.Default"
+                                                                       Disabled="@string.IsNullOrWhiteSpace(GetDecisionSelection(node.NodeId))"
+                                                                       OnClick="@(() => SaveDecision(node))">
+                                                                Save decision
+                                                            </MudButton>
+                                                        </MudStack>
+                                                    }
+                                                </MudCard>
+                                            }
                                         </BodyContent>
                                     </MudTreeViewItem>
                                 </ItemTemplate>

@@ -42,7 +42,7 @@ public sealed class MethodCallStackServiceTests
             null,
             CancellationToken.None);
 
-        var interfaceNode = Assert.Single(result.Nodes.Where(node => node.IsInterfaceTarget));
+        var interfaceNode = Assert.Single(result.Nodes, node => node.IsInterfaceTarget);
         Assert.True(interfaceNode.DecisionRequired);
         Assert.Equal("GreetingService", interfaceNode.CallerTypeName);
         Assert.Equal("GetGreeting", interfaceNode.MethodName);
@@ -88,7 +88,7 @@ public sealed class MethodCallStackServiceTests
             null,
             CancellationToken.None);
 
-        var interfaceNode = Assert.Single(result.Nodes.Where(node => node.IsInterfaceTarget));
+        var interfaceNode = Assert.Single(result.Nodes, node => node.IsInterfaceTarget);
         Assert.False(interfaceNode.DecisionRequired);
         Assert.NotNull(interfaceNode.Decision);
         Assert.Equal(decisionId, interfaceNode.Decision!.Id);
