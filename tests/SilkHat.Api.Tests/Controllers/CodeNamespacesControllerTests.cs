@@ -2,9 +2,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using SilkHat.Api.Controllers;
+using SilkHat.Api.Models;
 using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
+using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Tests.Controllers;
 
@@ -20,7 +22,7 @@ public sealed class CodeNamespacesControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetNamespaces(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, null);
+        var result = controller.GetNamespaces(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, null, new PagingQuery());
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
@@ -38,12 +40,12 @@ public sealed class CodeNamespacesControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetNamespaces(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, "Alpha.Sub");
+        var result = controller.GetNamespaces(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, "Alpha.Sub", new PagingQuery());
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var list = Assert.IsAssignableFrom<IReadOnlyList<string>>(ok.Value);
-        Assert.Single(list);
-        Assert.Equal("Alpha.Sub", list[0]);
+        var list = Assert.IsType<PagedResult<string>>(ok.Value);
+        Assert.Single(list.Items);
+        Assert.Equal("Alpha.Sub", list.Items[0]);
         store.Verify(s => s.Get(It.IsAny<Guid>()), Times.Once);
     }
 }

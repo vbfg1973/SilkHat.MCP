@@ -1,3 +1,5 @@
+using SilkHat.Core.Dtos;
+
 namespace SilkHat.Git.Core.Dtos;
 
 public enum GitChangeKind
@@ -28,7 +30,7 @@ public sealed record GitFileHistoryEntryDto(
 
 public sealed record GitFileHistoryDto(
     string Path,
-    IReadOnlyList<GitFileHistoryEntryDto> Entries);
+    PagedResult<GitFileHistoryEntryDto> Entries);
 
 public sealed record GitCoChangeEntryDto(
     string Path,
@@ -37,4 +39,4 @@ public sealed record GitCoChangeEntryDto(
 public sealed record GitCoChangeStatsDto(
     string Path,
     int TotalChangeCount,
-    IReadOnlyList<GitCoChangeEntryDto> Entries);
+    PagedResult<GitCoChangeEntryDto> Entries);

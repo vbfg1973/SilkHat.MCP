@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using SilkHat.Api.Extensions;
+using SilkHat.Api.Models;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Core.Dtos;
+using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
 
@@ -15,7 +18,11 @@ public sealed class CodeProjectsController : ApiControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IReadOnlyList<CodeProjectDto>> GetProjects(Guid id, string solutionId, [FromQuery] string? name)
+    public ActionResult<PagedResult<CodeProjectDto>> GetProjects(
+        Guid id,
+        string solutionId,
+        [FromQuery] string? name,
+        [FromQuery] PagingQuery pagingQuery)
     {
         var workspace = _codeStore.Get(id);
         if (workspace is null)
@@ -29,6 +36,7 @@ public sealed class CodeProjectsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
         }
 
+        var paging = pagingQuery.ResolvePaging();
         var projects = solution.Projects.Values.AsEnumerable();
         if (!string.IsNullOrWhiteSpace(name))
         {
@@ -38,7 +46,7 @@ public sealed class CodeProjectsController : ApiControllerBase
         var result = projects
             .Select(project => new CodeProjectDto(project.ProjectKey, project.Name, project.Language, project.AssemblyName))
             .OrderBy(project => project.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .ToPagedResult(paging);
 
         return Ok(result);
     }
@@ -67,7 +75,11 @@ public sealed class CodeProjectsController : ApiControllerBase
     }
 
     [HttpGet("{projectKey}/references")]
-    public ActionResult<IReadOnlyList<CodeProjectReferenceDto>> GetProjectReferences(Guid id, string solutionId, string projectKey)
+    public ActionResult<PagedResult<CodeProjectReferenceDto>> GetProjectReferences(
+        Guid id,
+        string solutionId,
+        string projectKey,
+        [FromQuery] PagingQuery pagingQuery)
     {
         var workspace = _codeStore.Get(id);
         if (workspace is null)
@@ -86,11 +98,16 @@ public sealed class CodeProjectsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Project not found.", "Code");
         }
 
-        return Ok(project.References);
+        var paging = pagingQuery.ResolvePaging();
+        return Ok(project.References.ToPagedResult(paging));
     }
 
     [HttpGet("{projectKey}/referenced-by")]
-    public ActionResult<IReadOnlyList<CodeProjectReferenceDto>> GetProjectReferencedBy(Guid id, string solutionId, string projectKey)
+    public ActionResult<PagedResult<CodeProjectReferenceDto>> GetProjectReferencedBy(
+        Guid id,
+        string solutionId,
+        string projectKey,
+        [FromQuery] PagingQuery pagingQuery)
     {
         var workspace = _codeStore.Get(id);
         if (workspace is null)
@@ -109,6 +126,7 @@ public sealed class CodeProjectsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Project not found.", "Code");
         }
 
-        return Ok(project.ReferencedBy);
+        var paging = pagingQuery.ResolvePaging();
+        return Ok(project.ReferencedBy.ToPagedResult(paging));
     }
 }

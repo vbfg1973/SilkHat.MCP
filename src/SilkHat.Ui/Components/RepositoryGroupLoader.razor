@@ -224,13 +224,13 @@
         try
         {
             _groups.Clear();
-            _groups.AddRange(await Api.GetRepositoryGroupsAsync());
+            _groups.AddRange((await Api.GetRepositoryGroupsAsync()).Items);
 
             _configs.Clear();
-            _configs.AddRange(await Api.GetRepositoryConfigsAsync());
+            _configs.AddRange((await Api.GetRepositoryConfigsAsync()).Items);
 
             _availableRepositories.Clear();
-            _availableRepositories.AddRange(await Api.GetAvailableRepositoriesAsync());
+            _availableRepositories.AddRange((await Api.GetAvailableRepositoriesAsync()).Items);
 
             if (_selectedGroup is not null)
             {
@@ -347,7 +347,7 @@
         try
         {
             var solutions = await Api.GetAvailableRepositorySolutionsAsync(_availableSelectedPath);
-            _availableSolutionSelections.AddRange(solutions.Select(solution => new RepositorySolutionEditor
+            _availableSolutionSelections.AddRange(solutions.Items.Select(solution => new RepositorySolutionEditor
             {
                 RelativePath = solution.RelativePath,
                 SolutionId = solution.SolutionId,
@@ -471,7 +471,7 @@
         {
             var solutions = await Api.GetAvailableRepositorySolutionsAsync(config.RootPath);
             config.Solutions.Clear();
-            config.Solutions.AddRange(solutions.Select(solution => new RepositorySolutionEditor
+            config.Solutions.AddRange(solutions.Items.Select(solution => new RepositorySolutionEditor
             {
                 RelativePath = solution.RelativePath,
                 SolutionId = solution.SolutionId,

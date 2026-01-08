@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Mvc;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Core.Dtos;
 using SilkHat.Api.Models;
+using SilkHat.Api.Extensions;
+using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
 
@@ -18,7 +20,7 @@ public sealed class CodeTreeController : ApiControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IReadOnlyList<CodeTreeEntryDto>> GetTree(
+    public ActionResult<PagedResult<CodeTreeEntryDto>> GetTree(
         Guid id,
         string solutionId,
         [FromQuery] CodeTreeQuery query)
@@ -46,6 +48,8 @@ public sealed class CodeTreeController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
         }
 
-        return Ok(_treeService.GetTree(solution, query.ParentId));
+        var paging = new PagingQuery { PageNumber = query.PageNumber, PageSize = query.PageSize }.ResolvePaging();
+        var results = _treeService.GetTree(solution, query.ParentId).ToPagedResult(paging);
+        return Ok(results);
     }
 }

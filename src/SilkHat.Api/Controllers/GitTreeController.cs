@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
+using SilkHat.Api.Extensions;
+using SilkHat.Api.Models;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Git.Core.Dtos;
+using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
 
@@ -18,12 +21,13 @@ public sealed class GitTreeController : ApiControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<GitTreeEntryDto>>> GetTree(
+    public async Task<ActionResult<PagedResult<GitTreeEntryDto>>> GetTree(
         Guid id,
         [FromQuery] string? name,
         [FromQuery] GitTreeEntryType? type,
         [FromQuery] DateTimeOffset? changedAfter,
         [FromQuery] string? author,
+        [FromQuery] PagingQuery pagingQuery,
         CancellationToken cancellationToken)
     {
         var repo = _store.Get(id);
@@ -34,6 +38,7 @@ public sealed class GitTreeController : ApiControllerBase
 
         try
         {
+            var paging = pagingQuery.ResolvePaging();
             var entries = await _gitCli.ListTreeAsync(
                 id,
                 repo.RootPath,
@@ -43,7 +48,7 @@ public sealed class GitTreeController : ApiControllerBase
                 author,
                 cancellationToken);
 
-            return Ok(entries);
+            return Ok(entries.ToPagedResult(paging));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -4,6 +4,7 @@ using Moq;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Models;
 using SilkHat.Api.Controllers;
+using SilkHat.Api.Models;
 using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure.Entities;
@@ -151,12 +152,12 @@ public sealed class RepositoryConfigsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = await controller.GetLoaded(CancellationToken.None);
+        var result = await controller.GetLoaded(new PagingQuery(), CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var configs = Assert.IsType<List<RepositoryConfigDto>>(ok.Value);
-        Assert.Single(configs);
-        Assert.Equal(first.Id, configs[0].Id);
+        var configs = Assert.IsType<PagedResult<RepositoryConfigDto>>(ok.Value);
+        Assert.Single(configs.Items);
+        Assert.Equal(first.Id, configs.Items[0].Id);
         store.Verify(s => s.GetAll(), Times.Once);
     }
 

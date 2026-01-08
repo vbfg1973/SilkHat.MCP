@@ -45,7 +45,7 @@ public sealed record GitFileHistoryEntryModel(
 
 public sealed record GitFileHistoryModel(
     string Path,
-    IReadOnlyList<GitFileHistoryEntryModel> Entries);
+    PagedResultModel<GitFileHistoryEntryModel> Entries);
 
 public sealed record GitCoChangeEntryModel(
     string Path,
@@ -54,4 +54,25 @@ public sealed record GitCoChangeEntryModel(
 public sealed record GitCoChangeStatsModel(
     string Path,
     int TotalChangeCount,
-    IReadOnlyList<GitCoChangeEntryModel> Entries);
+    PagedResultModel<GitCoChangeEntryModel> Entries);
+
+public enum GitDiffLineKind
+{
+    Add = 0,
+    Delete = 1
+}
+
+public sealed record GitFileDiffLineModel(
+    int LineNumber,
+    GitDiffLineKind Kind,
+    string Content);
+
+public sealed record GitFileLastChangeModel(
+    string Path,
+    string CommitSha,
+    string AbbreviatedSha,
+    string Author,
+    string AuthorEmail,
+    DateTimeOffset CommitDateUtc,
+    string Subject,
+    IReadOnlyList<GitFileDiffLineModel> DiffLines);

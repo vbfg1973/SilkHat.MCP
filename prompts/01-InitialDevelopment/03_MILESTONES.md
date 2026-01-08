@@ -117,4 +117,12 @@ Each milestone must end with:
 - Performance pass: caching indices per LoadedRepository
 - Ensure all tests stable
 
+## M7: Git Commit Query + Integration Coverage
+- Add commit query endpoints and models for author, sha, date range, merge vs ordinary commits, and file change filters.
+- Support change type enums for file changes (add/modify/delete/rename/etc).
+- Add unit tests that parse commit metadata and file change details (including the provided commit examples).
+- Add integration tests that query the current repository and assert the example commits appear in expected results.
+- Add generic paging (pageNumber/pageSize) across all list-returning endpoints, with shared result models and updated clients/tests.
+- IDE file tabs show last commit metadata (author + ISO date) and a diff toggle that annotates added (green) and deleted (red) lines from the last commit.
+
 At the end of each milestone, STOP and emit Milestone Commit Notes.

@@ -12,6 +12,7 @@ using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
 using System.Linq;
+using SilkHat.Api.Models;
 
 namespace SilkHat.Api.Controllers;
 
@@ -42,15 +43,17 @@ public sealed class RepositoryGroupsController : ApiControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<RepositoryGroupDto>>> GetAll(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<RepositoryGroupDto>>> GetAll(
+        [FromQuery] PagingQuery pagingQuery,
+        CancellationToken cancellationToken)
     {
-        var groups = await _dbContext.RepositoryGroups
+        var paging = pagingQuery.ResolvePaging();
+        var groupsQuery = _dbContext.RepositoryGroups
             .AsNoTracking()
             .OrderBy(group => group.Name)
-            .Select(group => group.ToDto())
-            .ToListAsync(cancellationToken);
+            .Select(group => group.ToDto());
 
-        return Ok(groups);
+        return Ok(await groupsQuery.ToPagedResultAsync(paging, cancellationToken));
     }
 
     [HttpGet("{id:guid}")]

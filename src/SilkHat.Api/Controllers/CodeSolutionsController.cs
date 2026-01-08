@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using SilkHat.Api.Extensions;
+using SilkHat.Api.Models;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Core.Dtos;
+using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
 
@@ -15,7 +18,9 @@ public sealed class CodeSolutionsController : ApiControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IReadOnlyList<CodeSolutionDto>> GetSolutions(Guid id)
+    public ActionResult<PagedResult<CodeSolutionDto>> GetSolutions(
+        Guid id,
+        [FromQuery] PagingQuery pagingQuery)
     {
         var workspace = _store.Get(id);
         if (workspace is null)
@@ -23,10 +28,11 @@ public sealed class CodeSolutionsController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
         }
 
+        var paging = pagingQuery.ResolvePaging();
         var results = workspace.Solutions.Values
             .OrderBy(solution => solution.SolutionName, StringComparer.OrdinalIgnoreCase)
             .Select(solution => new CodeSolutionDto(solution.SolutionId, solution.SolutionName, solution.RelativePath))
-            .ToList();
+            .ToPagedResult(paging);
 
         return Ok(results);
     }

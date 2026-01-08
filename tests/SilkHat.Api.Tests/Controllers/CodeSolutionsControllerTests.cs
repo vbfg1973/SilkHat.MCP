@@ -2,10 +2,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using SilkHat.Api.Controllers;
+using SilkHat.Api.Models;
 using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
+using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Tests.Controllers;
 
@@ -21,7 +23,7 @@ public sealed class CodeSolutionsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetSolutions(Guid.NewGuid());
+        var result = controller.GetSolutions(Guid.NewGuid(), new PagingQuery());
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
@@ -38,12 +40,12 @@ public sealed class CodeSolutionsControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetSolutions(Guid.NewGuid());
+        var result = controller.GetSolutions(Guid.NewGuid(), new PagingQuery());
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var list = Assert.IsAssignableFrom<IReadOnlyList<CodeSolutionDto>>(ok.Value);
-        Assert.Single(list);
-        Assert.Equal(CodeWorkspaceFactory.DefaultSolutionId, list[0].SolutionId);
+        var list = Assert.IsType<PagedResult<CodeSolutionDto>>(ok.Value);
+        Assert.Single(list.Items);
+        Assert.Equal(CodeWorkspaceFactory.DefaultSolutionId, list.Items[0].SolutionId);
         store.Verify(s => s.Get(It.IsAny<Guid>()), Times.Once);
     }
 }

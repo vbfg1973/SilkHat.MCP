@@ -1,5 +1,6 @@
 @page "/ide"
 @inject RepositoryApiClient Api
+@using System.Linq
 
 <PageTitle>IDE</PageTitle>
 
@@ -48,7 +49,27 @@
         <MudPaper Elevation="1" Class="pa-3 d-flex flex-column flex-grow-1" Style="min-width: 0;">
             @if (_currentState?.OpenFiles.Count > 0)
             {
-                <MudStack Row="true" Justify="Justify.FlexEnd" Class="mb-2">
+                var activeFile = _currentState.OpenFiles.ElementAtOrDefault(_currentState.ActiveTabIndex);
+                <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                    <MudCard Elevation="0" Class="pa-2" Style="min-width: 260px;">
+                        <MudCardContent Class="pa-0">
+                            @if (activeFile is null || !activeFile.HasCommitInfo)
+                            {
+                                <MudText Typo="Typo.body2">Last commit: unavailable</MudText>
+                            }
+                            else
+                            {
+                                <MudText Typo="Typo.subtitle2">@activeFile.AbbreviatedSha</MudText>
+                                <MudText Typo="Typo.body2">@FormatCommitDate(activeFile.LastCommitDateUtc)</MudText>
+                                <MudText Typo="Typo.body2">@activeFile.LastCommitAuthor</MudText>
+                                <MudText Typo="Typo.body2">@activeFile.LastCommitAuthorEmail</MudText>
+                            }
+                            <MudCheckBox T="bool"
+                                         Label="Show diff"
+                                         @bind-Value="ActiveShowDiff"
+                                         Disabled="@(activeFile is null)" />
+                        </MudCardContent>
+                    </MudCard>
                     <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="CloseAllTabs">Close all tabs</MudButton>
                 </MudStack>
                 <MudTabs Rounded="true" Elevation="0" @bind-ActivePanelIndex="_currentState.ActiveTabIndex" Class="flex-grow-1">
@@ -70,7 +91,15 @@
                             </TabContent>
                             <ChildContent>
                                 <MudPaper Elevation="0" Class="pa-3" Style="height: 100%; overflow: auto;">
-                                    <pre style="margin: 0; white-space: pre; font-family: Consolas, 'Courier New', monospace; font-size: 0.85rem;">@file.Content</pre>
+                                    <div style="font-family: Consolas, 'Courier New', monospace; font-size: 0.85rem; line-height: 1.4;">
+                                        @foreach (var line in file.RenderLines)
+                                        {
+                                            <div style="@GetLineStyle(line)">
+                                                <span style="display: inline-block; width: 3.5rem; color: #888;">@GetLineNumber(line)</span>
+                                                <span>@line.Text</span>
+                                            </div>
+                                        }
+                                    </div>
                                 </MudPaper>
                             </ChildContent>
                         </MudTabPanel>
@@ -91,7 +120,7 @@
     protected override async Task OnInitializedAsync()
     {
         var configs = await Api.GetLoadedRepositoryConfigsAsync();
-        foreach (var config in configs)
+        foreach (var config in configs.Items)
         {
             foreach (var solution in config.Solutions.Where(item => item.IsEnabled))
             {
@@ -163,7 +192,7 @@
         try
         {
             var tree = await Api.GetCodeTreeAsync(entry.ConfigId, entry.SolutionId);
-            state.TreeItems.AddRange(tree.Select(BuildTreeItem));
+            state.TreeItems.AddRange(tree.Items.Select(BuildTreeItem));
             state.TreeLoaded = true;
         }
         catch (Exception ex)
@@ -184,22 +213,109 @@
         if (existingIndex >= 0)
         {
             _currentState.ActiveTabIndex = existingIndex;
+            await InvokeAsync(StateHasChanged);
             return;
         }
 
         try
         {
             var fileContent = await Api.GetCodeFileAsync(_currentState.ConfigId, _currentState.SolutionId, entry.DisplayPath);
-            _currentState.OpenFiles.Add(new OpenFileTab(
+            var tab = new OpenFileTab(
                 entry.RepositoryPath,
                 entry.DisplayPath,
                 entry.Name,
-                fileContent.Content));
+                fileContent.Content);
+
+            try
+            {
+                var lastChange = await Api.GetGitFileLastChangeAsync(_currentState.ConfigId, entry.RepositoryPath, false);
+                tab.LastCommitAuthor = lastChange.Author;
+                tab.LastCommitAuthorEmail = lastChange.AuthorEmail;
+                tab.LastCommitDateUtc = lastChange.CommitDateUtc;
+                tab.AbbreviatedSha = string.IsNullOrWhiteSpace(lastChange.AbbreviatedSha)
+                    ? lastChange.CommitSha
+                    : lastChange.AbbreviatedSha;
+                tab.LastCommitSubject = lastChange.Subject;
+            }
+            catch
+            {
+                tab.LastCommitAuthor = null;
+                tab.LastCommitAuthorEmail = null;
+                tab.LastCommitDateUtc = null;
+                tab.AbbreviatedSha = null;
+            }
+
+            _currentState.OpenFiles.Add(tab);
             _currentState.ActiveTabIndex = _currentState.OpenFiles.Count - 1;
+            await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {
             _currentState.TreeError = ex.Message;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ToggleDiffAsync(bool value)
+    {
+        if (_currentState is null)
+        {
+            return;
+        }
+
+        var index = _currentState.ActiveTabIndex;
+        if (index < 0 || index >= _currentState.OpenFiles.Count)
+        {
+            return;
+        }
+
+        var file = _currentState.OpenFiles[index];
+        if (value && !file.DiffLoaded)
+        {
+            try
+            {
+                var lastChange = await Api.GetGitFileLastChangeAsync(_currentState.ConfigId, file.RepositoryPath, true);
+                file.LastCommitAuthor = lastChange.Author;
+                file.LastCommitAuthorEmail = lastChange.AuthorEmail;
+                file.LastCommitDateUtc = lastChange.CommitDateUtc;
+                file.AbbreviatedSha = string.IsNullOrWhiteSpace(lastChange.AbbreviatedSha)
+                    ? lastChange.CommitSha
+                    : lastChange.AbbreviatedSha;
+                file.LastCommitSubject = lastChange.Subject;
+                file.DiffLines = lastChange.DiffLines.ToList();
+                file.DiffLoaded = true;
+            }
+            catch (Exception ex)
+            {
+                _currentState.TreeError = ex.Message;
+            }
+        }
+
+        file.ShowDiff = value;
+        file.RenderLines = BuildAnnotatedLines(file.Content, file.DiffLines, file.ShowDiff);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private bool ActiveShowDiff
+    {
+        get
+        {
+            if (_currentState is null)
+            {
+                return false;
+            }
+
+            var index = _currentState.ActiveTabIndex;
+            if (index < 0 || index >= _currentState.OpenFiles.Count)
+            {
+                return false;
+            }
+
+            return _currentState.OpenFiles[index].ShowDiff;
+        }
+        set
+        {
+            _ = ToggleDiffAsync(value);
         }
     }
 
@@ -261,7 +377,7 @@
         try
         {
             var children = await Api.GetCodeTreeAsync(_currentState.ConfigId, _currentState.SolutionId, parent.DisplayPath);
-            return children
+            return children.Items
                 .Select(BuildTreeItem)
                 .ToList();
         }
@@ -305,7 +421,117 @@
         string RepositoryPath,
         string DisplayPath,
         string Name,
-        string Content);
+        string Content)
+    {
+        public string? LastCommitAuthor { get; set; }
+        public string? LastCommitAuthorEmail { get; set; }
+        public DateTimeOffset? LastCommitDateUtc { get; set; }
+        public string? AbbreviatedSha { get; set; }
+        public string? LastCommitSubject { get; set; }
+        public bool HasCommitInfo =>
+            LastCommitDateUtc.HasValue
+            && !string.IsNullOrWhiteSpace(LastCommitAuthor)
+            && !string.IsNullOrWhiteSpace(AbbreviatedSha)
+            && !string.IsNullOrWhiteSpace(LastCommitAuthorEmail);
+        public bool ShowDiff { get; set; }
+        public bool DiffLoaded { get; set; }
+        public List<GitFileDiffLineModel> DiffLines { get; set; } = new();
+        public List<AnnotatedLine> RenderLines { get; set; } = BuildAnnotatedLines(Content, Array.Empty<GitFileDiffLineModel>(), false);
+    }
+
+    private enum LineDecoration
+    {
+        None = 0,
+        Added = 1,
+        Deleted = 2,
+        Highlight = 3
+    }
+
+    private sealed record AnnotatedLine(int? LineNumber, string Text, LineDecoration Decoration);
+
+    private static List<AnnotatedLine> BuildAnnotatedLines(
+        string content,
+        IReadOnlyList<GitFileDiffLineModel> diffLines,
+        bool showDiff)
+    {
+        var normalized = content.Replace("\r\n", "\n").Replace('\r', '\n');
+        var rawLines = normalized.Split('\n', StringSplitOptions.None);
+        var deletionsByLine = new Dictionary<int, List<GitFileDiffLineModel>>();
+        var additions = new HashSet<int>();
+
+        if (showDiff)
+        {
+            foreach (var line in diffLines)
+            {
+                if (line.Kind == GitDiffLineKind.Add)
+                {
+                    additions.Add(line.LineNumber);
+                }
+                else
+                {
+                    if (!deletionsByLine.TryGetValue(line.LineNumber, out var bucket))
+                    {
+                        bucket = new List<GitFileDiffLineModel>();
+                        deletionsByLine[line.LineNumber] = bucket;
+                    }
+                    bucket.Add(line);
+                }
+            }
+        }
+
+        var result = new List<AnnotatedLine>();
+        for (var index = 0; index < rawLines.Length; index++)
+        {
+            var lineNumber = index + 1;
+            if (deletionsByLine.TryGetValue(lineNumber, out var deletes))
+            {
+                foreach (var deleted in deletes)
+                {
+                    result.Add(new AnnotatedLine(lineNumber, deleted.Content, LineDecoration.Deleted));
+                }
+            }
+
+            var decoration = additions.Contains(lineNumber) ? LineDecoration.Added : LineDecoration.None;
+            result.Add(new AnnotatedLine(lineNumber, rawLines[index], decoration));
+        }
+
+        foreach (var key in deletionsByLine.Keys.Where(key => key > rawLines.Length).OrderBy(key => key))
+        {
+            foreach (var deleted in deletionsByLine[key])
+            {
+                result.Add(new AnnotatedLine(key, deleted.Content, LineDecoration.Deleted));
+            }
+        }
+
+        return result;
+    }
+
+    private static string FormatCommitDate(DateTimeOffset? timestamp)
+    {
+        if (timestamp is null)
+        {
+            return string.Empty;
+        }
+
+        var utc = timestamp.Value.UtcDateTime;
+        return utc.ToString("yyyy-MM-dd HH:mm:ss");
+    }
+
+    private static string GetLineStyle(AnnotatedLine line)
+    {
+        return line.Decoration switch
+        {
+            LineDecoration.Added => "background-color: #e6f4ea;",
+            LineDecoration.Deleted => "background-color: #fce8e6;",
+            LineDecoration.Highlight => "background-color: #f1f3f4;",
+            _ => string.Empty
+        };
+    }
+
+    private static string GetLineNumber(AnnotatedLine line)
+    {
+        return line.LineNumber?.ToString() ?? string.Empty;
+    }
 
     private sealed record SolutionEntry(
         string SolutionId,
