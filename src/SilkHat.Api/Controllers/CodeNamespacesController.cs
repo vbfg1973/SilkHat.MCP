@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using SilkHat.Api.Extensions;
+using SilkHat.Api.Models;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
 
@@ -14,7 +17,11 @@ public sealed class CodeNamespacesController : ApiControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IReadOnlyList<string>> GetNamespaces(Guid id, string solutionId, [FromQuery] string? prefix)
+    public ActionResult<PagedResult<string>> GetNamespaces(
+        Guid id,
+        string solutionId,
+        [FromQuery] string? prefix,
+        [FromQuery] PagingQuery pagingQuery)
     {
         var workspace = _codeStore.Get(id);
         if (workspace is null)
@@ -28,12 +35,17 @@ public sealed class CodeNamespacesController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
         }
 
+        var paging = pagingQuery.ResolvePaging();
         var namespaces = solution.Namespaces.AsEnumerable();
         if (!string.IsNullOrWhiteSpace(prefix))
         {
             namespaces = namespaces.Where(ns => ns.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
         }
 
-        return Ok(namespaces.OrderBy(ns => ns, StringComparer.OrdinalIgnoreCase).ToList());
+        var result = namespaces
+            .OrderBy(ns => ns, StringComparer.OrdinalIgnoreCase)
+            .ToPagedResult(paging);
+
+        return Ok(result);
     }
 }

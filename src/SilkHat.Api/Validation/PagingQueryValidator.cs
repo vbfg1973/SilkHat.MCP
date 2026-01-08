@@ -4,14 +4,10 @@ using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Validation;
 
-public sealed class CodeTreeQueryValidator : AbstractValidator<CodeTreeQuery>
+public sealed class PagingQueryValidator : AbstractValidator<PagingQuery>
 {
-    public CodeTreeQueryValidator()
+    public PagingQueryValidator()
     {
-        RuleFor(query => query.ParentId)
-            .Must(value => value is null || !string.IsNullOrWhiteSpace(value))
-            .WithMessage("ParentId cannot be empty.");
-
         RuleFor(query => query.PageNumber)
             .Must(value => value is null || value >= 1)
             .WithMessage("PageNumber must be at least 1.");

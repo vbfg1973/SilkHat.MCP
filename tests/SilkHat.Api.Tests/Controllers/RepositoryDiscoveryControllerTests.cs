@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Moq;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Api.Controllers;
+using SilkHat.Api.Models;
 using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Core.Dtos;
 
@@ -25,11 +26,11 @@ public sealed class RepositoryDiscoveryControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetAvailable();
+        var result = controller.GetAvailable(new PagingQuery());
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var repos = Assert.IsType<List<AvailableRepositoryDto>>(ok.Value);
-        Assert.Single(repos);
+        var repos = Assert.IsType<PagedResult<AvailableRepositoryDto>>(ok.Value);
+        Assert.Single(repos.Items);
         discovery.Verify(d => d.ListAvailableRepositories(), Times.Once);
     }
 
@@ -44,7 +45,7 @@ public sealed class RepositoryDiscoveryControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetAvailable();
+        var result = controller.GetAvailable(new PagingQuery());
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(500, problem.StatusCode);
@@ -64,12 +65,12 @@ public sealed class RepositoryDiscoveryControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = controller.GetSolutions("/repos/Repo");
+        var result = controller.GetSolutions("/repos/Repo", new PagingQuery());
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var solutions = Assert.IsType<List<AvailableRepositorySolutionDto>>(ok.Value);
-        Assert.Single(solutions);
-        Assert.Equal("solution-1", solutions[0].SolutionId);
+        var solutions = Assert.IsType<PagedResult<AvailableRepositorySolutionDto>>(ok.Value);
+        Assert.Single(solutions.Items);
+        Assert.Equal("solution-1", solutions.Items[0].SolutionId);
         discovery.Verify(d => d.ListSolutions("/repos/Repo"), Times.Once);
     }
 }

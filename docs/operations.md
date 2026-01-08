@@ -31,6 +31,7 @@ Ports:
 Database:
 - PostgreSQL user/password/database are `silkhat` by default (see `docker-compose.yml`).
 - pgAdmin defaults to `admin@example.com` / `admin`.
+- The API container configures git to treat all repositories under `/repos` as safe directories on startup.
 
 ## Quick Validation
 

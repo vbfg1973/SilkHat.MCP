@@ -11,6 +11,8 @@ public sealed class RepositoryApiClient
     private readonly HttpClient _httpClient;
     private readonly ILogger<RepositoryApiClient> _logger;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private const int DefaultPageNumber = 1;
+    private const int DefaultPageSize = 50;
 
     public RepositoryApiClient(HttpClient httpClient, ILogger<RepositoryApiClient> logger)
     {
@@ -18,12 +20,13 @@ public sealed class RepositoryApiClient
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<RepositoryGroupModel>> GetRepositoryGroupsAsync(CancellationToken cancellationToken = default)
+    public async Task<PagedResultModel<RepositoryGroupModel>> GetRepositoryGroupsAsync(
+        CancellationToken cancellationToken = default)
     {
-        return await GetFromJsonAsync<List<RepositoryGroupModel>>(
+        return await GetFromJsonAsync<PagedResultModel<RepositoryGroupModel>>(
                    "api/repository-groups",
                    cancellationToken)
-               ?? new List<RepositoryGroupModel>();
+               ?? new PagedResultModel<RepositoryGroupModel>(new List<RepositoryGroupModel>(), DefaultPageNumber, DefaultPageSize, 0);
     }
 
     public async Task<RepositoryGroupModel> CreateRepositoryGroupAsync(CreateRepositoryGroupRequest request, CancellationToken cancellationToken = default)
@@ -40,37 +43,40 @@ public sealed class RepositoryApiClient
         return (await response.Content.ReadFromJsonAsync<RepositoryGroupModel>(cancellationToken: cancellationToken))!;
     }
 
-    public async Task<IReadOnlyList<RepositoryConfigModel>> GetRepositoryConfigsAsync(CancellationToken cancellationToken = default)
+    public async Task<PagedResultModel<RepositoryConfigModel>> GetRepositoryConfigsAsync(
+        CancellationToken cancellationToken = default)
     {
-        return await GetFromJsonAsync<List<RepositoryConfigModel>>(
+        return await GetFromJsonAsync<PagedResultModel<RepositoryConfigModel>>(
                    "api/repositories",
                    cancellationToken)
-               ?? new List<RepositoryConfigModel>();
+               ?? new PagedResultModel<RepositoryConfigModel>(new List<RepositoryConfigModel>(), DefaultPageNumber, DefaultPageSize, 0);
     }
 
-    public async Task<IReadOnlyList<RepositoryConfigModel>> GetLoadedRepositoryConfigsAsync(CancellationToken cancellationToken = default)
+    public async Task<PagedResultModel<RepositoryConfigModel>> GetLoadedRepositoryConfigsAsync(
+        CancellationToken cancellationToken = default)
     {
-        return await GetFromJsonAsync<List<RepositoryConfigModel>>(
+        return await GetFromJsonAsync<PagedResultModel<RepositoryConfigModel>>(
                    "api/repositories/loaded",
                    cancellationToken)
-               ?? new List<RepositoryConfigModel>();
+               ?? new PagedResultModel<RepositoryConfigModel>(new List<RepositoryConfigModel>(), DefaultPageNumber, DefaultPageSize, 0);
     }
 
-    public async Task<IReadOnlyList<AvailableRepositoryModel>> GetAvailableRepositoriesAsync(CancellationToken cancellationToken = default)
+    public async Task<PagedResultModel<AvailableRepositoryModel>> GetAvailableRepositoriesAsync(
+        CancellationToken cancellationToken = default)
     {
-        return await GetFromJsonAsync<List<AvailableRepositoryModel>>(
+        return await GetFromJsonAsync<PagedResultModel<AvailableRepositoryModel>>(
                    "api/repositories/available",
                    cancellationToken)
-               ?? new List<AvailableRepositoryModel>();
+               ?? new PagedResultModel<AvailableRepositoryModel>(new List<AvailableRepositoryModel>(), DefaultPageNumber, DefaultPageSize, 0);
     }
 
-    public async Task<IReadOnlyList<AvailableRepositorySolutionModel>> GetAvailableRepositorySolutionsAsync(
+    public async Task<PagedResultModel<AvailableRepositorySolutionModel>> GetAvailableRepositorySolutionsAsync(
         string rootPath,
         CancellationToken cancellationToken = default)
     {
         var url = $"api/repositories/available/solutions?path={Uri.EscapeDataString(rootPath)}";
-        return await GetFromJsonAsync<List<AvailableRepositorySolutionModel>>(url, cancellationToken)
-               ?? new List<AvailableRepositorySolutionModel>();
+        return await GetFromJsonAsync<PagedResultModel<AvailableRepositorySolutionModel>>(url, cancellationToken)
+               ?? new PagedResultModel<AvailableRepositorySolutionModel>(new List<AvailableRepositorySolutionModel>(), DefaultPageNumber, DefaultPageSize, 0);
     }
 
     public async Task<RepositoryConfigModel> CreateRepositoryConfigAsync(CreateRepositoryConfigRequest request, CancellationToken cancellationToken = default)
@@ -94,16 +100,16 @@ public sealed class RepositoryApiClient
         return (await response.Content.ReadFromJsonAsync<RepositoryGroupLoadResultModel>(cancellationToken: cancellationToken))!;
     }
 
-    public async Task<IReadOnlyList<CodeSolutionModel>> GetCodeSolutionsAsync(
+    public async Task<PagedResultModel<CodeSolutionModel>> GetCodeSolutionsAsync(
         Guid repositoryId,
         CancellationToken cancellationToken = default)
     {
         var url = $"api/repositories/{repositoryId}/code/solutions";
-        return await GetFromJsonAsync<List<CodeSolutionModel>>(url, cancellationToken)
-               ?? new List<CodeSolutionModel>();
+        return await GetFromJsonAsync<PagedResultModel<CodeSolutionModel>>(url, cancellationToken)
+               ?? new PagedResultModel<CodeSolutionModel>(new List<CodeSolutionModel>(), DefaultPageNumber, DefaultPageSize, 0);
     }
 
-    public async Task<IReadOnlyList<CodeProjectDto>> GetCodeProjectsAsync(
+    public async Task<PagedResultModel<CodeProjectDto>> GetCodeProjectsAsync(
         Guid repositoryId,
         string solutionId,
         string? name = null,
@@ -113,11 +119,11 @@ public sealed class RepositoryApiClient
             ? $"api/repositories/{repositoryId}/code/solutions/{solutionId}/projects"
             : $"api/repositories/{repositoryId}/code/solutions/{solutionId}/projects?name={Uri.EscapeDataString(name)}";
 
-        return await GetFromJsonAsync<List<CodeProjectDto>>(url, cancellationToken)
-               ?? new List<CodeProjectDto>();
+        return await GetFromJsonAsync<PagedResultModel<CodeProjectDto>>(url, cancellationToken)
+               ?? new PagedResultModel<CodeProjectDto>(new List<CodeProjectDto>(), DefaultPageNumber, DefaultPageSize, 0);
     }
 
-    public async Task<IReadOnlyList<CodeTreeEntryModel>> GetCodeTreeAsync(
+    public async Task<PagedResultModel<CodeTreeEntryModel>> GetCodeTreeAsync(
         Guid repositoryId,
         string solutionId,
         string? parentId = null,
@@ -129,8 +135,8 @@ public sealed class RepositoryApiClient
             url += $"?parentId={Uri.EscapeDataString(parentId)}";
         }
 
-        return await GetFromJsonAsync<List<CodeTreeEntryModel>>(url, cancellationToken)
-               ?? new List<CodeTreeEntryModel>();
+        return await GetFromJsonAsync<PagedResultModel<CodeTreeEntryModel>>(url, cancellationToken)
+               ?? new PagedResultModel<CodeTreeEntryModel>(new List<CodeTreeEntryModel>(), DefaultPageNumber, DefaultPageSize, 0);
     }
 
     public async Task<CodeFileContentModel> GetCodeFileAsync(
@@ -144,7 +150,7 @@ public sealed class RepositoryApiClient
                ?? new CodeFileContentModel(displayPath, displayPath, string.Empty);
     }
 
-    public async Task<IReadOnlyList<GitTreeEntryModel>> GetGitTreeAsync(
+    public async Task<PagedResultModel<GitTreeEntryModel>> GetGitTreeAsync(
         Guid repositoryId,
         string? name = null,
         GitTreeEntryType? type = null,
@@ -176,8 +182,8 @@ public sealed class RepositoryApiClient
         var queryString = query.Count > 0 ? "?" + string.Join("&", query) : string.Empty;
         var url = $"api/repositories/{repositoryId}/git/tree{queryString}";
 
-        return await GetFromJsonAsync<List<GitTreeEntryModel>>(url, cancellationToken)
-               ?? new List<GitTreeEntryModel>();
+        return await GetFromJsonAsync<PagedResultModel<GitTreeEntryModel>>(url, cancellationToken)
+               ?? new PagedResultModel<GitTreeEntryModel>(new List<GitTreeEntryModel>(), DefaultPageNumber, DefaultPageSize, 0);
     }
 
     public async Task<GitFileHistoryModel> GetGitFileHistoryAsync(
@@ -196,6 +202,16 @@ public sealed class RepositoryApiClient
     {
         var url = $"api/repositories/{repositoryId}/git/files/{Uri.EscapeDataString(path)}/cochanges";
         return (await GetFromJsonAsync<GitCoChangeStatsModel>(url, cancellationToken))!;
+    }
+
+    public async Task<GitFileLastChangeModel> GetGitFileLastChangeAsync(
+        Guid repositoryId,
+        string path,
+        bool includeDiff,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/{repositoryId}/git/files/{Uri.EscapeDataString(path)}/last-change?includeDiff={includeDiff.ToString().ToLowerInvariant()}";
+        return (await GetFromJsonAsync<GitFileLastChangeModel>(url, cancellationToken))!;
     }
 
     public async IAsyncEnumerable<RepoEventModel> LoadRepositoryAsync(

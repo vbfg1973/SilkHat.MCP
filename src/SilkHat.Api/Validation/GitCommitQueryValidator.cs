@@ -4,13 +4,17 @@ using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Validation;
 
-public sealed class CodeTreeQueryValidator : AbstractValidator<CodeTreeQuery>
+public sealed class GitCommitQueryValidator : AbstractValidator<GitCommitQuery>
 {
-    public CodeTreeQueryValidator()
+    public GitCommitQueryValidator()
     {
-        RuleFor(query => query.ParentId)
+        RuleFor(query => query.Sha)
             .Must(value => value is null || !string.IsNullOrWhiteSpace(value))
-            .WithMessage("ParentId cannot be empty.");
+            .WithMessage("Sha cannot be empty.");
+
+        RuleFor(query => query.Path)
+            .Must(value => value is null || !string.IsNullOrWhiteSpace(value))
+            .WithMessage("Path cannot be empty.");
 
         RuleFor(query => query.PageNumber)
             .Must(value => value is null || value >= 1)

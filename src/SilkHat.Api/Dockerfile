@@ -25,4 +25,6 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 EXPOSE 8080
 
 COPY --from=build /app/publish .
-ENTRYPOINT ["dotnet", "SilkHat.Api.dll"]
+COPY docker/api-entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]

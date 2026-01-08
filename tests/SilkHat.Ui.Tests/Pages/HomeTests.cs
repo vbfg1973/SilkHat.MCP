@@ -25,45 +25,60 @@ public sealed class HomeTests
 
         var handler = new FakeHttpMessageHandler();
         handler.AddJsonResponse("api/repository-groups", """
-[
-  {
-    "id": "d2719b29-ff3a-4af2-9e47-7a6fbd1f25a1",
-    "name": "Group One",
-    "description": "Primary group",
-    "createdUtc": "2024-01-01T00:00:00Z",
-    "updatedUtc": "2024-01-01T00:00:00Z"
-  }
-]
+{
+  "items": [
+    {
+      "id": "d2719b29-ff3a-4af2-9e47-7a6fbd1f25a1",
+      "name": "Group One",
+      "description": "Primary group",
+      "createdUtc": "2024-01-01T00:00:00Z",
+      "updatedUtc": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 50,
+  "totalCount": 1
+}
 """);
         handler.AddJsonResponse("api/repositories", """
-[
-  {
-    "id": "53fcfc7a-2cd5-449e-b7be-7fdc02a5c785",
-    "name": "Repo One",
-    "rootPath": "/repo",
-    "description": "Sample repo",
-    "groupId": "d2719b29-ff3a-4af2-9e47-7a6fbd1f25a1",
-    "solutions": [
-      {
-        "relativePath": "./RepoOne.sln",
-        "isEnabled": true,
-        "solutionId": "solution-1"
-      }
-    ],
-    "createdUtc": "2024-01-01T00:00:00Z",
-    "updatedUtc": "2024-01-01T00:00:00Z"
-  }
-]
+{
+  "items": [
+    {
+      "id": "53fcfc7a-2cd5-449e-b7be-7fdc02a5c785",
+      "name": "Repo One",
+      "rootPath": "/repo",
+      "description": "Sample repo",
+      "groupId": "d2719b29-ff3a-4af2-9e47-7a6fbd1f25a1",
+      "solutions": [
+        {
+          "relativePath": "./RepoOne.sln",
+          "isEnabled": true,
+          "solutionId": "solution-1"
+        }
+      ],
+      "createdUtc": "2024-01-01T00:00:00Z",
+      "updatedUtc": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 50,
+  "totalCount": 1
+}
 """);
         handler.AddJsonResponse("api/repositories/available", """
-[
-  {
-    "name": "Repo One",
-    "relativePath": "Repo One",
-    "fullPath": "/repos/repo-one",
-    "isGitRepository": true
-  }
-]
+{
+  "items": [
+    {
+      "name": "Repo One",
+      "relativePath": "Repo One",
+      "fullPath": "/repos/repo-one",
+      "isGitRepository": true
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 50,
+  "totalCount": 1
+}
 """);
 
         context.Services.AddScoped(_ => new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
@@ -97,37 +112,54 @@ public sealed class HomeTests
 
         var handler = new FakeHttpMessageHandler();
         handler.AddJsonResponse("api/repository-groups", """
-[
-  {
-    "id": "d2719b29-ff3a-4af2-9e47-7a6fbd1f25a1",
-    "name": "Group One",
-    "description": "Primary group",
-    "createdUtc": "2024-01-01T00:00:00Z",
-    "updatedUtc": "2024-01-01T00:00:00Z"
-  }
-]
+{
+  "items": [
+    {
+      "id": "d2719b29-ff3a-4af2-9e47-7a6fbd1f25a1",
+      "name": "Group One",
+      "description": "Primary group",
+      "createdUtc": "2024-01-01T00:00:00Z",
+      "updatedUtc": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 50,
+  "totalCount": 1
+}
 """);
         handler.AddJsonResponse("api/repositories", """
-[
-  {
-    "id": "53fcfc7a-2cd5-449e-b7be-7fdc02a5c785",
-    "name": "Repo One",
-    "rootPath": "/repo",
-    "description": "Sample repo",
-    "groupId": "d2719b29-ff3a-4af2-9e47-7a6fbd1f25a1",
-    "solutions": [
-      {
-        "relativePath": "./RepoOne.sln",
-        "isEnabled": true,
-        "solutionId": "solution-1"
-      }
-    ],
-    "createdUtc": "2024-01-01T00:00:00Z",
-    "updatedUtc": "2024-01-01T00:00:00Z"
-  }
-]
+{
+  "items": [
+    {
+      "id": "53fcfc7a-2cd5-449e-b7be-7fdc02a5c785",
+      "name": "Repo One",
+      "rootPath": "/repo",
+      "description": "Sample repo",
+      "groupId": "d2719b29-ff3a-4af2-9e47-7a6fbd1f25a1",
+      "solutions": [
+        {
+          "relativePath": "./RepoOne.sln",
+          "isEnabled": true,
+          "solutionId": "solution-1"
+        }
+      ],
+      "createdUtc": "2024-01-01T00:00:00Z",
+      "updatedUtc": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 50,
+  "totalCount": 1
+}
 """);
-        handler.AddJsonResponse("api/repositories/available", "[]");
+        handler.AddJsonResponse("api/repositories/available", """
+{
+  "items": [],
+  "pageNumber": 1,
+  "pageSize": 50,
+  "totalCount": 0
+}
+""");
 
         context.Services.AddScoped(_ => new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
         context.Services.AddScoped<RepositoryApiClient>();

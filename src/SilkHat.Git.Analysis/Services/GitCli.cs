@@ -1,11 +1,15 @@
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Git.Analysis.Models;
+using SilkHat.Core.Dtos;
 using SilkHat.Git.Core.Dtos;
 
 namespace SilkHat.Git.Analysis.Services;
 
 public sealed class GitCli : IGitCli
 {
+    private const string CommitHeaderPrefix = "COMMIT|";
+    private const string BodyBeginMarker = "BODY_BEGIN";
+    private const string BodyEndMarker = "BODY_END";
     private readonly IGitCommandRunner _runner;
     private readonly IGitRepositoryCacheStore _cacheStore;
 
@@ -109,34 +113,49 @@ public sealed class GitCli : IGitCli
         Guid configId,
         string repoRoot,
         string path,
+        int pageNumber,
+        int pageSize,
         CancellationToken cancellationToken)
     {
+        var normalizedPageNumber = Math.Max(pageNumber, 1);
+        var normalizedPageSize = Math.Clamp(pageSize, 1, PagingDefaults.MaxPageSize);
+        var skip = (normalizedPageNumber - 1) * normalizedPageSize;
+
         var normalizedKey = NormalizePathKey(path);
-        var result = await _runner.ExecuteAsync(
-            repoRoot,
-            new[] { "log", "--date=iso-strict", "--pretty=format:COMMIT|%H|%ad|%an|%s", "--name-status", "--", normalizedKey },
-            cancellationToken);
-        EnsureSuccess(result, "git log");
+        var enrichedEntries = await LoadHistoryEntriesAsync(configId, repoRoot, normalizedKey, cancellationToken);
+        var totalCount = enrichedEntries.Count;
+        var pageEntries = enrichedEntries
+            .Skip(skip)
+            .Take(normalizedPageSize)
+            .ToList();
 
-        var cache = _cacheStore.GetOrCreate(configId);
-        var entries = ParseHistory(result.StandardOutput, normalizedKey, cache);
-        var enrichedEntries = await PopulateHistoryMetricsAsync(repoRoot, entries, cancellationToken);
+        var pagedEntries = new PagedResult<GitFileHistoryEntryDto>(
+            pageEntries,
+            normalizedPageNumber,
+            normalizedPageSize,
+            totalCount);
 
-        return new GitFileHistoryDto(NormalizePath(normalizedKey), enrichedEntries);
+        return new GitFileHistoryDto(NormalizePath(normalizedKey), pagedEntries);
     }
 
     public async Task<GitCoChangeStatsDto> CoChangeStatsAsync(
         Guid configId,
         string repoRoot,
         string path,
+        int pageNumber,
+        int pageSize,
         CancellationToken cancellationToken)
     {
-        var history = await FileHistoryAsync(configId, repoRoot, path, cancellationToken);
+        var normalizedPageNumber = Math.Max(pageNumber, 1);
+        var normalizedPageSize = Math.Clamp(pageSize, 1, PagingDefaults.MaxPageSize);
+        var skip = (normalizedPageNumber - 1) * normalizedPageSize;
+
         var cache = _cacheStore.GetOrCreate(configId);
         var targetKey = NormalizePathKey(path);
+        var historyEntries = await LoadHistoryEntriesAsync(configId, repoRoot, targetKey, cancellationToken);
 
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in history.Entries)
+        foreach (var entry in historyEntries)
         {
             if (!cache.CommitFiles.TryGetValue(entry.CommitSha, out var files))
             {
@@ -154,14 +173,371 @@ public sealed class GitCli : IGitCli
             }
         }
 
-        var results = counts
+        var ordered = counts
             .OrderByDescending(kvp => kvp.Value)
             .ThenBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
-            .Take(50)
+            .ToList();
+
+        var pageEntries = ordered
+            .Skip(skip)
+            .Take(normalizedPageSize)
             .Select(kvp => new GitCoChangeEntryDto(NormalizePath(kvp.Key), kvp.Value))
             .ToList();
 
-        return new GitCoChangeStatsDto(NormalizePath(targetKey), history.Entries.Count, results);
+        var pagedEntries = new PagedResult<GitCoChangeEntryDto>(
+            pageEntries,
+            normalizedPageNumber,
+            normalizedPageSize,
+            ordered.Count);
+
+        return new GitCoChangeStatsDto(NormalizePath(targetKey), historyEntries.Count, pagedEntries);
+    }
+
+    private async Task<IReadOnlyList<GitFileHistoryEntryDto>> LoadHistoryEntriesAsync(
+        Guid configId,
+        string repoRoot,
+        string normalizedKey,
+        CancellationToken cancellationToken)
+    {
+        var result = await _runner.ExecuteAsync(
+            repoRoot,
+            new[] { "log", "--date=iso-strict", "--pretty=format:COMMIT|%H|%ad|%an|%s", "--name-status", "--", normalizedKey },
+            cancellationToken);
+        EnsureSuccess(result, "git log");
+
+        var cache = _cacheStore.GetOrCreate(configId);
+        var entries = ParseHistory(result.StandardOutput, normalizedKey, cache);
+        return await PopulateHistoryMetricsAsync(repoRoot, entries, cancellationToken);
+    }
+
+    public async Task<PagedResult<GitCommitDto>> QueryCommitsAsync(
+        Guid configId,
+        string repoRoot,
+        string? author,
+        string? sha,
+        DateTimeOffset? since,
+        DateTimeOffset? until,
+        bool? merge,
+        string? path,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        var normalizedPageNumber = Math.Max(pageNumber, 1);
+        var normalizedPageSize = Math.Clamp(pageSize, 1, PagingDefaults.MaxPageSize);
+        var skip = (normalizedPageNumber - 1) * normalizedPageSize;
+        var applyShaFilter = !string.IsNullOrWhiteSpace(sha);
+
+        var args = new List<string>
+        {
+            "log",
+            "--date=iso-strict",
+            $"--pretty=format:{CommitHeaderPrefix}%H|%h|%P|%an|%ae|%ad|%s%n{BodyBeginMarker}%n%b%n{BodyEndMarker}",
+            "--name-status"
+        };
+
+        if (!string.IsNullOrWhiteSpace(author))
+        {
+            args.Add($"--author={author}");
+        }
+
+        if (since.HasValue)
+        {
+            args.Add($"--since={since.Value:O}");
+        }
+
+        if (until.HasValue)
+        {
+            args.Add($"--until={until.Value:O}");
+        }
+
+        if (merge.HasValue)
+        {
+            args.Add(merge.Value ? "--merges" : "--no-merges");
+        }
+
+        var normalizedPath = string.Empty;
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            normalizedPath = NormalizePathKey(path);
+            args.Add("--follow");
+            args.Add("--find-renames");
+            args.Add("--");
+            args.Add(normalizedPath);
+        }
+
+        if (!applyShaFilter)
+        {
+            args.Add($"--skip={skip}");
+            args.Add($"--max-count={normalizedPageSize}");
+        }
+
+        var result = await _runner.ExecuteAsync(repoRoot, args.ToArray(), cancellationToken);
+        EnsureSuccess(result, "git log");
+
+        var commits = GitCommitParser.Parse(result.StandardOutput).ToList();
+        if (applyShaFilter)
+        {
+            var shaFilter = sha!.Trim();
+            commits = commits
+                .Where(commit =>
+                    commit.CommitSha.StartsWith(shaFilter, StringComparison.OrdinalIgnoreCase) ||
+                    commit.AbbreviatedSha.StartsWith(shaFilter, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        if (applyShaFilter)
+        {
+            var paged = commits
+                .Skip(skip)
+                .Take(normalizedPageSize)
+                .ToList();
+
+            return new PagedResult<GitCommitDto>(paged, normalizedPageNumber, normalizedPageSize, commits.Count);
+        }
+
+        var totalCount = await CountCommitsAsync(
+            repoRoot,
+            author,
+            since,
+            until,
+            merge,
+            normalizedPath,
+            cancellationToken);
+
+        return new PagedResult<GitCommitDto>(commits, normalizedPageNumber, normalizedPageSize, totalCount);
+    }
+
+    public async Task<GitFileLastChangeDto> GetFileLastChangeAsync(
+        Guid configId,
+        string repoRoot,
+        string path,
+        bool includeDiff,
+        CancellationToken cancellationToken)
+    {
+        var normalizedKey = NormalizePathKey(path);
+        var result = await _runner.ExecuteAsync(
+            repoRoot,
+            new[]
+            {
+                "log",
+                "-n",
+                "1",
+                "--date=iso-strict",
+                "--pretty=format:%H%x09%h%x09%an%x09%ae%x09%ad%x09%s",
+                "--follow",
+                "--",
+                normalizedKey
+            },
+            cancellationToken);
+        EnsureSuccess(result, "git log");
+
+        var line = result.StandardOutput.Trim();
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            throw new InvalidOperationException($"No commits found for '{normalizedKey}'.");
+        }
+
+        var parts = line.Split('\t');
+        if (parts.Length < 6)
+        {
+            throw new InvalidOperationException($"Unable to parse last commit for '{normalizedKey}'.");
+        }
+
+        var commitSha = parts[0].Trim();
+        var abbreviatedSha = parts[1].Trim();
+        var author = parts[2].Trim();
+        var authorEmail = parts[3].Trim();
+        var date = DateTimeOffset.Parse(parts[4].Trim());
+        var subject = parts[5].Trim();
+
+        var diffLines = includeDiff
+            ? await GetDiffLinesAsync(repoRoot, commitSha, normalizedKey, cancellationToken)
+            : Array.Empty<GitFileDiffLineDto>();
+
+        return new GitFileLastChangeDto(
+            NormalizePath(normalizedKey),
+            commitSha,
+            abbreviatedSha,
+            author,
+            authorEmail,
+            date,
+            subject,
+            diffLines);
+    }
+
+    private async Task<int> CountCommitsAsync(
+        string repoRoot,
+        string? author,
+        DateTimeOffset? since,
+        DateTimeOffset? until,
+        bool? merge,
+        string? normalizedPath,
+        CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            var args = new List<string> { "log", "--pretty=format:%H" };
+            if (!string.IsNullOrWhiteSpace(author))
+            {
+                args.Add($"--author={author}");
+            }
+
+            if (since.HasValue)
+            {
+                args.Add($"--since={since.Value:O}");
+            }
+
+            if (until.HasValue)
+            {
+                args.Add($"--until={until.Value:O}");
+            }
+
+            if (merge.HasValue)
+            {
+                args.Add(merge.Value ? "--merges" : "--no-merges");
+            }
+
+            args.Add("--follow");
+            args.Add("--find-renames");
+            args.Add("--");
+            args.Add(normalizedPath);
+
+            var result = await _runner.ExecuteAsync(repoRoot, args.ToArray(), cancellationToken);
+            EnsureSuccess(result, "git log");
+            var lines = result.StandardOutput
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return lines.Length;
+        }
+
+        var countArgs = new List<string> { "rev-list", "--count", "HEAD" };
+        if (!string.IsNullOrWhiteSpace(author))
+        {
+            countArgs.Add($"--author={author}");
+        }
+
+        if (since.HasValue)
+        {
+            countArgs.Add($"--since={since.Value:O}");
+        }
+
+        if (until.HasValue)
+        {
+            countArgs.Add($"--until={until.Value:O}");
+        }
+
+        if (merge.HasValue)
+        {
+            countArgs.Add(merge.Value ? "--merges" : "--no-merges");
+        }
+
+        var countResult = await _runner.ExecuteAsync(repoRoot, countArgs.ToArray(), cancellationToken);
+        EnsureSuccess(countResult, "git rev-list");
+
+        if (int.TryParse(countResult.StandardOutput.Trim(), out var total))
+        {
+            return total;
+        }
+
+        return 0;
+    }
+
+    private async Task<IReadOnlyList<GitFileDiffLineDto>> GetDiffLinesAsync(
+        string repoRoot,
+        string commitSha,
+        string normalizedKey,
+        CancellationToken cancellationToken)
+    {
+        var result = await _runner.ExecuteAsync(
+            repoRoot,
+            new[]
+            {
+                "show",
+                commitSha,
+                "--unified=0",
+                "--format=",
+                "--",
+                normalizedKey
+            },
+            cancellationToken);
+        EnsureSuccess(result, "git show");
+
+        return ParseDiffLines(result.StandardOutput);
+    }
+
+    private static IReadOnlyList<GitFileDiffLineDto> ParseDiffLines(string output)
+    {
+        var lines = new List<GitFileDiffLineDto>();
+        var currentLine = 1;
+
+        foreach (var rawLine in output.Split(new[] { '\r', '\n' }, StringSplitOptions.None))
+        {
+            if (string.IsNullOrEmpty(rawLine))
+            {
+                continue;
+            }
+
+            if (rawLine.StartsWith("@@", StringComparison.Ordinal))
+            {
+                if (TryParseHunkStart(rawLine, out var newStart))
+                {
+                    currentLine = newStart;
+                }
+                continue;
+            }
+
+            if (rawLine.StartsWith("diff --git", StringComparison.Ordinal)
+                || rawLine.StartsWith("index ", StringComparison.Ordinal)
+                || rawLine.StartsWith("---", StringComparison.Ordinal)
+                || rawLine.StartsWith("+++", StringComparison.Ordinal)
+                || rawLine.StartsWith("\\ No newline", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (rawLine.StartsWith('+'))
+            {
+                lines.Add(new GitFileDiffLineDto(currentLine, GitDiffLineKind.Add, rawLine[1..]));
+                currentLine += 1;
+                continue;
+            }
+
+            if (rawLine.StartsWith('-'))
+            {
+                lines.Add(new GitFileDiffLineDto(currentLine, GitDiffLineKind.Delete, rawLine[1..]));
+                continue;
+            }
+        }
+
+        return lines;
+    }
+
+    private static bool TryParseHunkStart(string line, out int newStart)
+    {
+        newStart = 1;
+        var plusIndex = line.IndexOf('+');
+        if (plusIndex < 0)
+        {
+            return false;
+        }
+
+        var index = plusIndex + 1;
+        var value = 0;
+        var hasDigit = false;
+        while (index < line.Length && char.IsDigit(line[index]))
+        {
+            hasDigit = true;
+            value = (value * 10) + (line[index] - '0');
+            index += 1;
+        }
+
+        if (!hasDigit)
+        {
+            return false;
+        }
+
+        newStart = value;
+        return true;
     }
 
     private async Task<GitPathChangeDto?> GetLastChangeAsync(
@@ -511,5 +887,219 @@ public sealed class GitCli : IGitCli
                 _ => GitChangeKind.Unknown
             };
         }
+    }
+}
+
+public static class GitCommitParser
+{
+    public static IReadOnlyList<GitCommitDto> Parse(string output)
+    {
+        var commits = new List<GitCommitDto>();
+        GitCommitBuilder? current = null;
+
+        foreach (var rawLine in output.Split(new[] { '\r', '\n' }, StringSplitOptions.None))
+        {
+            if (rawLine.StartsWith("COMMIT|", StringComparison.Ordinal))
+            {
+                if (current is not null)
+                {
+                    commits.Add(current.Build());
+                }
+
+                current = GitCommitBuilder.FromHeader(rawLine);
+                continue;
+            }
+
+            if (current is null)
+            {
+                continue;
+            }
+
+            if (string.Equals(rawLine, "BODY_BEGIN", StringComparison.Ordinal))
+            {
+                current.BeginBody();
+                continue;
+            }
+
+            if (string.Equals(rawLine, "BODY_END", StringComparison.Ordinal))
+            {
+                current.EndBody();
+                continue;
+            }
+
+            current.AddLine(rawLine);
+        }
+
+        if (current is not null)
+        {
+            commits.Add(current.Build());
+        }
+
+        return commits;
+    }
+
+    private sealed class GitCommitBuilder
+    {
+        private readonly string _commitSha;
+        private readonly string _abbreviatedSha;
+        private readonly IReadOnlyList<string> _parentShas;
+        private readonly string _authorName;
+        private readonly string _authorEmail;
+        private readonly DateTimeOffset _date;
+        private readonly string _subject;
+        private readonly List<string> _bodyLines = new();
+        private readonly List<GitCommitFileChangeDto> _changes = new();
+        private bool _inBody;
+
+        private GitCommitBuilder(
+            string commitSha,
+            string abbreviatedSha,
+            IReadOnlyList<string> parentShas,
+            string authorName,
+            string authorEmail,
+            DateTimeOffset date,
+            string subject)
+        {
+            _commitSha = commitSha;
+            _abbreviatedSha = abbreviatedSha;
+            _parentShas = parentShas;
+            _authorName = authorName;
+            _authorEmail = authorEmail;
+            _date = date;
+            _subject = subject;
+        }
+
+        public static GitCommitBuilder FromHeader(string header)
+        {
+            var parts = header.Split('|', 8);
+            if (parts.Length < 8)
+            {
+                throw new InvalidOperationException("Unexpected git log header format.");
+            }
+
+            var parents = parts[3]
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            return new GitCommitBuilder(
+                parts[1],
+                parts[2],
+                parents,
+                parts[4],
+                parts[5],
+                DateTimeOffset.Parse(parts[6]),
+                parts[7]);
+        }
+
+        public void BeginBody()
+        {
+            _inBody = true;
+        }
+
+        public void EndBody()
+        {
+            _inBody = false;
+        }
+
+        public void AddLine(string line)
+        {
+            if (_inBody)
+            {
+                _bodyLines.Add(line);
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return;
+            }
+
+            AddChange(line);
+        }
+
+        public GitCommitDto Build()
+        {
+            var body = string.Join('\n', _bodyLines).TrimEnd();
+            var isMerge = _parentShas.Count > 1;
+
+            return new GitCommitDto(
+                _commitSha,
+                _abbreviatedSha,
+                _parentShas,
+                _authorName,
+                _authorEmail,
+                _date,
+                _subject,
+                body,
+                isMerge,
+                _changes.ToList());
+        }
+
+        private void AddChange(string line)
+        {
+            var parts = line.Split('\t');
+            if (parts.Length < 2)
+            {
+                return;
+            }
+
+            var status = parts[0];
+            var changeKind = ParseChangeKind(status);
+
+            if (status.StartsWith("R", StringComparison.OrdinalIgnoreCase) && parts.Length >= 3)
+            {
+                _changes.Add(new GitCommitFileChangeDto(
+                    NormalizePath(parts[2]),
+                    NormalizePath(parts[1]),
+                    status,
+                    changeKind));
+                return;
+            }
+
+            if (status.StartsWith("C", StringComparison.OrdinalIgnoreCase) && parts.Length >= 3)
+            {
+                _changes.Add(new GitCommitFileChangeDto(
+                    NormalizePath(parts[2]),
+                    NormalizePath(parts[1]),
+                    status,
+                    changeKind));
+                return;
+            }
+
+            _changes.Add(new GitCommitFileChangeDto(
+                NormalizePath(parts[1]),
+                null,
+                status,
+                changeKind));
+        }
+    }
+
+    private static GitChangeKind ParseChangeKind(string status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return GitChangeKind.Unknown;
+        }
+
+        return char.ToUpperInvariant(status[0]) switch
+        {
+            'A' => GitChangeKind.Add,
+            'M' => GitChangeKind.Modify,
+            'D' => GitChangeKind.Delete,
+            'R' => GitChangeKind.Rename,
+            'C' => GitChangeKind.Copy,
+            _ => GitChangeKind.Unknown
+        };
+    }
+
+    private static string NormalizePath(string path)
+    {
+        var normalized = path.Replace('\\', '/').TrimStart('/');
+        if (normalized.StartsWith("./", StringComparison.Ordinal))
+        {
+            normalized = normalized[2..];
+        }
+
+        return "./" + normalized;
     }
 }

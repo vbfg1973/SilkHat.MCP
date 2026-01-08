@@ -1,8 +1,7 @@
 namespace SilkHat.Api.Models;
 
-public sealed class CodeTreeQuery
+public sealed class PagingQuery
 {
-    public string? ParentId { get; init; }
     public int? PageNumber { get; init; }
     public int? PageSize { get; init; }
 }

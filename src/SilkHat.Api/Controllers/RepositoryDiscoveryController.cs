@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using SilkHat.Analysis.Abstractions;
+using SilkHat.Api.Extensions;
+using SilkHat.Api.Models;
 using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
@@ -15,11 +17,13 @@ public sealed class RepositoryDiscoveryController : ApiControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IReadOnlyList<AvailableRepositoryDto>> GetAvailable()
+    public ActionResult<PagedResult<AvailableRepositoryDto>> GetAvailable([FromQuery] PagingQuery pagingQuery)
     {
         try
         {
-            return Ok(_discovery.ListAvailableRepositories());
+            var paging = pagingQuery.ResolvePaging();
+            var results = _discovery.ListAvailableRepositories();
+            return Ok(results.ToPagedResult(paging));
         }
         catch (InvalidOperationException ex)
         {
@@ -28,7 +32,9 @@ public sealed class RepositoryDiscoveryController : ApiControllerBase
     }
 
     [HttpGet("solutions")]
-    public ActionResult<IReadOnlyList<AvailableRepositorySolutionDto>> GetSolutions([FromQuery] string path)
+    public ActionResult<PagedResult<AvailableRepositorySolutionDto>> GetSolutions(
+        [FromQuery] string path,
+        [FromQuery] PagingQuery pagingQuery)
     {
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -38,7 +44,9 @@ public sealed class RepositoryDiscoveryController : ApiControllerBase
         var decodedPath = path.Contains('%') ? Uri.UnescapeDataString(path) : path;
         try
         {
-            return Ok(_discovery.ListSolutions(decodedPath));
+            var paging = pagingQuery.ResolvePaging();
+            var results = _discovery.ListSolutions(decodedPath);
+            return Ok(results.ToPagedResult(paging));
         }
         catch (InvalidOperationException ex)
         {

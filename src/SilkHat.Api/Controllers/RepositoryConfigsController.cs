@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SilkHat.Api.Extensions;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Services;
+using SilkHat.Api.Models;
 using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
@@ -29,31 +30,35 @@ public sealed class RepositoryConfigsController : ApiControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<RepositoryConfigDto>>> GetAll(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<RepositoryConfigDto>>> GetAll(
+        [FromQuery] PagingQuery pagingQuery,
+        CancellationToken cancellationToken)
     {
-        var configs = await _dbContext.RepositoryConfigs
+        var paging = pagingQuery.ResolvePaging();
+        var configsQuery = _dbContext.RepositoryConfigs
             .Include(config => config.Solutions)
             .AsNoTracking()
             .OrderBy(config => config.Name)
-            .Select(config => config.ToDto())
-            .ToListAsync(cancellationToken);
+            .Select(config => config.ToDto());
 
-        return Ok(configs);
+        return Ok(await configsQuery.ToPagedResultAsync(paging, cancellationToken));
     }
 
     [HttpGet("loaded")]
-    public async Task<ActionResult<IReadOnlyList<RepositoryConfigDto>>> GetLoaded(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<RepositoryConfigDto>>> GetLoaded(
+        [FromQuery] PagingQuery pagingQuery,
+        CancellationToken cancellationToken)
     {
+        var paging = pagingQuery.ResolvePaging();
         var loadedIds = _store.GetAll().Select(repo => repo.ConfigId).ToHashSet();
-        var configs = await _dbContext.RepositoryConfigs
+        var configsQuery = _dbContext.RepositoryConfigs
             .Include(config => config.Solutions)
             .AsNoTracking()
             .Where(config => loadedIds.Contains(config.Id))
             .OrderBy(config => config.Name)
-            .Select(config => config.ToDto())
-            .ToListAsync(cancellationToken);
+            .Select(config => config.ToDto());
 
-        return Ok(configs);
+        return Ok(await configsQuery.ToPagedResultAsync(paging, cancellationToken));
     }
 
     [HttpGet("{id:guid}")]

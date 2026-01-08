@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using SilkHat.Api.Extensions;
+using SilkHat.Api.Models;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Core.Dtos;
+using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Controllers;
 
@@ -15,14 +18,15 @@ public sealed class CodeNamedTypesController : ApiControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IReadOnlyList<NamedTypeDto>> GetNamedTypes(
+    public ActionResult<PagedResult<NamedTypeDto>> GetNamedTypes(
         Guid id,
         string solutionId,
         [FromQuery] string? pathPrefix,
         [FromQuery] string? namespacePrefix,
         [FromQuery] string? nameContains,
         [FromQuery] NamedTypeKind? kind,
-        [FromQuery] bool? definedOnly)
+        [FromQuery] bool? definedOnly,
+        [FromQuery] PagingQuery pagingQuery)
     {
         var workspace = _codeStore.Get(id);
         if (workspace is null)
@@ -36,6 +40,7 @@ public sealed class CodeNamedTypesController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
         }
 
+        var paging = pagingQuery.ResolvePaging();
         IEnumerable<NamedTypeDto> query = solution.NamedTypes;
 
         if (!string.IsNullOrWhiteSpace(pathPrefix))
@@ -63,6 +68,11 @@ public sealed class CodeNamedTypesController : ApiControllerBase
             query = query.Where(type => !type.IsExternal);
         }
 
-        return Ok(query.Take(500).ToList());
+        var result = query
+            .OrderBy(type => type.Namespace, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(type => type.Name, StringComparer.OrdinalIgnoreCase)
+            .ToPagedResult(paging);
+
+        return Ok(result);
     }
 }

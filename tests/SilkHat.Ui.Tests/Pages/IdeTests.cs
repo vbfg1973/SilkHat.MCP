@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Linq;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
@@ -27,35 +28,45 @@ public sealed class IdeTests
         var configId = Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d");
         var solutionId = "solution-1";
         var handler = new FakeHttpMessageHandler();
-        handler.AddJsonResponse("api/repositories/loaded", $@"[
-  {{
-    ""id"": ""{configId}"",
-    ""name"": ""Repo One"",
-    ""rootPath"": ""/repo"",
-    ""description"": null,
-    ""groupId"": null,
-    ""solutions"": [
-      {{
-        ""relativePath"": ""./RepoOne.sln"",
-        ""isEnabled"": true,
-        ""solutionId"": ""{solutionId}""
-      }}
-    ],
-    ""createdUtc"": ""2024-01-01T00:00:00Z"",
-    ""updatedUtc"": ""2024-01-01T00:00:00Z""
-  }}
-]");
+        handler.AddJsonResponse("api/repositories/loaded", $@"{{
+  ""items"": [
+    {{
+      ""id"": ""{configId}"",
+      ""name"": ""Repo One"",
+      ""rootPath"": ""/repo"",
+      ""description"": null,
+      ""groupId"": null,
+      ""solutions"": [
+        {{
+          ""relativePath"": ""./RepoOne.sln"",
+          ""isEnabled"": true,
+          ""solutionId"": ""{solutionId}""
+        }}
+      ],
+      ""createdUtc"": ""2024-01-01T00:00:00Z"",
+      ""updatedUtc"": ""2024-01-01T00:00:00Z""
+    }}
+  ],
+  ""pageNumber"": 1,
+  ""pageSize"": 50,
+  ""totalCount"": 1
+}}");
         handler.AddJsonResponse($"api/repositories/{configId}/code/solutions/{solutionId}/tree", """
-[
-  {
-    "repositoryPath": "./RepoOne",
-    "displayPath": "Repo One",
-    "name": "Repo One",
-    "type": 0,
-    "projectKey": "alpha",
-    "projectName": "Repo One"
-  }
-]
+{
+  "items": [
+    {
+      "repositoryPath": "./RepoOne",
+      "displayPath": "Repo One",
+      "name": "Repo One",
+      "type": 0,
+      "projectKey": "alpha",
+      "projectName": "Repo One"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 50,
+  "totalCount": 1
+}
 """);
 
         context.Services.AddScoped(_ => new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
@@ -77,7 +88,7 @@ public sealed class IdeTests
         Assert.NotNull(treeField);
 
         var nodes = (System.Collections.IList)treeField!.GetValue(state)!;
-        Assert.Equal(1, nodes.Count);
+        Assert.Single(nodes.Cast<object>());
         cut.WaitForAssertion(() => Assert.Contains("Repo One", cut.Markup));
     }
 
@@ -95,35 +106,45 @@ public sealed class IdeTests
         var configId = Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d");
         var solutionId = "solution-1";
         var handler = new FakeHttpMessageHandler();
-        handler.AddJsonResponse("api/repositories/loaded", $@"[
-  {{
-    ""id"": ""{configId}"",
-    ""name"": ""Repo One"",
-    ""rootPath"": ""/repo"",
-    ""description"": null,
-    ""groupId"": null,
-    ""solutions"": [
-      {{
-        ""relativePath"": ""./RepoOne.sln"",
-        ""isEnabled"": true,
-        ""solutionId"": ""{solutionId}""
-      }}
-    ],
-    ""createdUtc"": ""2024-01-01T00:00:00Z"",
-    ""updatedUtc"": ""2024-01-01T00:00:00Z""
-  }}
-]");
+        handler.AddJsonResponse("api/repositories/loaded", $@"{{
+  ""items"": [
+    {{
+      ""id"": ""{configId}"",
+      ""name"": ""Repo One"",
+      ""rootPath"": ""/repo"",
+      ""description"": null,
+      ""groupId"": null,
+      ""solutions"": [
+        {{
+          ""relativePath"": ""./RepoOne.sln"",
+          ""isEnabled"": true,
+          ""solutionId"": ""{solutionId}""
+        }}
+      ],
+      ""createdUtc"": ""2024-01-01T00:00:00Z"",
+      ""updatedUtc"": ""2024-01-01T00:00:00Z""
+    }}
+  ],
+  ""pageNumber"": 1,
+  ""pageSize"": 50,
+  ""totalCount"": 1
+}}");
         handler.AddJsonResponse($"api/repositories/{configId}/code/solutions/{solutionId}/tree", """
-[
-  {
-    "repositoryPath": "./Program.cs",
-    "displayPath": "Repo One/Program.cs",
-    "name": "Program.cs",
-    "type": 2,
-    "projectKey": "alpha",
-    "projectName": "Repo One"
-  }
-]
+{
+  "items": [
+    {
+      "repositoryPath": "./Program.cs",
+      "displayPath": "Repo One/Program.cs",
+      "name": "Program.cs",
+      "type": 2,
+      "projectKey": "alpha",
+      "projectName": "Repo One"
+    }
+  ],
+  "pageNumber": 1,
+  "pageSize": 50,
+  "totalCount": 1
+}
 """);
         handler.AddJsonResponse(
             $"api/repositories/{configId}/code/solutions/{solutionId}/files?path=Repo%20One%2FProgram.cs",
@@ -132,6 +153,20 @@ public sealed class IdeTests
   "repositoryPath": "./Program.cs",
   "displayPath": "Repo One/Program.cs",
   "content": "class Program {}"
+}
+""");
+        handler.AddJsonResponse(
+            $"api/repositories/{configId}/git/files/.%2FProgram.cs/last-change?includeDiff=false",
+            """
+{
+  "path": "./Program.cs",
+  "commitSha": "sha1",
+  "abbreviatedSha": "sha1",
+  "author": "alice",
+  "authorEmail": "alice@example.com",
+  "commitDateUtc": "2024-01-01T00:00:00Z",
+  "subject": "Update",
+  "diffLines": []
 }
 """);
         context.Services.AddScoped(_ => new HttpClient(handler) { BaseAddress = new Uri("http://localhost/") });
@@ -163,6 +198,14 @@ public sealed class IdeTests
         {
             var task = (Task)method!.Invoke(ide, new object?[] { entry })!;
             await task;
+        });
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("sha1", cut.Markup);
+            Assert.Contains("alice", cut.Markup);
+            Assert.Contains("alice@example.com", cut.Markup);
+            Assert.Contains("2024-01-01 00:00:00", cut.Markup);
         });
 
         var state = stateField!.GetValue(ide);

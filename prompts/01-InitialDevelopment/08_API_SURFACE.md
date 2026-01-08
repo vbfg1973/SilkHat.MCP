@@ -37,6 +37,8 @@ Code:
 
 Git:
 - GET /api/repositories/{id}/git/tree?...filters...
+- GET /api/repositories/{id}/git/commits?...filters...
+- GET /api/repositories/{id}/git/files/{path}/last-change?includeDiff=...
 - GET /api/repositories/{id}/git/files/{path}/history
 - GET /api/repositories/{id}/git/files/{path}/cochanges
 
@@ -47,3 +49,4 @@ Discovery:
 Requirements:
 - Swagger enabled
 - ProblemDetails with correlationId + failure category
+- All list-returning endpoints accept `pageNumber` and `pageSize` query parameters and return a paged result payload: `{ items, pageNumber, pageSize, totalCount }`.

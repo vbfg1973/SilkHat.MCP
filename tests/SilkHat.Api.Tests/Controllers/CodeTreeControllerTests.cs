@@ -5,6 +5,7 @@ using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Api.Models;
 using SilkHat.Code.Core.Dtos;
+using SilkHat.Core.Dtos;
 
 namespace SilkHat.Api.Tests.Controllers;
 
@@ -54,9 +55,9 @@ public sealed class CodeTreeControllerTests
         var result = controller.GetTree(Guid.NewGuid(), CodeWorkspaceFactory.DefaultSolutionId, new CodeTreeQuery());
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var entries = Assert.IsAssignableFrom<IReadOnlyList<CodeTreeEntryDto>>(ok.Value);
-        Assert.Single(entries);
-        Assert.Equal("Repo", entries[0].Name);
+        var entries = Assert.IsType<PagedResult<CodeTreeEntryDto>>(ok.Value);
+        Assert.Single(entries.Items);
+        Assert.Equal("Repo", entries.Items[0].Name);
         store.Verify(s => s.Get(It.IsAny<Guid>()), Times.Once);
         treeService.Verify(s => s.GetTree(solution, null), Times.Once);
     }

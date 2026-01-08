@@ -4,7 +4,9 @@ using Moq;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Models;
 using SilkHat.Api.Controllers;
+using SilkHat.Api.Models;
 using SilkHat.Api.Tests.TestHelpers;
+using SilkHat.Core.Dtos;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Git.Core.Dtos;
 
@@ -23,7 +25,7 @@ public sealed class GitTreeControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = await controller.GetTree(Guid.NewGuid(), null, null, null, null, CancellationToken.None);
+        var result = await controller.GetTree(Guid.NewGuid(), null, null, null, null, new PagingQuery(), CancellationToken.None);
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
@@ -62,11 +64,11 @@ public sealed class GitTreeControllerTests
             ControllerContext = ControllerTestFactory.CreateContext()
         };
 
-        var result = await controller.GetTree(configId, null, null, null, null, CancellationToken.None);
+        var result = await controller.GetTree(configId, null, null, null, null, new PagingQuery(), CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var entries = Assert.IsAssignableFrom<IReadOnlyList<GitTreeEntryDto>>(ok.Value);
-        Assert.Single(entries);
+        var entries = Assert.IsType<PagedResult<GitTreeEntryDto>>(ok.Value);
+        Assert.Single(entries.Items);
         gitCli.Verify(c => c.ListTreeAsync(
             configId,
             "/repo",
