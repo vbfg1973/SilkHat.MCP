@@ -21,6 +21,7 @@ public sealed class MethodCallStackServiceTests
                 It.IsAny<Guid>(),
                 It.IsAny<string>(),
                 It.IsAny<IMethodSymbol>(),
+                It.IsAny<bool>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MethodImplementationResolution(
                 null,
@@ -56,6 +57,7 @@ public sealed class MethodCallStackServiceTests
             It.IsAny<Guid>(),
             It.IsAny<string>(),
             It.Is<IMethodSymbol>(symbol => symbol.Name == "GetGreeting"),
+            It.IsAny<bool>(),
             It.IsAny<CancellationToken>()), Times.AtLeastOnce);
     }
 
@@ -73,6 +75,7 @@ public sealed class MethodCallStackServiceTests
                 It.IsAny<Guid>(),
                 It.IsAny<string>(),
                 It.IsAny<IMethodSymbol>(),
+                It.IsAny<bool>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MethodImplementationResolution(
                 implementation,

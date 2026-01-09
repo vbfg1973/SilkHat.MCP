@@ -40,13 +40,15 @@ State:
 - Tabs: per-solution open files, active tab index, diff toggle state, commit metadata (`IdeTabsState`).
 - Symbols: per-solution symbol popup state, active file, and symbol outline tree (`IdeSymbolsState`).
 - Call stack: per-solution call stack popup state, call nodes, mermaid diagram, and selected node (`IdeCallStackState`).
+- Decisions: per-solution pending/resolved lists, sorting, filtering, and dialog state (`IdeDecisionsState`).
+- Layout: per-solution active main view and toolbox selection (`IdeLayoutState`).
 
 Actions and effects:
 - Load solutions, select solution, load tree root/children, open file tab, close tabs, toggle diff.
 - Effects call API endpoints: `/api/repositories/loaded`, `/api/repositories/{id}/code/solutions/{solutionId}/tree`, `/api/repositories/{id}/code/solutions/{solutionId}/files`.
 - Symbol popup effects call `/api/repositories/{id}/code/solutions/{solutionId}/files/symbols?path=...` and reload when the active tab changes while the popup is open.
 - Call stack effects call `/api/repositories/{id}/code/solutions/{solutionId}/methods/call-stack` and `/api/repositories/{id}/code/solutions/{solutionId}/methods/call-stack/mermaid`.
-- Call stack decision effects call `/api/repositories/{id}/code/solutions/{solutionId}/decisions/interface-methods` to persist interface implementation choices.
+- Decision effects call `/api/repositories/{id}/code/solutions/{solutionId}/decisions/pending`, `/resolved`, `/discover`, `/resolve`, `/notes`, `/activate`, and `/validate` to manage decision lifecycle and notes.
 
 Components:
 - `IdeSolutionSelector` uses solutions state and dispatches selection actions.
@@ -57,6 +59,11 @@ Components:
 - `IdeSymbolPopup` opens `IdeCallStackPopup` for the selected method when the user requests a call stack.
 - `IdeMermaidViewer` renders Mermaid diagrams via the visualization host and JS interop.
 - `IdeD3Viewer` is a minimal D3 viewer used to exercise the visualization host and palette pipeline.
+- `DecisionToolboxContent` renders the Toolbox tabs for pending/resolved decisions and dispatches discovery actions.
+- `PendingDecisionsPanel` and `ResolvedDecisionsPanel` render decision rows with sorting and filtering controls.
+- `ResolveInterfaceDecisionControl` renders single-select candidate lists and dispatches resolve actions.
+- `DecisionNotesDialog` edits notes for a decision and dispatches note updates.
+- `IdeMenuBar` provides a single-select Toolbox menu that sets the active toolbox view (with a clear selection action).
 
 ### Git Domain
 
@@ -80,9 +87,10 @@ Decision rules:
 - If multiple non-test implementations exist, a decision is required and must be provided by the user.
 
 Decision persistence:
-- Decisions are stored in `MethodImplementationDecisions` (solution + repository scoped).
-- API endpoints: `GET /api/repositories/{id}/code/solutions/{solutionId}/decisions/interface-methods` and `POST` to create/update.
-- Decisions also persist Roslyn documentation IDs for interface and implementation symbols when available, enabling stable symbol lookup across workspace reloads/compilations.
+- Decisions are stored in the unified `Decisions` table (solution + repository scoped), with type-specific payload JSON.
+- API endpoints: `/api/repositories/{id}/code/solutions/{solutionId}/decisions/pending`, `/resolved`, `/discover`, `/resolve`, `/notes`, `/activate`, and `/validate`.
+- Decisions persist Roslyn documentation IDs for interface and implementation symbols when available, enabling stable symbol lookup across workspace reloads/compilations.
+  Legacy `MethodImplementationDecisions` entries are read only for back-compat during the migration window.
 
 Decision usage metadata:
 - Services that use decisions must return decision metadata (id + type) in their responses; the field is present but null when no decision was applied.

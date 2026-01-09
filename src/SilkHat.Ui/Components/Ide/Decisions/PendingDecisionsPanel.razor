@@ -1,0 +1,75 @@
+@using System.Text.Json
+@using MudBlazor
+@using SilkHat.Ui.Models
+@using SilkHat.Ui.State.Ide
+@using SilkHat.Ui.State.Ide.Actions
+
+@inject IDispatcher Dispatcher
+
+<div class="d-flex flex-row justify-space-between align-center mb-2">
+    <MudText Typo="Typo.subtitle2">Pending Decisions</MudText>
+    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="@OnDiscover">Discover</MudButton>
+</div>
+
+@if (ViewState.IsLoadingPending)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (ViewState.Pending.Count == 0)
+{
+    <MudText Typo="Typo.body2" Color="Color.Secondary">No pending decisions.</MudText>
+}
+else
+{
+    <MudExpansionPanels MultiExpansion="true">
+        @foreach (var decision in ViewState.Pending)
+        {
+            <MudExpansionPanel Text="@decision.Name">
+                <div class="d-flex flex-column gap-2">
+                    <MudText Typo="Typo.caption">Type: @decision.Type</MudText>
+                    <MudText Typo="Typo.caption">Discovered: @decision.DiscoveredUtc:yyyy-MM-dd HH:mm:ss</MudText>
+                    @if (!decision.IsValid)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Warning">Invalid (missing symbols)</MudText>
+                    }
+
+                    @if (decision.Type == DecisionTypeModel.ResolveInterface)
+                    {
+                        var payload = ParseResolveInterfacePayload(decision);
+                        if (payload is not null)
+                        {
+                            <ResolveInterfaceDecisionControl Decision="decision"
+                                                              Payload="payload"
+                                                              SolutionId="@SolutionId" />
+                        }
+                    }
+                </div>
+            </MudExpansionPanel>
+        }
+    </MudExpansionPanels>
+}
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    [Parameter] public string SolutionId { get; set; } = string.Empty;
+    [Parameter] public IdeDecisionsViewState ViewState { get; set; } = IdeDecisionsViewState.Default;
+    [Parameter] public EventCallback OnDiscover { get; set; }
+
+    private ResolveInterfaceDecisionPayloadModel? ParseResolveInterfacePayload(DecisionSummaryModel decision)
+    {
+        if (decision.Payload is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return decision.Payload.Value.Deserialize<ResolveInterfaceDecisionPayloadModel>(JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+}

@@ -1,0 +1,120 @@
+@using System.Text.Json
+@using MudBlazor
+@using SilkHat.Ui.Models
+@using SilkHat.Ui.State.Ide
+@using SilkHat.Ui.State.Ide.Actions
+
+@inject IDispatcher Dispatcher
+@inject IDialogService DialogService
+
+<div class="d-flex flex-row justify-space-between align-center mb-2">
+    <MudText Typo="Typo.subtitle2">Resolved Decisions</MudText>
+    <MudSelect T="bool?" Dense="true" Label="Active" Value="@ViewState.ResolvedActiveFilter" ValueChanged="OnActiveChanged">
+        <MudSelectItem T="bool?" Value="@(null)">All</MudSelectItem>
+        <MudSelectItem T="bool?" Value="true">Active</MudSelectItem>
+        <MudSelectItem T="bool?" Value="false">Inactive</MudSelectItem>
+    </MudSelect>
+</div>
+
+@if (ViewState.IsLoadingResolved)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (ViewState.Resolved.Count == 0)
+{
+    <MudText Typo="Typo.body2" Color="Color.Secondary">No resolved decisions.</MudText>
+}
+else
+{
+    <MudExpansionPanels MultiExpansion="true">
+        @foreach (var decision in ViewState.Resolved)
+        {
+            <MudExpansionPanel Text="@decision.Name">
+                <div class="d-flex flex-column gap-2">
+                    <MudText Typo="Typo.caption">Type: @decision.Type</MudText>
+                    <MudText Typo="Typo.caption">Resolved: @decision.ResolvedUtc:yyyy-MM-dd HH:mm:ss</MudText>
+                    <MudText Typo="Typo.caption">Active: @decision.IsActive</MudText>
+                    @if (!decision.IsValid)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Warning">Invalid (missing symbols)</MudText>
+                    }
+
+                    @if (decision.Type == DecisionTypeModel.ResolveInterface)
+                    {
+                        var payload = ParseResolveInterfacePayload(decision);
+                        if (payload is not null)
+                        {
+                            <MudText Typo="Typo.body2">
+                                Selected: @(payload.SelectedTypeDocId ?? payload.SelectedMethodDocId ?? "None")
+                            </MudText>
+                        }
+                    }
+
+                    <div class="d-flex flex-row gap-2">
+                        <MudSwitch T="bool"
+                                   Value="@decision.IsActive"
+                                   ValueChanged="value => ToggleActive(decision, value)"
+                                   Color="Color.Primary"
+                                   Label="Active" />
+                        <MudButton Variant="Variant.Text" OnClick="() => OpenNotes(decision)">Notes</MudButton>
+                        <MudButton Variant="Variant.Text" OnClick="() => Validate(decision)">Validate</MudButton>
+                    </div>
+                </div>
+            </MudExpansionPanel>
+        }
+    </MudExpansionPanels>
+}
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    [Parameter] public string SolutionId { get; set; } = string.Empty;
+    [Parameter] public IdeDecisionsViewState ViewState { get; set; } = IdeDecisionsViewState.Default;
+    [Parameter] public EventCallback<bool?> OnActiveFilterChanged { get; set; }
+
+    private ResolveInterfaceDecisionPayloadModel? ParseResolveInterfacePayload(DecisionSummaryModel decision)
+    {
+        if (decision.Payload is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return decision.Payload.Value.Deserialize<ResolveInterfaceDecisionPayloadModel>(JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private Task OnActiveChanged(bool? value)
+    {
+        return OnActiveFilterChanged.InvokeAsync(value);
+    }
+
+    private void ToggleActive(DecisionSummaryModel decision, bool value)
+    {
+        var request = new DecisionActivateRequestModel(decision.Id, value);
+        Dispatcher.Dispatch(new SetDecisionActiveAction(SolutionId, request));
+    }
+
+    private void Validate(DecisionSummaryModel decision)
+    {
+        var request = new DecisionValidateRequestModel(decision.Id);
+        Dispatcher.Dispatch(new ValidateDecisionAction(SolutionId, request));
+    }
+
+    private async Task OpenNotes(DecisionSummaryModel decision)
+    {
+        var parameters = new DialogParameters
+        {
+            ["DecisionId"] = decision.Id,
+            ["SolutionId"] = SolutionId,
+            ["Notes"] = decision.Notes
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
+        await DialogService.ShowAsync<DecisionNotesDialog>("Decision Notes", parameters, options);
+    }
+}

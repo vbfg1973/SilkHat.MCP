@@ -10,8 +10,6 @@
 @inject IState<IdeTreeState> TreeState
 @inject IDispatcher Dispatcher
 
-<MudText Typo="Typo.subtitle2" Class="mb-2">Repository Tree</MudText>
-
 @if (!string.IsNullOrWhiteSpace(CurrentTree?.Error))
 {
     <MudAlert Severity="Severity.Error" Class="mb-2">@CurrentTree!.Error</MudAlert>
@@ -20,6 +18,7 @@
 <div class="ide-tree-scroll">
     <MudTreeView T="CodeTreeEntryModel"
                  Class="ide-tree-viewer"
+                 Style="font-size: 10px;"
                  Dense="true"
                  ServerData="LoadTreeChildrenAsync"
                  Items="CurrentTree?.Items">
@@ -33,6 +32,7 @@
                          CanExpand="@context.Expandable"
                          Icon="@context.Icon"
                          LoadingIconColor="Color.Info"
+                         Style="font-size: 10px;"
                          OnClick="@(async (MouseEventArgs _) => await OnTreeEntrySelected(context.Value))" />
     </ItemTemplate>
 </MudTreeView>

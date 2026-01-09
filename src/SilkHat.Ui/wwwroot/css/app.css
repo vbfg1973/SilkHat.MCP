@@ -154,17 +154,18 @@ code {
 }
 
 .ide-tree-viewer {
-    font-size: 0.85rem;
+    font-size: 10px;
     white-space: nowrap;
 }
 
 .ide-tree-viewer .mud-icon-root {
-    font-size: 1rem;
+    font-size: 10px !important;
 }
 
 .ide-tree-panel .mud-treeview-item-content,
 .ide-tree-panel .mud-treeview-item-label {
     white-space: nowrap;
+    font-size: 10px !important;
 }
 
 .ide-tabs-panel {
@@ -241,8 +242,8 @@ code {
 }
 
 .ide-toolbox-panel {
-    flex: 0 0 280px;
-    min-width: 280px;
+    flex: 0 0 308px;
+    min-width: 308px;
     height: 100%;
     overflow: auto;
     border: 1px solid rgba(0, 0, 0, 0.08);

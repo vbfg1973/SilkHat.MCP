@@ -1,0 +1,186 @@
+@using MudBlazor
+@using SilkHat.Ui.Models
+@using SilkHat.Ui.State.Ide
+@using SilkHat.Ui.State.Ide.Actions
+@inject IState<IdeSolutionsState> SolutionsState
+@inject IState<IdeDecisionsState> DecisionsState
+@inject IDispatcher Dispatcher
+
+@if (string.IsNullOrWhiteSpace(SelectedSolutionId))
+{
+    <MudText Typo="Typo.body2" Color="Color.Secondary">Select a solution to view decisions.</MudText>
+}
+else
+{
+    <div class="d-flex flex-column gap-2">
+        <div class="d-flex flex-row flex-wrap gap-2 align-center">
+            <MudSelect T="DecisionTypeModel?" Dense="true" Label="Type" Value="@CurrentView.FilterType" ValueChanged="OnFilterChanged">
+                <MudSelectItem T="DecisionTypeModel?" Value="@(null)">All</MudSelectItem>
+                <MudSelectItem T="DecisionTypeModel?" Value="@DecisionTypeModel.ResolveInterface">ResolveInterface</MudSelectItem>
+            </MudSelect>
+            <MudSelect T="DecisionSortOption" Dense="true" Label="Sort" Value="@CurrentView.SortOption" ValueChanged="OnSortChanged">
+                <MudSelectItem Value="@DecisionSortOption.Age">Age</MudSelectItem>
+                <MudSelectItem Value="@DecisionSortOption.Type">Type</MudSelectItem>
+            </MudSelect>
+            <MudSwitch T="bool"
+                       @bind-Value="SortDescending"
+                       Color="Color.Primary"
+                       Label="Desc" />
+        </div>
+
+        <MudTabs Rounded="true">
+            <MudTabPanel Text="Pending">
+                <PendingDecisionsPanel SolutionId="@(SelectedSolutionId!)"
+                                       ViewState="@CurrentView"
+                                       OnDiscover="@Discover" />
+            </MudTabPanel>
+            <MudTabPanel Text="Resolved">
+                <ResolvedDecisionsPanel SolutionId="@(SelectedSolutionId!)"
+                                        ViewState="@CurrentView"
+                                        OnActiveFilterChanged="@OnActiveFilterChanged" />
+            </MudTabPanel>
+        </MudTabs>
+    </div>
+}
+
+@code {
+    private string? _lastSolutionId;
+
+    private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
+    private IdeDecisionsViewState CurrentView
+    {
+        get
+        {
+            if (SelectedSolutionId is null)
+            {
+                return IdeDecisionsViewState.Default;
+            }
+
+            return DecisionsState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
+                ? view
+                : IdeDecisionsViewState.Default;
+        }
+    }
+
+    private bool SortDescending
+    {
+        get => CurrentView.SortDescending;
+        set
+        {
+            if (SelectedSolutionId is null)
+            {
+                return;
+            }
+
+            Dispatcher.Dispatch(new LoadPendingDecisionsAction(
+                SelectedSolutionId,
+                CurrentView.FilterType,
+                CurrentView.SortOption,
+                value));
+
+            Dispatcher.Dispatch(new LoadResolvedDecisionsAction(
+                SelectedSolutionId,
+                CurrentView.FilterType,
+                CurrentView.SortOption,
+                value,
+                CurrentView.ResolvedActiveFilter));
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (SelectedSolutionId is null || SelectedSolutionId == _lastSolutionId)
+        {
+            return;
+        }
+
+        _lastSolutionId = SelectedSolutionId;
+        Dispatcher.Dispatch(new LoadPendingDecisionsAction(
+            SelectedSolutionId,
+            CurrentView.FilterType,
+            CurrentView.SortOption,
+            CurrentView.SortDescending));
+        Dispatcher.Dispatch(new LoadResolvedDecisionsAction(
+            SelectedSolutionId,
+            CurrentView.FilterType,
+            CurrentView.SortOption,
+            CurrentView.SortDescending,
+            CurrentView.ResolvedActiveFilter));
+    }
+
+    private Task OnFilterChanged(DecisionTypeModel? value)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        Dispatcher.Dispatch(new LoadPendingDecisionsAction(
+            SelectedSolutionId,
+            value,
+            CurrentView.SortOption,
+            CurrentView.SortDescending));
+        Dispatcher.Dispatch(new LoadResolvedDecisionsAction(
+            SelectedSolutionId,
+            value,
+            CurrentView.SortOption,
+            CurrentView.SortDescending,
+            CurrentView.ResolvedActiveFilter));
+        return Task.CompletedTask;
+    }
+
+    private Task OnSortChanged(DecisionSortOption option)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        Dispatcher.Dispatch(new LoadPendingDecisionsAction(
+            SelectedSolutionId,
+            CurrentView.FilterType,
+            option,
+            CurrentView.SortDescending));
+        Dispatcher.Dispatch(new LoadResolvedDecisionsAction(
+            SelectedSolutionId,
+            CurrentView.FilterType,
+            option,
+            CurrentView.SortDescending,
+            CurrentView.ResolvedActiveFilter));
+        return Task.CompletedTask;
+    }
+
+    private Task OnSortDescendingChanged(bool value)
+    {
+        SortDescending = value;
+        return Task.CompletedTask;
+    }
+
+    private Task OnActiveFilterChanged(bool? value)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        Dispatcher.Dispatch(new LoadResolvedDecisionsAction(
+            SelectedSolutionId,
+            CurrentView.FilterType,
+            CurrentView.SortOption,
+            CurrentView.SortDescending,
+            value));
+        return Task.CompletedTask;
+    }
+
+    private Task Discover()
+    {
+        if (SelectedSolutionId is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        Dispatcher.Dispatch(new DiscoverDecisionsAction(SelectedSolutionId, CurrentView.FilterType));
+        return Task.CompletedTask;
+    }
+}

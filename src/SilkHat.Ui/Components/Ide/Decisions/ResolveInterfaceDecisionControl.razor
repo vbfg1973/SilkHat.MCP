@@ -1,0 +1,77 @@
+@using MudBlazor
+@using SilkHat.Ui.Models
+@using SilkHat.Ui.State.Ide.Actions
+
+@inject IDispatcher Dispatcher
+
+<MudText Typo="Typo.body2">Select implementation</MudText>
+
+<MudRadioGroup T="string" @bind-Value="_selectedKey">
+    @foreach (var candidate in Payload.Candidates)
+    {
+        <MudRadio T="string" Value="@GetKey(candidate)">
+            @candidate.TypeName
+        </MudRadio>
+    }
+</MudRadioGroup>
+
+<div class="d-flex flex-row gap-2">
+    <MudButton Variant="Variant.Filled"
+               Color="Color.Primary"
+               Disabled="@string.IsNullOrWhiteSpace(_selectedKey)"
+               OnClick="SaveDecision">
+        Save
+    </MudButton>
+    <MudButton Variant="Variant.Text" OnClick="ClearSelection">
+        Clear
+    </MudButton>
+</div>
+
+@code {
+    [Parameter] public DecisionSummaryModel Decision { get; set; } = default!;
+    [Parameter] public ResolveInterfaceDecisionPayloadModel Payload { get; set; } = default!;
+    [Parameter] public string SolutionId { get; set; } = string.Empty;
+
+    private string _selectedKey = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        _selectedKey = Payload.SelectedMethodDocId
+            ?? Payload.SelectedTypeDocId
+            ?? string.Empty;
+    }
+
+    private string GetKey(ResolveInterfaceDecisionCandidateModel candidate)
+    {
+        return candidate.MethodDocId
+               ?? candidate.TypeDocId
+               ?? candidate.TypeName;
+    }
+
+    private void ClearSelection()
+    {
+        _selectedKey = string.Empty;
+    }
+
+    private void SaveDecision()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedKey))
+        {
+            return;
+        }
+
+        var selected = Payload.Candidates.FirstOrDefault(candidate => GetKey(candidate) == _selectedKey);
+        var updated = Payload with
+        {
+            SelectedTypeDocId = selected?.TypeDocId,
+            SelectedMethodDocId = selected?.MethodDocId
+        };
+
+        var request = new DecisionResolveRequestModel(
+            Decision.Id,
+            DecisionTypeModel.ResolveInterface,
+            updated);
+
+        Dispatcher.Dispatch(new ResolveDecisionAction(SolutionId, request));
+    }
+}

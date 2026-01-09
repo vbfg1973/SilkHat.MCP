@@ -5,6 +5,12 @@ public enum IdeMainView
     Tabs
 }
 
+public enum IdeToolboxView
+{
+    None,
+    Decisions
+}
+
 public sealed record IdeLayoutState
 {
     public IdeLayoutState()
@@ -20,7 +26,7 @@ public sealed record IdeLayoutState
     public IReadOnlyDictionary<string, IdeLayoutViewState> Views { get; init; }
 }
 
-public sealed record IdeLayoutViewState(IdeMainView ActiveView, bool IsToolboxHidden)
+public sealed record IdeLayoutViewState(IdeMainView ActiveView, IdeToolboxView ToolboxView)
 {
-    public static IdeLayoutViewState Default => new(IdeMainView.Tabs, false);
+    public static IdeLayoutViewState Default => new(IdeMainView.Tabs, IdeToolboxView.None);
 }

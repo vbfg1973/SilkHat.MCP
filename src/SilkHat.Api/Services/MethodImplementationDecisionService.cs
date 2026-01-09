@@ -1,8 +1,10 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.CodeAnalysis;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Analysis.Services;
+using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
 
@@ -10,7 +12,8 @@ namespace SilkHat.Api.Services;
 
 public sealed class MethodImplementationDecisionService : IMethodImplementationDecisionService
 {
-    private const string DecisionType = "InterfaceImplementation";
+    private const string DecisionTypeName = "InterfaceImplementation";
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly SilkHatDbContext _dbContext;
 
     public MethodImplementationDecisionService(SilkHatDbContext dbContext)
@@ -24,6 +27,7 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
         Guid repositoryConfigId,
         string solutionId,
         IMethodSymbol interfaceMethod,
+        bool ignoreStoredDecisions,
         CancellationToken cancellationToken)
     {
         if (interfaceMethod.ContainingType.TypeKind != TypeKind.Interface
@@ -39,35 +43,68 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
         var interfaceMetadataName = GetMetadataName(interfaceMethod.ContainingType);
         var interfaceNamespace = interfaceMethod.ContainingNamespace?.ToDisplayString() ?? string.Empty;
         var interfaceMethodDocId = DocumentationIdUtility.GetDocumentationId(interfaceMethod);
-        var storedDecision = await _dbContext.MethodImplementationDecisions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(decision =>
-                decision.RepositoryConfigId == repositoryConfigId
-                && decision.SolutionId == solutionId
-                && (!string.IsNullOrWhiteSpace(interfaceMethodDocId)
-                    ? (decision.InterfaceMethodDocumentationId == interfaceMethodDocId
-                        || (decision.InterfaceMethodDocumentationId == null
-                            && decision.InterfaceMethodSignature == interfaceMethodSignature))
-                    : decision.InterfaceMethodSignature == interfaceMethodSignature),
-                cancellationToken);
-
-        if (storedDecision is not null)
+        if (!ignoreStoredDecisions)
         {
-            var resolved = ResolveImplementationByDocId(solution, storedDecision.ImplementationMethodDocumentationId)
-                ?? ResolveImplementationByName(
-                    solution,
-                    interfaceMethod,
-                    interfaceMetadataName,
-                    interfaceTypeName,
-                    storedDecision.ImplementationTypeName);
-            if (resolved is not null)
+            var subjectKey = !string.IsNullOrWhiteSpace(interfaceMethodDocId)
+                ? interfaceMethodDocId
+                : interfaceMethodSignature;
+
+            var unifiedDecision = await _dbContext.Decisions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(decision =>
+                    decision.RepositoryConfigId == repositoryConfigId
+                    && decision.SolutionId == solutionId
+                    && decision.DecisionType == DecisionType.ResolveInterface
+                    && decision.SubjectKey == subjectKey
+                    && decision.Status == DecisionStatus.Resolved
+                    && decision.IsActive
+                    && decision.IsValid,
+                    cancellationToken);
+
+            if (unifiedDecision is not null)
             {
-                return new MethodImplementationResolution(
-                    resolved,
-                    new DecisionUsage(storedDecision.Id, DecisionType),
-                    false,
-                    Array.Empty<string>(),
-                    Array.Empty<string?>());
+                var resolved = ResolveFromUnifiedDecision(solution, interfaceMethod, unifiedDecision.PayloadJson);
+                if (resolved is not null)
+                {
+                    return new MethodImplementationResolution(
+                        resolved,
+                        new DecisionUsage(unifiedDecision.Id, DecisionTypeName),
+                        false,
+                        Array.Empty<string>(),
+                        Array.Empty<string?>());
+                }
+            }
+
+            var storedDecision = await _dbContext.MethodImplementationDecisions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(decision =>
+                    decision.RepositoryConfigId == repositoryConfigId
+                    && decision.SolutionId == solutionId
+                    && (!string.IsNullOrWhiteSpace(interfaceMethodDocId)
+                        ? (decision.InterfaceMethodDocumentationId == interfaceMethodDocId
+                            || (decision.InterfaceMethodDocumentationId == null
+                                && decision.InterfaceMethodSignature == interfaceMethodSignature))
+                        : decision.InterfaceMethodSignature == interfaceMethodSignature),
+                    cancellationToken);
+
+            if (storedDecision is not null)
+            {
+                var resolved = ResolveImplementationByDocId(solution, storedDecision.ImplementationMethodDocumentationId)
+                    ?? ResolveImplementationByName(
+                        solution,
+                        interfaceMethod,
+                        interfaceMetadataName,
+                        interfaceTypeName,
+                        storedDecision.ImplementationTypeName);
+                if (resolved is not null)
+                {
+                    return new MethodImplementationResolution(
+                        resolved,
+                        new DecisionUsage(storedDecision.Id, DecisionTypeName),
+                        false,
+                        Array.Empty<string>(),
+                        Array.Empty<string?>());
+                }
             }
         }
 
@@ -162,6 +199,52 @@ public sealed class MethodImplementationDecisionService : IMethodImplementationD
                 if (impl is not null)
                 {
                     return impl;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static IMethodSymbol? ResolveFromUnifiedDecision(
+        CodeSolutionWorkspace solution,
+        IMethodSymbol interfaceMethod,
+        string payloadJson)
+    {
+        ResolveInterfaceDecisionPayloadDto? payload;
+        try
+        {
+            payload = JsonSerializer.Deserialize<ResolveInterfaceDecisionPayloadDto>(payloadJson, JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        if (payload is null)
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(payload.SelectedMethodDocId))
+        {
+            var resolved = DocumentationIdUtility.FindMethodByDocumentationId(solution, payload.SelectedMethodDocId);
+            if (resolved is not null)
+            {
+                return resolved;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(payload.SelectedTypeDocId))
+        {
+            var type = DocumentationIdUtility.FindTypeByDocumentationId(solution, payload.SelectedTypeDocId);
+            if (type is not null)
+            {
+                var interfaceMember = ResolveInterfaceMember(interfaceMethod.ContainingType, interfaceMethod);
+                var resolved = ResolveImplementationMethod(type, interfaceMethod, interfaceMember);
+                if (resolved is not null)
+                {
+                    return resolved;
                 }
             }
         }

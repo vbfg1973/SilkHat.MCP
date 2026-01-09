@@ -129,6 +129,7 @@ public sealed class MethodCallStackService : IMethodCallStackService
                     repositoryConfigId,
                     solution.SolutionId,
                     targetMethod,
+                    false,
                     cancellationToken);
 
                 if (resolution.Implementation is not null)
