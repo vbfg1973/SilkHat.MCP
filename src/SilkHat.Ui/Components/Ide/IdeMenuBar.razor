@@ -76,8 +76,13 @@
             <MudMenuItem Disabled="true">Indentation</MudMenuItem>
         </MudMenu>
         <MudMenu Dense="true" Label="Toolbox" ActivationEvent="MouseEvent.LeftClick">
-            <MudMenuItem OnClick="ToggleToolbox" Disabled="@IsTabsDisabled">
-                @(IsToolboxHidden ? "Show Toolbox" : "Hide Toolbox")
+            <MudMenuItem OnClick="@(() => SelectToolboxView(IdeToolboxView.Decisions))" Disabled="@IsTabsDisabled">
+                <MudIcon Icon="@GetToolboxIcon(IdeToolboxView.Decisions)" Size="Size.Small" Class="me-2" />
+                Decisions
+            </MudMenuItem>
+            <MudDivider />
+            <MudMenuItem OnClick="ClearToolboxSelection" Disabled="@IsTabsDisabled">
+                Clear Selection
             </MudMenuItem>
         </MudMenu>
     </MudStack>
@@ -122,18 +127,18 @@
                     .ToList()))
             .ToList();
 
-    private bool IsToolboxHidden
+    private IdeToolboxView SelectedToolboxView
     {
         get
         {
             if (SelectedSolutionId is null)
             {
-                return false;
+                return IdeToolboxView.None;
             }
 
             return LayoutState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
-                ? view.IsToolboxHidden
-                : IdeLayoutViewState.Default.IsToolboxHidden;
+                ? view.ToolboxView
+                : IdeLayoutViewState.Default.ToolboxView;
         }
     }
 
@@ -205,13 +210,30 @@
         }));
     }
 
-    private void ToggleToolbox()
+    private void SelectToolboxView(IdeToolboxView view)
     {
         if (SelectedSolutionId is null)
         {
             return;
         }
 
-        Dispatcher.Dispatch(new SetToolboxVisibilityAction(SelectedSolutionId, !IsToolboxHidden));
+        Dispatcher.Dispatch(new SetToolboxViewAction(SelectedSolutionId, view));
+    }
+
+    private void ClearToolboxSelection()
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SetToolboxViewAction(SelectedSolutionId, IdeToolboxView.None));
+    }
+
+    private string GetToolboxIcon(IdeToolboxView view)
+    {
+        return SelectedToolboxView == view
+            ? Icons.Material.Filled.Check
+            : Icons.Material.Filled.CheckBoxOutlineBlank;
     }
 }

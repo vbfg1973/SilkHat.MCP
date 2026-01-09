@@ -43,10 +43,12 @@ public sealed class IdeTests
 
         context.Services.AddScoped<IState<IdeSolutionsState>>(_ => new StateWrapper<IdeSolutionsState>(solutionsState));
         context.Services.AddScoped<IState<IdeTreeState>>(_ => new StateWrapper<IdeTreeState>(treeState));
+        context.Services.AddScoped<IState<IdeDecisionsState>>(_ => new StateWrapper<IdeDecisionsState>(new IdeDecisionsState()));
         context.Services.AddScoped<IState<IdeSymbolsState>>(_ => new StateWrapper<IdeSymbolsState>(new IdeSymbolsState()));
         context.Services.AddScoped<IDispatcher>(_ => new RecordingDispatcher());
         context.Services.AddScoped<IActionSubscriber>(_ => new NoOpActionSubscriber());
 
+        context.RenderComponent<MudPopoverProvider>();
         var cut = context.RenderComponent<IdeTree>();
 
         cut.WaitForAssertion(() => Assert.Contains("Repo One", cut.Markup));
@@ -83,11 +85,13 @@ public sealed class IdeTests
 
         context.Services.AddScoped<IState<IdeSolutionsState>>(_ => new StateWrapper<IdeSolutionsState>(solutionsState));
         context.Services.AddScoped<IState<IdeTabsState>>(_ => new StateWrapper<IdeTabsState>(tabsState));
+        context.Services.AddScoped<IState<IdeDecisionsState>>(_ => new StateWrapper<IdeDecisionsState>(new IdeDecisionsState()));
         context.Services.AddScoped<IState<IdeSymbolsState>>(_ => new StateWrapper<IdeSymbolsState>(new IdeSymbolsState()));
         context.Services.AddScoped<IState<IdeLayoutState>>(_ => new StateWrapper<IdeLayoutState>(new IdeLayoutState()));
         context.Services.AddScoped<IDispatcher>(_ => new RecordingDispatcher());
         context.Services.AddScoped<IActionSubscriber>(_ => new NoOpActionSubscriber());
 
+        context.RenderComponent<MudPopoverProvider>();
         var cut = context.RenderComponent<IdeTabs>();
 
         cut.WaitForAssertion(() =>

@@ -1,0 +1,45 @@
+@using MudBlazor
+@using SilkHat.Ui.Models
+@using SilkHat.Ui.State.Ide.Actions
+
+@inject IDispatcher Dispatcher
+
+<MudDialog>
+    <DialogContent>
+        <MudTextField T="string"
+                      Label="Notes"
+                      Lines="5"
+                      Variant="Variant.Outlined"
+                      @bind-Value="_notes" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Save" Color="Color.Primary">Save</MudButton>
+        <MudButton OnClick="Close">Cancel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IMudDialogInstance Dialog { get; set; } = default!;
+    [Parameter] public Guid DecisionId { get; set; }
+    [Parameter] public string SolutionId { get; set; } = string.Empty;
+    [Parameter] public string? Notes { get; set; }
+
+    private string? _notes;
+
+    protected override void OnParametersSet()
+    {
+        _notes = Notes;
+    }
+
+    private void Save()
+    {
+        var request = new DecisionNotesRequestModel(DecisionId, _notes);
+        Dispatcher.Dispatch(new UpdateDecisionNotesAction(SolutionId, request));
+        Dialog.Close();
+    }
+
+    private void Close()
+    {
+        Dialog.Cancel();
+    }
+}

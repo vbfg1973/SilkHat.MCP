@@ -1,6 +1,8 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SilkHat.Code.Core.Dtos;
+using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
 
@@ -9,6 +11,7 @@ namespace SilkHat.Api.Controllers;
 [Route("api/repositories/{id:guid}/code/solutions/{solutionId}/decisions/interface-methods")]
 public sealed class MethodImplementationDecisionsController : ApiControllerBase
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly SilkHatDbContext _dbContext;
 
     public MethodImplementationDecisionsController(SilkHatDbContext dbContext)
@@ -97,6 +100,7 @@ public sealed class MethodImplementationDecisionsController : ApiControllerBase
             _dbContext.MethodImplementationDecisions.Add(existing);
         }
 
+        await UpsertUnifiedDecision(id, solutionId, existing, request, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         var dto = new MethodImplementationDecisionDto(
@@ -112,5 +116,62 @@ public sealed class MethodImplementationDecisionsController : ApiControllerBase
             existing.UpdatedUtc);
 
         return Ok(dto);
+    }
+
+    private async Task UpsertUnifiedDecision(
+        Guid repositoryId,
+        string solutionId,
+        MethodImplementationDecision decision,
+        MethodImplementationDecisionRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var subjectKey = !string.IsNullOrWhiteSpace(request.InterfaceMethodDocumentationId)
+            ? request.InterfaceMethodDocumentationId
+            : request.InterfaceMethodSignature;
+        var payload = new ResolveInterfaceDecisionPayloadDto(
+            request.InterfaceTypeName,
+            request.InterfaceTypeDocumentationId ?? string.Empty,
+            request.InterfaceMethodDocumentationId ?? string.Empty,
+            Array.Empty<ResolveInterfaceDecisionCandidateDto>(),
+            request.ImplementationTypeDocumentationId,
+            request.ImplementationMethodDocumentationId);
+        var payloadJson = JsonSerializer.Serialize(payload, JsonOptions);
+
+        var unified = await _dbContext.Decisions
+            .FirstOrDefaultAsync(existingDecision =>
+                existingDecision.RepositoryConfigId == repositoryId
+                && existingDecision.SolutionId == solutionId
+                && existingDecision.DecisionType == DecisionType.ResolveInterface
+                && existingDecision.SubjectKey == subjectKey,
+                cancellationToken);
+
+        if (unified is null)
+        {
+            unified = new Decision
+            {
+                Id = decision.Id,
+                RepositoryConfigId = repositoryId,
+                SolutionId = solutionId,
+                DecisionType = DecisionType.ResolveInterface,
+                Status = DecisionStatus.Resolved,
+                IsActive = true,
+                IsValid = true,
+                Name = request.InterfaceTypeName,
+                SubjectKey = subjectKey,
+                DiscoveredUtc = DateTimeOffset.UtcNow,
+                ResolvedUtc = DateTimeOffset.UtcNow,
+                PayloadJson = payloadJson
+            };
+            _dbContext.Decisions.Add(unified);
+        }
+        else
+        {
+            unified.Name = request.InterfaceTypeName;
+            unified.PayloadJson = payloadJson;
+            unified.Status = DecisionStatus.Resolved;
+            unified.IsActive = true;
+            unified.IsValid = true;
+            unified.ResolvedUtc = DateTimeOffset.UtcNow;
+        }
     }
 }

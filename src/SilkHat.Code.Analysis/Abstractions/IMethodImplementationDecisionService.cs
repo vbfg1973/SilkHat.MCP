@@ -11,6 +11,7 @@ public interface IMethodImplementationDecisionService
         Guid repositoryConfigId,
         string solutionId,
         IMethodSymbol interfaceMethod,
+        bool ignoreStoredDecisions,
         CancellationToken cancellationToken);
 }
 

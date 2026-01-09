@@ -213,6 +213,143 @@ public sealed class RepositoryApiClient
         return (await response.Content.ReadFromJsonAsync<MethodImplementationDecisionModel>(cancellationToken: cancellationToken))!;
     }
 
+    public async Task<IReadOnlyList<DecisionSummaryModel>> GetPendingDecisionsAsync(
+        Guid repositoryId,
+        string solutionId,
+        DecisionTypeModel? type = null,
+        string? sort = null,
+        bool descending = false,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+        if (type.HasValue)
+        {
+            query.Add($"type={Uri.EscapeDataString(type.Value.ToString())}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(sort))
+        {
+            query.Add($"sort={Uri.EscapeDataString(sort)}");
+        }
+
+        if (descending)
+        {
+            query.Add("descending=true");
+        }
+
+        var queryString = query.Count > 0 ? "?" + string.Join("&", query) : string.Empty;
+        var url = $"api/repositories/{repositoryId}/code/solutions/{solutionId}/decisions/pending{queryString}";
+        return await GetFromJsonAsync<IReadOnlyList<DecisionSummaryModel>>(url, cancellationToken)
+               ?? Array.Empty<DecisionSummaryModel>();
+    }
+
+    public async Task<IReadOnlyList<DecisionSummaryModel>> GetResolvedDecisionsAsync(
+        Guid repositoryId,
+        string solutionId,
+        DecisionTypeModel? type = null,
+        bool? active = null,
+        string? sort = null,
+        bool descending = false,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new List<string>();
+        if (type.HasValue)
+        {
+            query.Add($"type={Uri.EscapeDataString(type.Value.ToString())}");
+        }
+
+        if (active.HasValue)
+        {
+            query.Add($"active={active.Value.ToString().ToLowerInvariant()}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(sort))
+        {
+            query.Add($"sort={Uri.EscapeDataString(sort)}");
+        }
+
+        if (descending)
+        {
+            query.Add("descending=true");
+        }
+
+        var queryString = query.Count > 0 ? "?" + string.Join("&", query) : string.Empty;
+        var url = $"api/repositories/{repositoryId}/code/solutions/{solutionId}/decisions/resolved{queryString}";
+        return await GetFromJsonAsync<IReadOnlyList<DecisionSummaryModel>>(url, cancellationToken)
+               ?? Array.Empty<DecisionSummaryModel>();
+    }
+
+    public async Task<IReadOnlyList<DecisionSummaryModel>> DiscoverDecisionsAsync(
+        Guid repositoryId,
+        string solutionId,
+        DecisionDiscoverRequestModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"api/repositories/{repositoryId}/code/solutions/{solutionId}/decisions/discover",
+            request,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<IReadOnlyList<DecisionSummaryModel>>(cancellationToken: cancellationToken))!
+               ?? Array.Empty<DecisionSummaryModel>();
+    }
+
+    public async Task<DecisionSummaryModel> ResolveDecisionAsync(
+        Guid repositoryId,
+        string solutionId,
+        DecisionResolveRequestModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"api/repositories/{repositoryId}/code/solutions/{solutionId}/decisions/resolve",
+            request,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<DecisionSummaryModel>(cancellationToken: cancellationToken))!;
+    }
+
+    public async Task<DecisionSummaryModel> UpdateDecisionNotesAsync(
+        Guid repositoryId,
+        string solutionId,
+        DecisionNotesRequestModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"api/repositories/{repositoryId}/code/solutions/{solutionId}/decisions/notes",
+            request,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<DecisionSummaryModel>(cancellationToken: cancellationToken))!;
+    }
+
+    public async Task<DecisionSummaryModel> SetDecisionActiveAsync(
+        Guid repositoryId,
+        string solutionId,
+        DecisionActivateRequestModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"api/repositories/{repositoryId}/code/solutions/{solutionId}/decisions/activate",
+            request,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<DecisionSummaryModel>(cancellationToken: cancellationToken))!;
+    }
+
+    public async Task<DecisionSummaryModel> ValidateDecisionAsync(
+        Guid repositoryId,
+        string solutionId,
+        DecisionValidateRequestModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"api/repositories/{repositoryId}/code/solutions/{solutionId}/decisions/validate",
+            request,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<DecisionSummaryModel>(cancellationToken: cancellationToken))!;
+    }
+
     public async Task<PagedResultModel<GitTreeEntryModel>> GetGitTreeAsync(
         Guid repositoryId,
         string? name = null,

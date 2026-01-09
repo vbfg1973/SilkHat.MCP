@@ -30,6 +30,7 @@ public sealed class MethodImplementationDecisionServiceTests
             Guid.NewGuid(),
             solution.SolutionId,
             interfaceMethod,
+            false,
             CancellationToken.None);
 
         Assert.NotNull(result.Implementation);
@@ -65,6 +66,7 @@ public sealed class MethodImplementationDecisionServiceTests
             repositoryConfigId,
             solution.SolutionId,
             interfaceMethod,
+            false,
             CancellationToken.None);
 
         Assert.NotNull(result.Implementation);
@@ -106,6 +108,7 @@ public sealed class MethodImplementationDecisionServiceTests
             repositoryConfigId,
             solution.SolutionId,
             interfaceMethod,
+            false,
             CancellationToken.None);
 
         Assert.NotNull(result.Implementation);
@@ -129,6 +132,7 @@ public sealed class MethodImplementationDecisionServiceTests
             Guid.NewGuid(),
             solution.SolutionId,
             interfaceMethod,
+            false,
             CancellationToken.None);
 
         Assert.Null(result.Implementation);
@@ -150,6 +154,7 @@ public sealed class MethodImplementationDecisionServiceTests
             Guid.NewGuid(),
             solution.SolutionId,
             interfaceMethod,
+            false,
             CancellationToken.None);
 
         Assert.NotNull(result.Implementation);

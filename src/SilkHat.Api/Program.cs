@@ -60,6 +60,7 @@ builder.Services.AddSingleton<IComplexityStrategyFactory, SilkHat.Code.Analysis.
 builder.Services.AddSingleton<IMethodComplexityService, MethodComplexityService>();
 builder.Services.AddSingleton<ITypeComplexityService, TypeComplexityService>();
 builder.Services.AddScoped<IMethodImplementationDecisionService, MethodImplementationDecisionService>();
+builder.Services.AddScoped<IDecisionService, DecisionService>();
 builder.Services.AddScoped<IMethodCallStackService, MethodCallStackService>();
 builder.Services.AddSingleton<IMethodCallStackMermaidService, MethodCallStackMermaidService>();
 builder.Services.Configure<RepositoryDiscoveryOptions>(options =>

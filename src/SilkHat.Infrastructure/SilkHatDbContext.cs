@@ -14,6 +14,7 @@ public sealed class SilkHatDbContext : DbContext
     public DbSet<RepositoryGroup> RepositoryGroups => Set<RepositoryGroup>();
     public DbSet<RepositorySolutionConfig> RepositorySolutionConfigs => Set<RepositorySolutionConfig>();
     public DbSet<MethodImplementationDecision> MethodImplementationDecisions => Set<MethodImplementationDecision>();
+    public DbSet<Decision> Decisions => Set<Decision>();
 
     public override int SaveChanges()
     {

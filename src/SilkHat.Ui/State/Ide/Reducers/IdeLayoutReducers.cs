@@ -17,13 +17,13 @@ public static class IdeLayoutReducers
     }
 
     [ReducerMethod]
-    public static IdeLayoutState ReduceToolboxVisibility(IdeLayoutState state, SetToolboxVisibilityAction action)
+    public static IdeLayoutState ReduceToolboxView(IdeLayoutState state, SetToolboxViewAction action)
     {
         var views = new Dictionary<string, IdeLayoutViewState>(state.Views, StringComparer.OrdinalIgnoreCase);
         var current = views.TryGetValue(action.SolutionId, out var view)
             ? view
             : IdeLayoutViewState.Default;
-        views[action.SolutionId] = current with { IsToolboxHidden = action.IsHidden };
+        views[action.SolutionId] = current with { ToolboxView = action.View };
         return new IdeLayoutState(views);
     }
 }

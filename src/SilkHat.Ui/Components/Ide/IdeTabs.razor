@@ -59,7 +59,7 @@
                                     </div>
                                 </div>
                             </MudPaper>
-                            @if (!IsToolboxHidden)
+                            @if (SelectedToolboxView != IdeToolboxView.None)
                             {
                                 <IdeToolbox />
                             }
@@ -188,18 +188,18 @@
         return line.LineNumber?.ToString() ?? string.Empty;
     }
 
-    private bool IsToolboxHidden
+    private IdeToolboxView SelectedToolboxView
     {
         get
         {
             if (SelectedSolutionId is null)
             {
-                return false;
+                return IdeToolboxView.None;
             }
 
             return LayoutState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
-                ? view.IsToolboxHidden
-                : IdeLayoutViewState.Default.IsToolboxHidden;
+                ? view.ToolboxView
+                : IdeLayoutViewState.Default.ToolboxView;
         }
     }
 }

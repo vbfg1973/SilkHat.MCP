@@ -1,8 +1,29 @@
-@using MudBlazor
+@using Fluxor
+@using SilkHat.Ui.Components.Ide.Decisions
+@using SilkHat.Ui.State.Ide
+@inject IState<IdeSolutionsState> SolutionsState
+@inject IState<IdeLayoutState> LayoutState
 
-<MudPaper Elevation="0" Class="pa-3 ide-toolbox-panel">
-    <MudText Typo="Typo.subtitle2">Toolbox</MudText>
-    <MudText Typo="Typo.body2" Color="Color.Secondary">
-        No tools available yet.
-    </MudText>
-</MudPaper>
+@if (SelectedToolboxView == IdeToolboxView.Decisions)
+{
+    <DecisionToolbox />
+}
+
+@code {
+    private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
+    private IdeToolboxView SelectedToolboxView
+    {
+        get
+        {
+            if (SelectedSolutionId is null)
+            {
+                return IdeToolboxView.None;
+            }
+
+            return LayoutState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
+                ? view.ToolboxView
+                : IdeLayoutViewState.Default.ToolboxView;
+        }
+    }
+}
