@@ -66,6 +66,25 @@ public static class DocumentationIdUtility
         return null;
     }
 
+    public static INamespaceSymbol? FindNamespaceByDocumentationId(
+        CodeSolutionWorkspace solution,
+        string documentationId)
+    {
+        foreach (var compilation in solution.Compilations.Values)
+        {
+            foreach (var ns in EnumerateNamespaces(compilation.GlobalNamespace))
+            {
+                var docId = ns.GetDocumentationCommentId();
+                if (string.Equals(docId, documentationId, StringComparison.Ordinal))
+                {
+                    return ns;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public static INamedTypeSymbol? FindTypeByDocumentationId(
         CodeSolutionWorkspace solution,
         string documentationId)
@@ -78,6 +97,42 @@ public static class DocumentationIdUtility
                 if (string.Equals(docId, documentationId, StringComparison.Ordinal))
                 {
                     return type;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public static IPropertySymbol? FindPropertyByDocumentationId(
+        CodeSolutionWorkspace solution,
+        string documentationId)
+    {
+        return FindPropertyByDocumentationIdInternal(solution, documentationId);
+    }
+
+    public static IEventSymbol? FindEventByDocumentationId(
+        CodeSolutionWorkspace solution,
+        string documentationId)
+    {
+        return FindEventByDocumentationIdInternal(solution, documentationId);
+    }
+
+    public static IFieldSymbol? FindFieldByDocumentationId(
+        CodeSolutionWorkspace solution,
+        string documentationId)
+    {
+        foreach (var compilation in solution.Compilations.Values)
+        {
+            foreach (var type in EnumerateTypes(compilation.GlobalNamespace))
+            {
+                foreach (var field in type.GetMembers().OfType<IFieldSymbol>())
+                {
+                    var docId = field.GetDocumentationCommentId();
+                    if (string.Equals(docId, documentationId, StringComparison.Ordinal))
+                    {
+                        return field;
+                    }
                 }
             }
         }
@@ -144,7 +199,19 @@ public static class DocumentationIdUtility
         }
     }
 
-    private static IPropertySymbol? FindPropertyByDocumentationId(
+    private static IEnumerable<INamespaceSymbol> EnumerateNamespaces(INamespaceSymbol root)
+    {
+        yield return root;
+        foreach (var member in root.GetMembers().OfType<INamespaceSymbol>())
+        {
+            foreach (var nested in EnumerateNamespaces(member))
+            {
+                yield return nested;
+            }
+        }
+    }
+
+    private static IPropertySymbol? FindPropertyByDocumentationIdInternal(
         CodeSolutionWorkspace solution,
         string documentationId)
     {
@@ -166,7 +233,7 @@ public static class DocumentationIdUtility
         return null;
     }
 
-    private static IEventSymbol? FindEventByDocumentationId(
+    private static IEventSymbol? FindEventByDocumentationIdInternal(
         CodeSolutionWorkspace solution,
         string documentationId)
     {

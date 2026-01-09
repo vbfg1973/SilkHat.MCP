@@ -2,97 +2,98 @@ using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging.Abstractions;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Analysis.Services;
-using SilkHat.Code.Core.Dtos;
 
 namespace SilkHat.Tests.Services;
 
-public sealed class DocumentationIdResolutionTests
+public sealed class SymbolDescriptionServiceTests
 {
     [Fact]
-    public async Task DocumentationIds_ResolveAcrossWorkspaceReloads_ForMethods()
+    public async Task DescribeNamedType_ReturnsDetails()
     {
-        var (_, firstSolution) = await LoadWorkspaceAsync();
-        var docIds = new[]
-        {
-            GetMethodDocId(firstSolution, "SilkHat.Sample.Lib.IClock", "get_Now"),
-            GetMethodDocId(firstSolution, "SilkHat.Sample.Lib.SystemClock", "get_Now"),
-            GetMethodDocId(firstSolution, "SilkHat.Sample.App.IGreetingProvider", "GetGreeting"),
-            GetMethodDocId(firstSolution, "SilkHat.Sample.App.FriendlyGreetingProvider", "GetGreeting"),
-            GetMethodDocId(firstSolution, "SilkHat.Sample.App.PublicEntry", "Run")
-        };
+        var (workspace, solution) = await LoadWorkspaceAsync();
+        var docId = GetTypeDocId(solution, "SilkHat.Sample.Lib.SystemClock");
+        var service = new SymbolDescriptionService();
 
-        var (secondWorkspace, secondSolution) = await LoadWorkspaceAsync();
-        foreach (var docId in docIds)
-        {
-            var resolved = DocumentationIdUtility.FindMethodByDocumentationId(secondSolution, docId);
-            Assert.NotNull(resolved);
-            Assert.Equal(docId, resolved!.GetDocumentationCommentId());
-        }
+        var result = await service.DescribeNamedTypeAsync(solution, workspace, docId, CancellationToken.None);
+
+        Assert.Equal(SymbolDescriptionStatus.Success, result.Status);
+        Assert.NotNull(result.Description);
+        Assert.Equal("SystemClock", result.Description!.Name);
+        Assert.Equal("Class", result.Description!.TypeKind);
+        Assert.NotNull(result.Description!.Location);
     }
 
     [Fact]
-    public async Task DocumentationIds_ResolveAcrossWorkspaceReloads_ForTypes()
+    public async Task DescribeMethod_ReturnsDetails()
     {
-        var (_, firstSolution) = await LoadWorkspaceAsync();
-        var docIds = new[]
-        {
-            GetTypeDocId(firstSolution, "SilkHat.Sample.Lib.IClock"),
-            GetTypeDocId(firstSolution, "SilkHat.Sample.Lib.SystemClock"),
-            GetTypeDocId(firstSolution, "SilkHat.Sample.App.FriendlyGreetingProvider"),
-            GetTypeDocId(firstSolution, "SilkHat.Sample.App.PublicEntry")
-        };
+        var (workspace, solution) = await LoadWorkspaceAsync();
+        var docId = GetMethodDocId(solution, "SilkHat.Sample.App.StatusHelper", "GetHTTPStatus");
+        var service = new SymbolDescriptionService();
 
-        var (secondWorkspace, secondSolution) = await LoadWorkspaceAsync();
-        foreach (var docId in docIds)
-        {
-            var resolved = DocumentationIdUtility.FindTypeByDocumentationId(secondSolution, docId);
-            Assert.NotNull(resolved);
-            Assert.Equal(docId, resolved!.GetDocumentationCommentId());
-        }
+        var result = await service.DescribeMethodAsync(solution, workspace, docId, CancellationToken.None);
+
+        Assert.Equal(SymbolDescriptionStatus.Success, result.Status);
+        Assert.NotNull(result.Description);
+        Assert.Equal("GetHTTPStatus", result.Description!.Name);
+        Assert.Single(result.Description!.Parameters);
+        Assert.NotNull(result.Description!.Location);
     }
 
     [Fact]
-    public async Task DocumentationIds_ResolveAcrossWorkspaceReloads_ForPropertiesFieldsAndEvents()
+    public async Task DescribeProperty_ReturnsDetails()
     {
-        var (firstWorkspace, firstSolution) = await LoadWorkspaceAsync();
-        var docIds = new[]
-        {
-            GetPropertyDocId(firstSolution, "SilkHat.Sample.App.StatusHelper", "Grade11PlusScore"),
-            GetFieldDocId(firstSolution, "SilkHat.Sample.Lib.LibConstants", "DefaultLabel"),
-            GetEventDocId(firstSolution, "SilkHat.Sample.App.StatusHelper", "StatusChecked")
-        };
+        var (workspace, solution) = await LoadWorkspaceAsync();
+        var docId = GetPropertyDocId(solution, "SilkHat.Sample.App.StatusHelper", "Grade11PlusScore");
+        var service = new SymbolDescriptionService();
 
-        var (secondWorkspace, secondSolution) = await LoadWorkspaceAsync();
-        foreach (var docId in docIds)
-        {
-            if (docId.StartsWith("P:", StringComparison.Ordinal))
-            {
-                var resolved = DocumentationIdUtility.FindPropertyByDocumentationId(secondSolution, docId);
-                Assert.NotNull(resolved);
-            }
-            else if (docId.StartsWith("F:", StringComparison.Ordinal))
-            {
-                var resolved = DocumentationIdUtility.FindFieldByDocumentationId(secondSolution, docId);
-                Assert.NotNull(resolved);
-            }
-            else if (docId.StartsWith("E:", StringComparison.Ordinal))
-            {
-                var resolved = DocumentationIdUtility.FindEventByDocumentationId(secondSolution, docId);
-                Assert.NotNull(resolved);
-            }
-        }
+        var result = await service.DescribePropertyAsync(solution, workspace, docId, CancellationToken.None);
+
+        Assert.Equal(SymbolDescriptionStatus.Success, result.Status);
+        Assert.NotNull(result.Description);
+        Assert.True(result.Description!.HasGetter);
+        Assert.True(result.Description!.HasSetter);
     }
 
     [Fact]
-    public async Task DocumentationIds_ResolveAcrossWorkspaceReloads_ForNamespaces()
+    public async Task DescribeField_ReturnsDetails()
     {
-        var (firstWorkspace, firstSolution) = await LoadWorkspaceAsync();
-        var docId = GetNamespaceDocId(firstSolution, "SilkHat.Sample.App");
+        var (workspace, solution) = await LoadWorkspaceAsync();
+        var docId = GetFieldDocId(solution, "SilkHat.Sample.Lib.LibConstants", "DefaultLabel");
+        var service = new SymbolDescriptionService();
 
-        var (secondWorkspace, secondSolution) = await LoadWorkspaceAsync();
-        var resolved = DocumentationIdUtility.FindNamespaceByDocumentationId(secondSolution, docId);
-        Assert.NotNull(resolved);
-        Assert.Equal(docId, resolved!.GetDocumentationCommentId());
+        var result = await service.DescribeFieldAsync(solution, workspace, docId, CancellationToken.None);
+
+        Assert.Equal(SymbolDescriptionStatus.Success, result.Status);
+        Assert.NotNull(result.Description);
+        Assert.True(result.Description!.Modifiers.IsConst);
+    }
+
+    [Fact]
+    public async Task DescribeEvent_ReturnsDetails()
+    {
+        var (workspace, solution) = await LoadWorkspaceAsync();
+        var docId = GetEventDocId(solution, "SilkHat.Sample.App.StatusHelper", "StatusChecked");
+        var service = new SymbolDescriptionService();
+
+        var result = await service.DescribeEventAsync(solution, workspace, docId, CancellationToken.None);
+
+        Assert.Equal(SymbolDescriptionStatus.Success, result.Status);
+        Assert.NotNull(result.Description);
+        Assert.Equal("StatusChecked", result.Description!.Name);
+    }
+
+    [Fact]
+    public async Task DescribeNamespace_ReturnsDetails()
+    {
+        var (workspace, solution) = await LoadWorkspaceAsync();
+        var docId = GetNamespaceDocId(solution, "SilkHat.Sample.App");
+        var service = new SymbolDescriptionService();
+
+        var result = await service.DescribeNamespaceAsync(solution, workspace, docId, CancellationToken.None);
+
+        Assert.Equal(SymbolDescriptionStatus.Success, result.Status);
+        Assert.NotNull(result.Description);
+        Assert.Equal("SilkHat.Sample.App", result.Description!.FullName);
     }
 
     private static string GetMethodDocId(CodeSolutionWorkspace solution, string typeMetadataName, string methodName)

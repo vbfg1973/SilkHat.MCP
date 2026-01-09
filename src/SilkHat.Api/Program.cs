@@ -52,8 +52,10 @@ builder.Services.AddSingleton<ICodeWorkspaceLoader, CodeWorkspaceLoader>();
 builder.Services.AddSingleton<ICodeTreeService, CodeTreeService>();
 builder.Services.AddSingleton<ICodeFileService, CodeFileService>();
 builder.Services.AddSingleton<ICodeSymbolOutlineService, CodeSymbolOutlineService>();
+builder.Services.AddSingleton<ISymbolDescriptionService, SymbolDescriptionService>();
 builder.Services.AddScoped<IMethodImplementationDecisionService, MethodImplementationDecisionService>();
 builder.Services.AddScoped<IMethodCallStackService, MethodCallStackService>();
+builder.Services.AddSingleton<IMethodCallStackMermaidService, MethodCallStackMermaidService>();
 builder.Services.Configure<RepositoryDiscoveryOptions>(options =>
 {
     options.RepoRoot = builder.Configuration["REPO_ROOT"];

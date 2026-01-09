@@ -59,9 +59,11 @@ public sealed class ComplexitySamples
 public sealed class StatusHelper
 {
     public int Grade11PlusScore { get; set; }
+    public event EventHandler? StatusChecked;
 
     public string GetHTTPStatus(string serverId)
     {
+        StatusChecked?.Invoke(this, EventArgs.Empty);
         return $"HTTP {serverId}";
     }
 }
