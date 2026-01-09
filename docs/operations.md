@@ -37,3 +37,14 @@ Database:
 
 - API health: `http://localhost:18080/api/health` returns `OK`.
 - UI loads at `http://localhost:10080` and can read `/api/health`.
+
+## Release Pipeline
+
+Publishing is handled by GitHub Actions on pushes to `master`. The workflow runs unit tests and integration tests, computes the next version tag in the `1.0.<minor>` series (starting at `1.0.1`), creates and pushes that tag, then publishes container images to GHCR.
+
+Images:
+- `ghcr.io/<owner>/silkhat-api:<version>`
+- `ghcr.io/<owner>/silkhat-ui:<version>`
+
+Tags:
+- Tags follow `1.0.<minor>` and are created only after all tests pass on `master`.

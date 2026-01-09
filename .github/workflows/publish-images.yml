@@ -1,0 +1,117 @@
+name: Publish Images
+
+on:
+  push:
+    branches:
+      - "**"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Run tests
+        run: ./scripts/test.sh
+
+  test-integration:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Run tests
+        run: ./scripts/test.sh
+
+      - name: Run integration tests
+        run: ./scripts/test-integration.sh
+
+  publish:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    needs:
+      - test
+    env:
+      REGISTRY: ghcr.io
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Run tests
+        run: ./scripts/test.sh
+
+      - name: Run integration tests
+        run: ./scripts/test-integration.sh
+
+      - name: Compute version tag
+        run: |
+          set -euo pipefail
+          git fetch --tags
+          tags=$(git tag -l '1.0.*' | sed -n 's/^1\\.0\\.//p' | sort -n)
+          if [ -z "$tags" ]; then
+            minor=1
+          else
+            minor=$(( $(echo "$tags" | tail -n1) + 1 ))
+          fi
+          version="1.0.${minor}"
+          if git rev-parse -q --verify "refs/tags/${version}"; then
+            echo "Tag ${version} already exists." >&2
+            exit 1
+          fi
+          echo "VERSION_TAG=${version}" >> "$GITHUB_ENV"
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "OWNER_LOWER=${owner}" >> "$GITHUB_ENV"
+
+      - name: Create and push tag
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag -a "$VERSION_TAG" -m "Release $VERSION_TAG"
+          git push origin "$VERSION_TAG"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: src/SilkHat.Api/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER_LOWER }}/silkhat-api:${{ env.VERSION_TAG }}
+
+      - name: Build and push UI image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: src/SilkHat.Ui/Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.OWNER_LOWER }}/silkhat-ui:${{ env.VERSION_TAG }}
