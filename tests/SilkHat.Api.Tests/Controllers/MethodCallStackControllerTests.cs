@@ -66,7 +66,8 @@ public sealed class MethodCallStackControllerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MethodCallStackResult(new List<MethodCallStackNode> { node }, false, null));
 
-        var controller = new MethodCallStackController(store.Object, callStackService.Object)
+        var mermaidService = new Mock<IMethodCallStackMermaidService>();
+        var controller = new MethodCallStackController(store.Object, callStackService.Object, mermaidService.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -98,7 +99,8 @@ public sealed class MethodCallStackControllerTests
     {
         var store = new Mock<ICodeWorkspaceStore>();
         var callStackService = new Mock<IMethodCallStackService>();
-        var controller = new MethodCallStackController(store.Object, callStackService.Object)
+        var mermaidService = new Mock<IMethodCallStackMermaidService>();
+        var controller = new MethodCallStackController(store.Object, callStackService.Object, mermaidService.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -167,7 +169,11 @@ public sealed class MethodCallStackControllerTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MethodCallStackResult(new List<MethodCallStackNode> { node }, false, null));
 
-        var controller = new MethodCallStackController(store.Object, callStackService.Object)
+        var mermaidService = new Mock<IMethodCallStackMermaidService>();
+        mermaidService.Setup(s => s.BuildDiagram(It.IsAny<IReadOnlyList<MethodCallStackNode>>()))
+            .Returns("sequenceDiagram");
+
+        var controller = new MethodCallStackController(store.Object, callStackService.Object, mermaidService.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -190,6 +196,7 @@ public sealed class MethodCallStackControllerTests
             null,
             false,
             It.IsAny<CancellationToken>()), Times.Once);
+        mermaidService.Verify(s => s.BuildDiagram(It.IsAny<IReadOnlyList<MethodCallStackNode>>()), Times.Once);
     }
 
     private static CodeSolutionWorkspace CreateSolution(string solutionId)

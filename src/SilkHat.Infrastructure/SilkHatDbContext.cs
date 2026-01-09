@@ -29,94 +29,24 @@ public sealed class SilkHatDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<RepositoryGroup>(entity =>
-        {
-            entity.HasKey(group => group.Id);
-            entity.Property(group => group.Name).IsRequired();
-        });
-
-        modelBuilder.Entity<RepositoryConfig>(entity =>
-        {
-            entity.HasKey(config => config.Id);
-            entity.Property(config => config.Name).IsRequired();
-            entity.Property(config => config.RootPath).IsRequired();
-            entity.HasOne(config => config.Group)
-                .WithMany(group => group.RepositoryConfigs)
-                .HasForeignKey(config => config.GroupId)
-                .OnDelete(DeleteBehavior.SetNull);
-            entity.HasMany(config => config.Solutions)
-                .WithOne(solution => solution.RepositoryConfig)
-                .HasForeignKey(solution => solution.RepositoryConfigId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<RepositorySolutionConfig>(entity =>
-        {
-            entity.HasKey(solution => solution.Id);
-            entity.Property(solution => solution.RelativePath).IsRequired();
-            entity.Property(solution => solution.SolutionId).IsRequired();
-        });
-
-        modelBuilder.Entity<MethodImplementationDecision>(entity =>
-        {
-            entity.HasKey(decision => decision.Id);
-            entity.Property(decision => decision.RepositoryConfigId).IsRequired();
-            entity.Property(decision => decision.SolutionId).IsRequired();
-            entity.Property(decision => decision.InterfaceTypeName).IsRequired();
-            entity.Property(decision => decision.InterfaceMethodSignature).IsRequired();
-            entity.Property(decision => decision.ImplementationTypeName).IsRequired();
-            entity.HasIndex(decision => new
-                {
-                    decision.RepositoryConfigId,
-                    decision.SolutionId,
-                    decision.InterfaceMethodSignature
-                })
-                .IsUnique();
-        });
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(SilkHatDbContext).Assembly);
     }
 
     private void UpdateTimestamps()
     {
         var now = DateTimeOffset.UtcNow;
-        foreach (var entry in ChangeTracker.Entries())
+        foreach (var entry in ChangeTracker.Entries<BaseEntity>())
         {
-            if (entry.Entity is RepositoryConfig config)
+            if (entry.State == EntityState.Added)
             {
-                if (entry.State == EntityState.Added)
-                {
-                    config.CreatedUtc = now;
-                    config.UpdatedUtc = now;
-                }
-                else if (entry.State == EntityState.Modified)
-                {
-                    config.UpdatedUtc = now;
-                }
+                entry.Entity.CreatedUtc = now;
+                entry.Entity.UpdatedUtc = now;
             }
-
-            if (entry.Entity is RepositoryGroup group)
+            else if (entry.State == EntityState.Modified)
             {
-                if (entry.State == EntityState.Added)
-                {
-                    group.CreatedUtc = now;
-                    group.UpdatedUtc = now;
-                }
-                else if (entry.State == EntityState.Modified)
-                {
-                    group.UpdatedUtc = now;
-                }
-            }
-
-            if (entry.Entity is MethodImplementationDecision decision)
-            {
-                if (entry.State == EntityState.Added)
-                {
-                    decision.CreatedUtc = now;
-                    decision.UpdatedUtc = now;
-                }
-                else if (entry.State == EntityState.Modified)
-                {
-                    decision.UpdatedUtc = now;
-                }
+                entry.Entity.UpdatedUtc = now;
+                entry.Property(entity => entity.CreatedUtc).IsModified = false;
             }
         }
     }
