@@ -17,8 +17,9 @@ public sealed class CodeNamedTypesControllerTests
     public void GetNamedTypes_ReturnsProblem_WhenWorkspaceMissing()
     {
         var store = new Mock<ICodeWorkspaceStore>();
+        var complexityService = new Mock<ITypeComplexityService>();
         store.Setup(s => s.Get(It.IsAny<Guid>())).Returns((CodeRepositoryWorkspace?)null);
-        var controller = new CodeNamedTypesController(store.Object)
+        var controller = new CodeNamedTypesController(store.Object, complexityService.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -43,8 +44,9 @@ public sealed class CodeNamedTypesControllerTests
     {
         var workspace = CodeWorkspaceFactory.CreateWorkspace();
         var store = new Mock<ICodeWorkspaceStore>();
+        var complexityService = new Mock<ITypeComplexityService>();
         store.Setup(s => s.Get(It.IsAny<Guid>())).Returns(workspace);
-        var controller = new CodeNamedTypesController(store.Object)
+        var controller = new CodeNamedTypesController(store.Object, complexityService.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -64,5 +66,94 @@ public sealed class CodeNamedTypesControllerTests
         Assert.Single(list.Items);
         Assert.Equal("Bar", list.Items[0].Name);
         store.Verify(s => s.Get(It.IsAny<Guid>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetNamedTypeComplexity_ReturnsBadRequest_WhenMeasureMissing()
+    {
+        var workspace = CodeWorkspaceFactory.CreateWorkspace();
+        var store = new Mock<ICodeWorkspaceStore>();
+        var complexityService = new Mock<ITypeComplexityService>();
+        store.Setup(s => s.Get(It.IsAny<Guid>())).Returns(workspace);
+        var controller = new CodeNamedTypesController(store.Object, complexityService.Object)
+        {
+            ControllerContext = ControllerTestFactory.CreateContext()
+        };
+
+        var result = await controller.GetNamedTypeComplexity(
+            Guid.NewGuid(),
+            CodeWorkspaceFactory.DefaultSolutionId,
+            "doc",
+            null,
+            CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetNamedTypeComplexity_ReturnsBadRequest_WhenInterfaceUnsupported()
+    {
+        var workspace = CodeWorkspaceFactory.CreateWorkspace();
+        var store = new Mock<ICodeWorkspaceStore>();
+        var complexityService = new Mock<ITypeComplexityService>();
+        store.Setup(s => s.Get(It.IsAny<Guid>())).Returns(workspace);
+        complexityService.Setup(s => s.GetTypeComplexityAsync(
+                workspace.Solutions[CodeWorkspaceFactory.DefaultSolutionId],
+                "doc",
+                ComplexityMeasureType.Cyclomatic,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TypeComplexityResult(TypeComplexityStatus.InterfaceNotSupported, null));
+
+        var controller = new CodeNamedTypesController(store.Object, complexityService.Object)
+        {
+            ControllerContext = ControllerTestFactory.CreateContext()
+        };
+
+        var result = await controller.GetNamedTypeComplexity(
+            Guid.NewGuid(),
+            CodeWorkspaceFactory.DefaultSolutionId,
+            "doc",
+            ComplexityMeasureType.Cyclomatic,
+            CancellationToken.None);
+
+        var problem = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetNamedTypeComplexity_ReturnsResult_WhenResolved()
+    {
+        var workspace = CodeWorkspaceFactory.CreateWorkspace();
+        var store = new Mock<ICodeWorkspaceStore>();
+        var complexityService = new Mock<ITypeComplexityService>();
+        store.Setup(s => s.Get(It.IsAny<Guid>())).Returns(workspace);
+        var dto = new ComplexityResultDto("doc", ComplexityMeasureType.Indentation, ComplexityTargetKind.NamedType, NamedTypeKind.Class, 12);
+        complexityService.Setup(s => s.GetTypeComplexityAsync(
+                workspace.Solutions[CodeWorkspaceFactory.DefaultSolutionId],
+                "doc",
+                ComplexityMeasureType.Indentation,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TypeComplexityResult(TypeComplexityStatus.Success, dto));
+
+        var controller = new CodeNamedTypesController(store.Object, complexityService.Object)
+        {
+            ControllerContext = ControllerTestFactory.CreateContext()
+        };
+
+        var result = await controller.GetNamedTypeComplexity(
+            Guid.NewGuid(),
+            CodeWorkspaceFactory.DefaultSolutionId,
+            "doc",
+            ComplexityMeasureType.Indentation,
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Same(dto, ok.Value);
+        complexityService.Verify(s => s.GetTypeComplexityAsync(
+            workspace.Solutions[CodeWorkspaceFactory.DefaultSolutionId],
+            "doc",
+            ComplexityMeasureType.Indentation,
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 }

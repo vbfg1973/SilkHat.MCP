@@ -383,7 +383,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         string rootPath)
     {
         var kind = symbol.IsRecord
-            ? NamedTypeKind.Record
+            ? symbol.TypeKind == TypeKind.Struct ? NamedTypeKind.Struct : NamedTypeKind.Record
             : symbol.TypeKind switch
             {
                 TypeKind.Class => NamedTypeKind.Class,

@@ -377,7 +377,7 @@ public sealed class SymbolDescriptionService : ISymbolDescriptionService
     {
         if (symbol.IsRecord)
         {
-            return "Record";
+            return symbol.TypeKind == TypeKind.Struct ? "Struct" : "Record";
         }
 
         return symbol.TypeKind switch
