@@ -62,6 +62,7 @@ public sealed class MethodCallStackControllerTests
                 null,
                 "symbol-key",
                 null,
+                false,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MethodCallStackResult(new List<MethodCallStackNode> { node }, false, null));
 
@@ -73,7 +74,7 @@ public sealed class MethodCallStackControllerTests
         var result = await controller.GetCallStack(
             repositoryId,
             solutionId,
-            new MethodCallStackRequestDto(null, "symbol-key", null),
+            new MethodCallStackRequestDto(null, "symbol-key", null, false),
             CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
@@ -88,6 +89,7 @@ public sealed class MethodCallStackControllerTests
             null,
             "symbol-key",
             null,
+            false,
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -104,7 +106,7 @@ public sealed class MethodCallStackControllerTests
         var result = await controller.GetCallStack(
             Guid.NewGuid(),
             "solution-1",
-            new MethodCallStackRequestDto(null, "symbol-key", null),
+            new MethodCallStackRequestDto(null, "symbol-key", null, false),
             CancellationToken.None);
 
         var problem = Assert.IsType<ObjectResult>(result.Result);
@@ -161,6 +163,7 @@ public sealed class MethodCallStackControllerTests
                 null,
                 "symbol-key",
                 null,
+                false,
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new MethodCallStackResult(new List<MethodCallStackNode> { node }, false, null));
 
@@ -172,7 +175,7 @@ public sealed class MethodCallStackControllerTests
         var result = await controller.GetCallStackMermaid(
             repositoryId,
             solutionId,
-            new MethodCallStackRequestDto(null, "symbol-key", null),
+            new MethodCallStackRequestDto(null, "symbol-key", null, false),
             CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result.Result);
@@ -185,6 +188,7 @@ public sealed class MethodCallStackControllerTests
             null,
             "symbol-key",
             null,
+            false,
             It.IsAny<CancellationToken>()), Times.Once);
     }
 

@@ -41,6 +41,7 @@ public sealed class MethodCallStackServiceTests
             null,
             symbolKey,
             null,
+            false,
             CancellationToken.None);
 
         var interfaceNode = Assert.Single(result.Nodes, node => node.IsInterfaceTarget);
@@ -88,6 +89,7 @@ public sealed class MethodCallStackServiceTests
             null,
             symbolKey,
             null,
+            false,
             CancellationToken.None);
 
         var interfaceNode = Assert.Single(result.Nodes, node => node.IsInterfaceTarget);

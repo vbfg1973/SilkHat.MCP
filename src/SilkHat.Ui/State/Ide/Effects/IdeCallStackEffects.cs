@@ -35,8 +35,24 @@ public sealed class IdeCallStackEffects
             return Task.CompletedTask;
         }
 
-        dispatcher.Dispatch(new LoadCallStackAction(action.SolutionId, configId.Value, action.DocumentationId, action.SymbolKey, null));
-        dispatcher.Dispatch(new LoadCallStackMermaidAction(action.SolutionId, configId.Value, action.DocumentationId, action.SymbolKey, null));
+        var includeExternal = _callStackState.Value.Views.TryGetValue(action.SolutionId, out var current)
+            ? current.IncludeExternalCalls
+            : false;
+
+        dispatcher.Dispatch(new LoadCallStackAction(
+            action.SolutionId,
+            configId.Value,
+            action.DocumentationId,
+            action.SymbolKey,
+            null,
+            includeExternal));
+        dispatcher.Dispatch(new LoadCallStackMermaidAction(
+            action.SolutionId,
+            configId.Value,
+            action.DocumentationId,
+            action.SymbolKey,
+            null,
+            includeExternal));
         return Task.CompletedTask;
     }
 
@@ -49,7 +65,7 @@ public sealed class IdeCallStackEffects
             var response = await _api.GetMethodCallStackAsync(
                 action.ConfigId,
                 action.SolutionId,
-                new MethodCallStackRequestModel(action.DocumentationId, action.SymbolKey, action.MaxDepth));
+                new MethodCallStackRequestModel(action.DocumentationId, action.SymbolKey, action.MaxDepth, action.IncludeExternalCalls));
             dispatcher.Dispatch(new LoadCallStackSuccessAction(action.SolutionId, action.DocumentationId, action.SymbolKey, response.Nodes));
         }
         catch (Exception ex)
@@ -68,7 +84,7 @@ public sealed class IdeCallStackEffects
             var response = await _api.GetMethodCallStackMermaidAsync(
                 action.ConfigId,
                 action.SolutionId,
-                new MethodCallStackRequestModel(action.DocumentationId, action.SymbolKey, action.MaxDepth));
+                new MethodCallStackRequestModel(action.DocumentationId, action.SymbolKey, action.MaxDepth, action.IncludeExternalCalls));
             dispatcher.Dispatch(new LoadCallStackMermaidSuccessAction(action.SolutionId, action.DocumentationId, action.SymbolKey, response.Diagram));
         }
         catch (Exception ex)
@@ -102,8 +118,20 @@ public sealed class IdeCallStackEffects
                 : null;
             if (!string.IsNullOrWhiteSpace(view?.DocumentationId) || !string.IsNullOrWhiteSpace(view?.SymbolKey))
             {
-                dispatcher.Dispatch(new LoadCallStackAction(action.SolutionId, action.ConfigId, view!.DocumentationId, view.SymbolKey ?? string.Empty, null));
-                dispatcher.Dispatch(new LoadCallStackMermaidAction(action.SolutionId, action.ConfigId, view.DocumentationId, view.SymbolKey ?? string.Empty, null));
+                dispatcher.Dispatch(new LoadCallStackAction(
+                    action.SolutionId,
+                    action.ConfigId,
+                    view!.DocumentationId,
+                    view.SymbolKey ?? string.Empty,
+                    null,
+                    view.IncludeExternalCalls));
+                dispatcher.Dispatch(new LoadCallStackMermaidAction(
+                    action.SolutionId,
+                    action.ConfigId,
+                    view.DocumentationId,
+                    view.SymbolKey ?? string.Empty,
+                    null,
+                    view.IncludeExternalCalls));
             }
         }
         catch (Exception ex)
@@ -118,5 +146,39 @@ public sealed class IdeCallStackEffects
         var solution = _solutionsState.Value.Solutions
             .FirstOrDefault(item => string.Equals(item.SolutionId, solutionId, StringComparison.OrdinalIgnoreCase));
         return solution?.ConfigId;
+    }
+
+    [EffectMethod]
+    public Task HandleIncludeExternal(SetCallStackIncludeExternalAction action, IDispatcher dispatcher)
+    {
+        var configId = GetConfigId(action.SolutionId);
+        if (configId is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var view = _callStackState.Value.Views.TryGetValue(action.SolutionId, out var current)
+            ? current
+            : null;
+        if (string.IsNullOrWhiteSpace(view?.DocumentationId) && string.IsNullOrWhiteSpace(view?.SymbolKey))
+        {
+            return Task.CompletedTask;
+        }
+
+        dispatcher.Dispatch(new LoadCallStackAction(
+            action.SolutionId,
+            configId.Value,
+            view!.DocumentationId,
+            view.SymbolKey ?? string.Empty,
+            null,
+            action.IncludeExternalCalls));
+        dispatcher.Dispatch(new LoadCallStackMermaidAction(
+            action.SolutionId,
+            configId.Value,
+            view.DocumentationId,
+            view.SymbolKey ?? string.Empty,
+            null,
+            action.IncludeExternalCalls));
+        return Task.CompletedTask;
     }
 }

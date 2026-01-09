@@ -1,0 +1,28 @@
+@inject IJSRuntime JSRuntime
+
+<div class="ide-mermaid-viewer" id="@_containerId"></div>
+
+@code {
+    [Parameter]
+    public string? Diagram { get; set; }
+
+    private readonly string _containerId = $"mermaid-{Guid.NewGuid():N}";
+    private string? _lastDiagram;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && string.Equals(_lastDiagram, Diagram, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastDiagram = Diagram;
+        if (string.IsNullOrWhiteSpace(Diagram))
+        {
+            await JSRuntime.InvokeVoidAsync("silkhatMermaid.clear", _containerId);
+            return;
+        }
+
+        await JSRuntime.InvokeVoidAsync("silkhatMermaid.render", _containerId, Diagram);
+    }
+}

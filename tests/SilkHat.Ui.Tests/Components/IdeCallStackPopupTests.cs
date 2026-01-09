@@ -74,6 +74,7 @@ public sealed class IdeCallStackPopupTests
                 null,
                 null,
                 "symbol-key",
+                false,
                 nodes,
                 "sequenceDiagram",
                 IdeCallStackShadingMode.None,

@@ -21,6 +21,7 @@ public sealed class MethodCallStackService : IMethodCallStackService
         string? documentationId,
         string methodSymbolKey,
         int? maxDepth,
+        bool includeExternalCalls,
         CancellationToken cancellationToken)
     {
         if (workspace is null)
@@ -61,6 +62,7 @@ public sealed class MethodCallStackService : IMethodCallStackService
             nodes,
             path,
             maxDepth,
+            includeExternalCalls,
             cancellationToken);
 
         return new MethodCallStackResult(nodes, false, null);
@@ -77,6 +79,7 @@ public sealed class MethodCallStackService : IMethodCallStackService
         List<MethodCallStackNode> nodes,
         HashSet<string> path,
         int? maxDepth,
+        bool includeExternalCalls,
         CancellationToken cancellationToken)
     {
         if (maxDepth.HasValue && depth > maxDepth.Value)
@@ -105,6 +108,11 @@ public sealed class MethodCallStackService : IMethodCallStackService
 
             var targetMethod = ResolveCallTarget(semanticModel, callNode);
             if (targetMethod is null)
+            {
+                continue;
+            }
+
+            if (!includeExternalCalls && !IsInCodebase(workspace, targetMethod))
             {
                 continue;
             }
@@ -182,6 +190,11 @@ public sealed class MethodCallStackService : IMethodCallStackService
                 continue;
             }
 
+            if (!includeExternalCalls && !IsInCodebase(workspace, resolvedMethod))
+            {
+                continue;
+            }
+
             var nextCompilation = GetCompilationForSymbol(solution, resolvedMethod) ?? compilation;
             var nextIdentifier = DocumentationIdUtility.GetDocumentationId(resolvedMethod)
                 ?? SymbolKeyUtility.GetSymbolKeyString(resolvedMethod, nextCompilation);
@@ -201,6 +214,7 @@ public sealed class MethodCallStackService : IMethodCallStackService
                 nodes,
                 path,
                 maxDepth,
+                includeExternalCalls,
                 cancellationToken);
 
             path.Remove(nextIdentifier);
@@ -359,6 +373,24 @@ public sealed class MethodCallStackService : IMethodCallStackService
             : string.Join(",", descriptor.ParameterTypes);
 
         return $"{descriptor.Namespace}.{descriptor.TypeName}.{descriptor.MethodName}.{parameterList}";
+    }
+
+    private static bool IsInCodebase(CodeRepositoryWorkspace workspace, IMethodSymbol method)
+    {
+        foreach (var location in method.Locations)
+        {
+            if (!location.IsInSource || location.SourceTree?.FilePath is not { Length: > 0 } filePath)
+            {
+                continue;
+            }
+
+            if (filePath.StartsWith(workspace.RootPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private sealed record MethodDescriptor(

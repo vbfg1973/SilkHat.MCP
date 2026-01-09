@@ -1,17 +1,17 @@
-M10: refine call stack resolution + decision handling + dialog-based UI tests
+M10: add call stack UX controls + mermaid fixes + external-call filtering
 
 Why:
-- Keep call stack analysis stable across SymbolKey API visibility changes, resolve interface property implementations correctly, and preserve existing test intent while wiring dialogs properly.
+- Make call stack exploration clearer in the UI, keep Mermaid output stable with nested returns, and allow optional inclusion of external calls while defaulting to in-codebase analysis.
 
 What:
-- Added SymbolKey fallback resolution by comparing generated keys when reflection-based resolve is unavailable.
-- Resolved interface property/event implementations by mapping to the correct accessor method.
-- Aligned IdeSolutionEntry namespace usage for existing test imports without altering assertions.
-- Updated call stack UI tests to render via MudDialogProvider/IDialogService (same assertions, correct dialog wiring).
-- Added a Roslyn EmitAsync test helper and clarified the test stability rule in architecture docs.
+- Added IncludeExternalCalls flag through DTOs/models, UI state, actions, reducers, and effects; default false and reload on toggle.
+- Filtered call stack traversal to skip external calls unless explicitly enabled.
+- Mermaid sequence rendering now preserves nesting (call -> children -> return) and fixes return line syntax.
+- Stabilized Mermaid participant labeling using short type names and interface+implementation mapping to keep lanes connected.
+- Added the include-external checkbox to the call stack popup.
 
 Tests:
-- `dotnet test` (blocked: MSBuild named pipe socket permission denied).
+- `dotnet test`
 
 Runtime verification:
-- `REPO_ROOT=/home/vbfg/repos/c/dev/repos docker compose up --build -d` (blocked: docker socket permission denied).
+- `REPO_ROOT=/home/vbfg/repos/c/dev/repos/ docker-compose up --build -d` failed with Docker snapshot error: "parent snapshot ... does not exist".

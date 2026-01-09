@@ -97,6 +97,32 @@ Correlation:
 - All UI API calls include `X-Correlation-Id` (GUID) and log both the local id and response header value.
 - API middleware echoes or creates `X-Correlation-Id` and decorates server logs with it.
 
+## Visualization Rendering (Mermaid + D3)
+
+SilkHat uses Mermaid and D3 for visualizations inside Blazor components (popups, tabs, and panels). Rendering runs via JS interop.
+
+### Runtime rules
+
+- Use a dedicated component per visualization (`IdeMermaidViewer`, future D3 viewers); never render directly in tab markup.
+- Rendering must occur after the DOM element exists and has layout (`OnAfterRenderAsync` with change guards).
+- Rendering must re-run when a tab/popup becomes visible or resized (hidden containers often render blank SVG).
+- Always use a stable container id per instance and avoid global mutable state.
+- If rendering fails or returns empty SVG, fall back to text output and log a warning.
+- Mermaid/D3 scripts must load before the Blazor runtime initializes.
+
+### Dependency rule
+
+- The latest stable Mermaid and D3 builds must be installed and served locally from `wwwroot/js`.
+- CDN usage is not permitted; keep versions pinned in the repo to avoid outages or version drift.
+
+### Testing rules
+
+- Add component-level tests that verify:
+  - JS interop render is invoked when a diagram is provided.
+  - JS interop clear is invoked when the diagram is empty.
+- Add UI tests that ensure the viewer component is present in the popup/tab and that state changes trigger rendering.
+- When adding a new visualization type, add a test that exercises a minimal dataset and verifies the renderer path is invoked.
+
 ## Documentation Maintenance
 
 Whenever UI state, actions, effects, or components change, update the UI Architecture section above to reflect the current state structure, API endpoints, logging, and component usage.

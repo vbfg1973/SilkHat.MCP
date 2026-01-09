@@ -15,15 +15,21 @@
         <MudStack Spacing="2">
             <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                 <MudText Typo="Typo.h6">Method Call Stack</MudText>
-                <MudSelect T="IdeCallStackShadingMode"
-                           Dense="true"
-                           Value="CurrentView?.ShadingMode ?? IdeCallStackShadingMode.None"
-                           ValueChanged="OnShadingChanged"
-                           Label="Shading">
-                    <MudSelectItem Value="IdeCallStackShadingMode.None">Default</MudSelectItem>
-                    <MudSelectItem Value="IdeCallStackShadingMode.CognitiveComplexity">Cognitive Complexity</MudSelectItem>
-                    <MudSelectItem Value="IdeCallStackShadingMode.CyclomaticComplexity">Cyclomatic Complexity</MudSelectItem>
-                </MudSelect>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudCheckBox T="bool"
+                                 @bind-Value="IncludeExternalCalls"
+                                 Color="Color.Default"
+                                 Label="Include external calls" />
+                    <MudSelect T="IdeCallStackShadingMode"
+                               Dense="true"
+                               Value="CurrentView?.ShadingMode ?? IdeCallStackShadingMode.None"
+                               ValueChanged="OnShadingChanged"
+                               Label="Shading">
+                        <MudSelectItem Value="IdeCallStackShadingMode.None">Default</MudSelectItem>
+                        <MudSelectItem Value="IdeCallStackShadingMode.CognitiveComplexity">Cognitive Complexity</MudSelectItem>
+                        <MudSelectItem Value="IdeCallStackShadingMode.CyclomaticComplexity">Cyclomatic Complexity</MudSelectItem>
+                    </MudSelect>
+                </MudStack>
             </MudStack>
             @if (!string.IsNullOrWhiteSpace(CurrentView?.Error))
             {
@@ -117,8 +123,8 @@
                         }
                         else
                         {
-                            <MudPaper Elevation="0" Class="pa-3" Style="white-space: pre-wrap; font-family: Consolas, 'Courier New', monospace;">
-                                @CurrentView!.MermaidDiagram
+                            <MudPaper Elevation="0" Class="pa-3">
+                                <IdeMermaidViewer Diagram="@CurrentView!.MermaidDiagram" />
                             </MudPaper>
                         }
                     </ChildContent>
@@ -224,6 +230,22 @@
         }
 
         Dispatcher.Dispatch(new SetCallStackShadingModeAction(SelectedSolutionId, mode));
+    }
+
+    private void OnIncludeExternalChanged(bool value)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SetCallStackIncludeExternalAction(SelectedSolutionId, value));
+    }
+
+    private bool IncludeExternalCalls
+    {
+        get => CurrentView?.IncludeExternalCalls ?? false;
+        set => OnIncludeExternalChanged(value);
     }
 
     private void OnDecisionSelected(string nodeId, string? value)

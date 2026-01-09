@@ -15,7 +15,11 @@ public sealed record CodeLocationModel(
 
 public sealed record DecisionInfoModel(Guid Id, string Type);
 
-public sealed record MethodCallStackRequestModel(string? DocumentationId, string SymbolKey, int? MaxDepth);
+public sealed record MethodCallStackRequestModel(
+    string? DocumentationId,
+    string SymbolKey,
+    int? MaxDepth,
+    bool IncludeExternalCalls);
 
 public sealed record MethodCallStackNodeModel(
     string NodeId,

@@ -58,7 +58,8 @@ public static class IdeCallStackReducers
             IsLoading = true,
             Error = null,
             DocumentationId = action.DocumentationId,
-            SymbolKey = action.SymbolKey
+            SymbolKey = action.SymbolKey,
+            IncludeExternalCalls = action.IncludeExternalCalls
         };
 
         return state with { Views = views };
@@ -114,7 +115,8 @@ public static class IdeCallStackReducers
             IsMermaidLoading = true,
             MermaidError = null,
             DocumentationId = action.DocumentationId,
-            SymbolKey = action.SymbolKey
+            SymbolKey = action.SymbolKey,
+            IncludeExternalCalls = action.IncludeExternalCalls
         };
 
         return state with { Views = views };
@@ -201,6 +203,18 @@ public static class IdeCallStackReducers
             : IdeCallStackViewState.Empty;
 
         views[action.SolutionId] = view with { ShadingMode = action.Mode };
+        return state with { Views = views };
+    }
+
+    [ReducerMethod]
+    public static IdeCallStackState ReduceIncludeExternal(IdeCallStackState state, SetCallStackIncludeExternalAction action)
+    {
+        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
+        var view = views.TryGetValue(action.SolutionId, out var existing)
+            ? existing
+            : IdeCallStackViewState.Empty;
+
+        views[action.SolutionId] = view with { IncludeExternalCalls = action.IncludeExternalCalls };
         return state with { Views = views };
     }
 }

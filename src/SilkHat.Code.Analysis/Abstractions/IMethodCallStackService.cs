@@ -11,5 +11,6 @@ public interface IMethodCallStackService
         string? documentationId,
         string methodSymbolKey,
         int? maxDepth,
+        bool includeExternalCalls,
         CancellationToken cancellationToken);
 }
