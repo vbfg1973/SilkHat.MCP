@@ -10,14 +10,19 @@
 @inject IState<IdeTreeState> TreeState
 @inject IDispatcher Dispatcher
 
-<MudText Typo="Typo.subtitle1" Class="mb-2">Repository Tree</MudText>
+<MudText Typo="Typo.subtitle2" Class="mb-2">Repository Tree</MudText>
 
 @if (!string.IsNullOrWhiteSpace(CurrentTree?.Error))
 {
     <MudAlert Severity="Severity.Error" Class="mb-2">@CurrentTree!.Error</MudAlert>
 }
 
-<MudTreeView T="CodeTreeEntryModel" ServerData="LoadTreeChildrenAsync" Items="CurrentTree?.Items">
+<div class="ide-tree-scroll">
+    <MudTreeView T="CodeTreeEntryModel"
+                 Class="ide-tree-viewer"
+                 Dense="true"
+                 ServerData="LoadTreeChildrenAsync"
+                 Items="CurrentTree?.Items">
     <ItemTemplate>
         <MudTreeViewItem T="CodeTreeEntryModel"
                          Value="@context.Value"
@@ -31,6 +36,7 @@
                          OnClick="@(async (MouseEventArgs _) => await OnTreeEntrySelected(context.Value))" />
     </ItemTemplate>
 </MudTreeView>
+</div>
 
 @code {
     private IdeTreeViewState? CurrentTree => SelectedSolutionId is null

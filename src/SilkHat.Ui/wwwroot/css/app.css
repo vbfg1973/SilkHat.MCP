@@ -115,6 +115,113 @@ code {
     height: auto;
 }
 
+.ide-d3-viewer {
+    min-height: 160px;
+    width: 100%;
+}
+
+.ide-layout {
+    width: 100%;
+    padding: 0 5vw;
+    --ide-gap: 20px;
+}
+
+.ide-layout-row {
+    gap: var(--ide-gap, 16px);
+    align-items: stretch;
+}
+
+.ide-tree-panel {
+    height: calc(100vh - 260px);
+    max-height: calc(100vh - 260px);
+    overflow: hidden;
+}
+
+.ide-tree-scroll {
+    height: 100%;
+    overflow: auto;
+}
+
+.ide-tree-viewer {
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.ide-tree-viewer .mud-icon-root {
+    font-size: 1rem;
+}
+
+.ide-tree-panel .mud-treeview-item-content,
+.ide-tree-panel .mud-treeview-item-label {
+    white-space: nowrap;
+}
+
+.ide-tabs-panel {
+    height: calc(100vh - 260px);
+    max-height: calc(100vh - 260px);
+    overflow: hidden;
+}
+
+.ide-tab-body {
+    height: 100%;
+    max-height: 100vh;
+}
+
+.ide-file-tooling {
+    display: flex;
+    gap: var(--ide-gap, 16px);
+    height: 100%;
+}
+
+.ide-file-panel {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.ide-file-scroll {
+    height: 100%;
+    overflow: auto;
+    flex: 1 1 auto;
+}
+
+.ide-file-content {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    min-width: max-content;
+}
+
+.ide-file-line-number {
+    display: inline-block;
+    width: 3.5rem;
+    color: #888;
+}
+
+.ide-file-line-text {
+    white-space: pre;
+}
+
+.ide-toolbox-panel {
+    flex: 0 0 280px;
+    min-width: 280px;
+    height: 100%;
+    overflow: auto;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.mud-theme-dark .ide-toolbox-panel {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.mud-theme-dark .ide-file-panel {
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
     color: var(--bs-secondary-color);
     text-align: end;

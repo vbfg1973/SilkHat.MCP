@@ -1,7 +1,8 @@
 (() => {
   let initialized = false;
+  let currentThemeKey = null;
 
-  function ensureInit() {
+  function ensureInit(theme) {
     if (initialized || typeof mermaid === "undefined") {
       return;
     }
@@ -10,8 +11,28 @@
       startOnLoad: false,
       theme: "neutral",
       securityLevel: "strict",
+      themeVariables: theme || undefined,
     });
     initialized = true;
+    currentThemeKey = theme ? JSON.stringify(theme) : "default";
+  }
+
+  function ensureTheme(theme) {
+    if (typeof mermaid === "undefined") {
+      return;
+    }
+
+    const themeKey = theme ? JSON.stringify(theme) : "default";
+    if (!initialized || currentThemeKey !== themeKey) {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: "neutral",
+        securityLevel: "strict",
+        themeVariables: theme || undefined,
+      });
+      initialized = true;
+      currentThemeKey = themeKey;
+    }
   }
 
   function waitForMermaid() {
@@ -52,7 +73,23 @@
     return false;
   }
 
-  async function render(containerId, diagram) {
+  function buildThemeVariables(theme) {
+    if (!theme) {
+      return null;
+    }
+
+    return {
+      primaryColor: theme.primary,
+      primaryTextColor: theme.textPrimary,
+      secondaryColor: theme.secondary,
+      tertiaryColor: theme.tertiary || theme.secondary,
+      mainBkg: theme.surface || theme.background,
+      lineColor: theme.lines || theme.textSecondary,
+      textColor: theme.textPrimary,
+    };
+  }
+
+  async function render(containerId, diagram, theme) {
     const container = document.getElementById(containerId);
     if (!container) {
       return;
@@ -60,7 +97,9 @@
 
     const ready = await waitForMermaid();
     await waitForVisible(container);
-    ensureInit();
+    const themeVariables = buildThemeVariables(theme);
+    ensureInit(themeVariables);
+    ensureTheme(themeVariables);
     if (!ready || typeof mermaid === "undefined") {
       container.textContent = diagram;
       return;
