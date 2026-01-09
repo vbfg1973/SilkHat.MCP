@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using SilkHat.Api.Extensions;
 using SilkHat.Api.Models;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
 using SilkHat.Core.Dtos;
 
@@ -11,10 +12,12 @@ namespace SilkHat.Api.Controllers;
 public sealed class CodeNamedTypesController : ApiControllerBase
 {
     private readonly ICodeWorkspaceStore _codeStore;
+    private readonly ITypeComplexityService _typeComplexityService;
 
-    public CodeNamedTypesController(ICodeWorkspaceStore codeStore)
+    public CodeNamedTypesController(ICodeWorkspaceStore codeStore, ITypeComplexityService typeComplexityService)
     {
         _codeStore = codeStore;
+        _typeComplexityService = typeComplexityService;
     }
 
     [HttpGet]
@@ -74,5 +77,57 @@ public sealed class CodeNamedTypesController : ApiControllerBase
             .ToPagedResult(paging);
 
         return Ok(result);
+    }
+
+    [HttpGet("complexity")]
+    public async Task<ActionResult<ComplexityResultDto>> GetNamedTypeComplexity(
+        Guid id,
+        string solutionId,
+        [FromQuery] string? docId,
+        [FromQuery] ComplexityMeasureType? measure,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(docId))
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Invalid Request", "docId is required.", "Code");
+        }
+
+        if (!measure.HasValue)
+        {
+            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Invalid Request", "measure is required.", "Code");
+        }
+
+        var workspace = _codeStore.Get(id);
+        if (workspace is null)
+        {
+            return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
+        }
+
+        var solution = workspace.TryGetSolution(solutionId);
+        if (solution is null)
+        {
+            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+        }
+
+        var result = await _typeComplexityService.GetTypeComplexityAsync(
+            solution,
+            docId,
+            measure.Value,
+            cancellationToken);
+
+        return result.Status switch
+        {
+            TypeComplexityStatus.InterfaceNotSupported => ProblemWithCategory(
+                StatusCodes.Status400BadRequest,
+                "Invalid Request",
+                "Only concrete types are supported.",
+                "Code"),
+            TypeComplexityStatus.NotFound => ProblemWithCategory(
+                StatusCodes.Status404NotFound,
+                "Not Found",
+                "Named type not found.",
+                "Code"),
+            _ => Ok(result.Result)
+        };
     }
 }

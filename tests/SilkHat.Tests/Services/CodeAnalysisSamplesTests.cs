@@ -37,7 +37,7 @@ public sealed class CodeAnalysisSamplesTests
         AssertNamedType(solution, "SampleEnum", NamedTypeKind.Enum, "SilkHat.Sample.App");
         AssertNamedType(solution, "SampleStruct", NamedTypeKind.Struct, "SilkHat.Sample.App");
         AssertNamedType(solution, "SampleRecord", NamedTypeKind.Record, "SilkHat.Sample.App");
-        AssertNamedType(solution, "SampleRecordStruct", NamedTypeKind.Record, "SilkHat.Sample.App");
+        AssertNamedType(solution, "SampleRecordStruct", NamedTypeKind.Struct, "SilkHat.Sample.App");
         AssertNamedType(solution, "SampleDelegate", NamedTypeKind.Delegate, "SilkHat.Sample.App");
         AssertNamedType(solution, "IClock", NamedTypeKind.Interface, "SilkHat.Sample.Lib");
         AssertNamedType(solution, "SystemClock", NamedTypeKind.Class, "SilkHat.Sample.Lib");
