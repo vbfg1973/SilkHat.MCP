@@ -4,38 +4,42 @@
 @inherits VisualizationComponentBase
 @inject VisualizationThemeService VisualizationThemeService
 
-<div class="ide-mermaid-viewer" id="@ContainerId"></div>
+<div class="ide-d3-viewer" id="@ContainerId"></div>
 
 @code {
     [Parameter]
-    public string? Diagram { get; set; }
+    public string? Label { get; set; }
 
-    private string? _lastDiagram;
+    private string? _lastLabel;
     private string? _lastPaletteKey;
 
-    protected override bool HasContent => !string.IsNullOrWhiteSpace(Diagram);
+    protected override bool HasContent => !string.IsNullOrWhiteSpace(Label);
 
     protected override async Task RenderAsync(bool force)
     {
         var palette = VisualizationThemeService.GetPalette();
         var paletteKey = palette.GetKey();
         if (!force
-            && string.Equals(_lastDiagram, Diagram, StringComparison.Ordinal)
+            && string.Equals(_lastLabel, Label, StringComparison.Ordinal)
             && string.Equals(_lastPaletteKey, paletteKey, StringComparison.Ordinal))
         {
             return;
         }
 
-        _lastDiagram = Diagram;
+        _lastLabel = Label;
         _lastPaletteKey = paletteKey;
 
-        await JSRuntime.InvokeVoidAsync("silkhatMermaid.render", ContainerId, Diagram, palette);
+        await JSRuntime.InvokeVoidAsync(
+            "silkhatD3.render",
+            ContainerId,
+            new { label = Label },
+            palette);
     }
 
     protected override Task ClearAsync()
     {
-        _lastDiagram = Diagram;
+        _lastLabel = Label;
         _lastPaletteKey = null;
-        return JSRuntime.InvokeVoidAsync("silkhatMermaid.clear", ContainerId).AsTask();
+        return JSRuntime.InvokeVoidAsync("silkhatD3.clear", ContainerId).AsTask();
     }
 }

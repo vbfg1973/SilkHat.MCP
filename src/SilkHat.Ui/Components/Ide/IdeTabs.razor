@@ -19,6 +19,9 @@
         <IdeCommitCard />
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
             <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="OpenSymbolsPopup">Symbols</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="ToggleToolbox">
+                @(_isToolboxHidden ? "Show Toolbox" : "Hide Toolbox")
+            </MudButton>
             <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="CloseAllTabs">Close all tabs</MudButton>
         </MudStack>
     </MudStack>
@@ -44,17 +47,27 @@
                     </div>
                 </TabContent>
                 <ChildContent>
-                    <MudPaper Elevation="0" Class="pa-3" Style="height: 100%; overflow: auto;">
-                        <div style="font-family: Consolas, 'Courier New', monospace; font-size: 0.85rem; line-height: 1.4;">
-                            @foreach (var line in file.RenderLines)
-                            {
-                                <div style="@GetLineStyle(line)">
-                                    <span style="display: inline-block; width: 3.5rem; color: #888;">@GetLineNumber(line)</span>
-                                    <span style="white-space: pre;">@line.Text</span>
+                    <div class="ide-tab-body" style="height: 100%;">
+                        <div class="ide-file-tooling" style="height: 100%;">
+                            <MudPaper Elevation="0" Class="pa-3 ide-file-panel">
+                                <div class="ide-file-scroll">
+                                    <div class="ide-file-content">
+                                        @foreach (var line in file.RenderLines)
+                                        {
+                                            <div style="@GetLineStyle(line)">
+                                                <span class="ide-file-line-number">@GetLineNumber(line)</span>
+                                                <span class="ide-file-line-text" style="white-space: pre;">@line.Text</span>
+                                            </div>
+                                        }
+                                    </div>
                                 </div>
+                            </MudPaper>
+                            @if (!_isToolboxHidden)
+                            {
+                                <IdeToolbox />
                             }
                         </div>
-                    </MudPaper>
+                    </div>
                 </ChildContent>
             </MudTabPanel>
         }
@@ -63,6 +76,7 @@
 
 @code {
     private IDialogReference? _symbolDialog;
+    private bool _isToolboxHidden;
 
     private IdeTabsViewState? TabsView
     {
@@ -124,6 +138,11 @@
         }
 
         Dispatcher.Dispatch(new CloseAllTabsAction(SelectedSolutionId));
+    }
+
+    private void ToggleToolbox()
+    {
+        _isToolboxHidden = !_isToolboxHidden;
     }
 
     private void OnActiveTabChanged(int index)

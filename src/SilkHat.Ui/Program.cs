@@ -24,6 +24,7 @@ builder.Logging.AddSerilog(Log.Logger, dispose: true);
 
 builder.Services.AddMudServices();
 builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<VisualizationThemeService>();
 builder.Services.AddFluxor(options =>
 {
     options.ScanAssemblies(typeof(Program).Assembly);

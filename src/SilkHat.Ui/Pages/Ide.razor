@@ -12,14 +12,14 @@
     <IdeSolutionSelector />
 </MudPaper>
 
-<div style="width: 90vw; margin-left: 5vw; margin-right: 5vw;">
-    <div class="d-flex gap-4">
-        <MudPaper Elevation="1" Class="pa-3" Style="width: 320px; flex-shrink: 0;">
+<div class="ide-layout">
+    <div class="d-flex ide-layout-row">
+        <MudPaper Elevation="1" Class="pa-3 ide-tree-panel" Style="width: 320px; flex-shrink: 0; height: calc(100vh - 260px);">
             <IdeTree />
         </MudPaper>
-        <MudPaper Elevation="1" Class="pa-3 d-flex flex-column flex-grow-1" Style="min-width: 0;">
+        <div class="d-flex flex-column flex-grow-1 ide-tabs-panel" style="min-width: 0; height: calc(100vh - 260px); overflow: hidden;">
             <IdeTabs />
-        </MudPaper>
+        </div>
     </div>
 </div>
 

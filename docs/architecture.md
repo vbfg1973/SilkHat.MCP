@@ -55,6 +55,8 @@ Components:
 - `IdeSymbolPopup` renders the named type/member outline for the active file and dispatches symbol selection.
 - `IdeCallStackPopup` renders the call stack tree and mermaid output and dispatches open-file actions for call sites.
 - `IdeSymbolPopup` opens `IdeCallStackPopup` for the selected method when the user requests a call stack.
+- `IdeMermaidViewer` renders Mermaid diagrams via the visualization host and JS interop.
+- `IdeD3Viewer` is a minimal D3 viewer used to exercise the visualization host and palette pipeline.
 
 ### Git Domain
 
@@ -99,16 +101,18 @@ Correlation:
 
 ## Visualization Rendering (Mermaid + D3)
 
-SilkHat uses Mermaid and D3 for visualizations inside Blazor components (popups, tabs, and panels). Rendering runs via JS interop.
+SilkHat uses Mermaid and D3 for visualizations inside Blazor components (popups, tabs, and panels). Rendering runs via JS interop coordinated through a shared visualization host.
 
 ### Runtime rules
 
-- Use a dedicated component per visualization (`IdeMermaidViewer`, future D3 viewers); never render directly in tab markup.
-- Rendering must occur after the DOM element exists and has layout (`OnAfterRenderAsync` with change guards).
-- Rendering must re-run when a tab/popup becomes visible or resized (hidden containers often render blank SVG).
-- Always use a stable container id per instance and avoid global mutable state.
+- Use a dedicated component per visualization (`IdeMermaidViewer`, `IdeD3Viewer`) backed by `VisualizationComponentBase`; never render directly in tab markup.
+- Visualization components register a stable container id with `window.silkhatVisualHost` from `wwwroot/js/visualization-host.js`.
+- Rendering must occur after the DOM element exists and has layout (`OnAfterRenderAsync`), and must be re-triggered when the host observes visibility or size changes (tabs/popup resize).
+- JS interop must be idempotent: safe to register/unregister multiple times without leaking observers.
 - If rendering fails or returns empty SVG, fall back to text output and log a warning.
 - Mermaid/D3 scripts must load before the Blazor runtime initializes.
+- Visualization renderers should accept theme palettes so diagrams match the current MudTheme.
+- Theme palette data is produced by `VisualizationThemeService` as a `VisualizationThemePalette` DTO and passed to JS renderers (Mermaid and D3).
 
 ### Dependency rule
 
@@ -118,8 +122,11 @@ SilkHat uses Mermaid and D3 for visualizations inside Blazor components (popups,
 ### Testing rules
 
 - Add component-level tests that verify:
-  - JS interop render is invoked when a diagram is provided.
-  - JS interop clear is invoked when the diagram is empty.
+  - `silkhatVisualHost.register` is invoked when a viewer renders.
+  - JS interop render is invoked when content is provided.
+  - JS interop clear is invoked when content is empty.
+  - A render request from the host triggers another render call.
+  - Palette data is passed to the renderer.
 - Add UI tests that ensure the viewer component is present in the popup/tab and that state changes trigger rendering.
 - When adding a new visualization type, add a test that exercises a minimal dataset and verifies the renderer path is invoked.
 
