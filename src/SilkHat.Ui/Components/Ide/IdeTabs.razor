@@ -10,6 +10,7 @@
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeTabsState> TabsState
 @inject IState<IdeSymbolsState> SymbolsState
+@inject IState<IdeLayoutState> LayoutState
 @inject IDispatcher Dispatcher
 @inject IDialogService DialogService
 
@@ -18,10 +19,6 @@
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
         <IdeCommitCard />
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="OpenSymbolsPopup">Symbols</MudButton>
-            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="ToggleToolbox">
-                @(_isToolboxHidden ? "Show Toolbox" : "Hide Toolbox")
-            </MudButton>
             <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="CloseAllTabs">Close all tabs</MudButton>
         </MudStack>
     </MudStack>
@@ -29,7 +26,7 @@
              Elevation="0"
              ActivePanelIndex="@TabsView!.ActiveTabIndex"
              ActivePanelIndexChanged="OnActiveTabChanged"
-             Class="flex-grow-1">
+             Class="flex-grow-1 ide-mud-tabs">
         @for (var index = 0; index < TabsView.OpenFiles.Count; index++)
         {
             var file = TabsView.OpenFiles[index];
@@ -62,7 +59,7 @@
                                     </div>
                                 </div>
                             </MudPaper>
-                            @if (!_isToolboxHidden)
+                            @if (!IsToolboxHidden)
                             {
                                 <IdeToolbox />
                             }
@@ -76,8 +73,6 @@
 
 @code {
     private IDialogReference? _symbolDialog;
-    private bool _isToolboxHidden;
-
     private IdeTabsViewState? TabsView
     {
         get
@@ -140,10 +135,6 @@
         Dispatcher.Dispatch(new CloseAllTabsAction(SelectedSolutionId));
     }
 
-    private void ToggleToolbox()
-    {
-        _isToolboxHidden = !_isToolboxHidden;
-    }
 
     private void OnActiveTabChanged(int index)
     {
@@ -195,5 +186,20 @@
     private static string GetLineNumber(IdeAnnotatedLine line)
     {
         return line.LineNumber?.ToString() ?? string.Empty;
+    }
+
+    private bool IsToolboxHidden
+    {
+        get
+        {
+            if (SelectedSolutionId is null)
+            {
+                return false;
+            }
+
+            return LayoutState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
+                ? view.IsToolboxHidden
+                : IdeLayoutViewState.Default.IsToolboxHidden;
+        }
     }
 }

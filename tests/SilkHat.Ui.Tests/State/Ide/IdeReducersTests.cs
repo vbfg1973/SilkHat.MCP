@@ -18,7 +18,7 @@ public sealed class IdeReducersTests
 
         var solutions = new List<IdeSolutionEntry>
         {
-            new("solution-1", "./RepoOne.sln", "./RepoOne.sln", Guid.NewGuid(), "./RepoOne.sln (Repo One)")
+            new("solution-1", "./RepoOne.sln", "./RepoOne.sln", "Repo One", Guid.NewGuid(), "./RepoOne.sln (Repo One)")
         };
         var loaded = IdeSolutionsReducers.ReduceLoadSolutionsSuccess(initial, new LoadSolutionsSuccessAction(solutions));
         Assert.False(loaded.IsLoading);

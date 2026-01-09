@@ -1,0 +1,35 @@
+@using Fluxor
+@using MudBlazor
+@using SilkHat.Ui.State.Ide
+@inject IState<IdeSolutionsState> SolutionsState
+@inject IState<IdeLayoutState> LayoutState
+
+@if (ActiveView == IdeMainView.Tabs)
+{
+    <IdeTabs />
+}
+else
+{
+    <MudPaper Elevation="0" Class="pa-4">
+        <MudText Typo="Typo.body1">Selected view is not available yet.</MudText>
+    </MudPaper>
+}
+
+@code {
+    private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
+    private IdeMainView ActiveView
+    {
+        get
+        {
+            if (SelectedSolutionId is null)
+            {
+                return IdeMainView.Tabs;
+            }
+
+            return LayoutState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
+                ? view.ActiveView
+                : IdeLayoutViewState.Default.ActiveView;
+        }
+    }
+}

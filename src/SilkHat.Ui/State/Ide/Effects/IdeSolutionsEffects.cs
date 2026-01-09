@@ -33,6 +33,7 @@ public sealed class IdeSolutionsEffects
                         solution.SolutionId,
                         solution.RelativePath,
                         solution.RelativePath,
+                        config.Name,
                         config.Id,
                         $"{solution.RelativePath} ({config.Name})"));
                 }
