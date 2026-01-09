@@ -1,0 +1,15 @@
+<div class="ide-workspace">
+    <div class="ide-menu-bar">
+        <IdeMenuBar />
+    </div>
+    <div class="ide-layout">
+        <div class="d-flex ide-layout-row">
+            <MudPaper Elevation="1" Class="pa-3 ide-tree-panel" Style="width: 320px; flex-shrink: 0; height: calc(100vh - 260px);">
+                <IdeTree />
+            </MudPaper>
+            <div class="d-flex flex-column flex-grow-1 ide-tabs-panel" style="min-width: 0; height: calc(100vh - 260px); overflow: hidden;">
+                <IdeMainViewHost />
+            </div>
+        </div>
+    </div>
+</div>

@@ -26,7 +26,7 @@ public sealed class IdeTests
             null,
             new List<IdeSolutionEntry>
             {
-                new(solutionId, "./RepoOne.sln", "./RepoOne.sln", Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d"), "./RepoOne.sln (Repo One)")
+                new(solutionId, "./RepoOne.sln", "./RepoOne.sln", "Repo One", Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d"), "./RepoOne.sln (Repo One)")
             },
             solutionId);
         var treeState = new IdeTreeState(new Dictionary<string, IdeTreeViewState>(StringComparer.OrdinalIgnoreCase)
@@ -65,7 +65,7 @@ public sealed class IdeTests
             null,
             new List<IdeSolutionEntry>
             {
-                new(solutionId, "./RepoOne.sln", "./RepoOne.sln", Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d"), "./RepoOne.sln (Repo One)")
+                new(solutionId, "./RepoOne.sln", "./RepoOne.sln", "Repo One", Guid.Parse("8c80d1a5-5d2b-4a9e-b0e1-5d9733a1cb5d"), "./RepoOne.sln (Repo One)")
             },
             solutionId);
         var tab = new IdeOpenFileTab("./Program.cs", "Repo One/Program.cs", "Program.cs", "  class Program {}")
@@ -84,6 +84,7 @@ public sealed class IdeTests
         context.Services.AddScoped<IState<IdeSolutionsState>>(_ => new StateWrapper<IdeSolutionsState>(solutionsState));
         context.Services.AddScoped<IState<IdeTabsState>>(_ => new StateWrapper<IdeTabsState>(tabsState));
         context.Services.AddScoped<IState<IdeSymbolsState>>(_ => new StateWrapper<IdeSymbolsState>(new IdeSymbolsState()));
+        context.Services.AddScoped<IState<IdeLayoutState>>(_ => new StateWrapper<IdeLayoutState>(new IdeLayoutState()));
         context.Services.AddScoped<IDispatcher>(_ => new RecordingDispatcher());
         context.Services.AddScoped<IActionSubscriber>(_ => new NoOpActionSubscriber());
 

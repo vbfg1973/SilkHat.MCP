@@ -122,8 +122,19 @@ code {
 
 .ide-layout {
     width: 100%;
-    padding: 0 5vw;
     --ide-gap: 20px;
+}
+
+.ide-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ide-gap, 16px);
+    padding: var(--ide-gap, 16px);
+    width: 100%;
+}
+
+.ide-menu-bar {
+    width: 100%;
 }
 
 .ide-layout-row {
@@ -162,15 +173,38 @@ code {
     overflow: hidden;
 }
 
+.ide-mud-tabs {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.ide-mud-tabs .mud-tabs-panels {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+}
+
+.ide-mud-tabs .mud-tab-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+}
+
 .ide-tab-body {
     height: 100%;
     max-height: 100vh;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .ide-file-tooling {
     display: flex;
     gap: var(--ide-gap, 16px);
     height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
 .ide-file-panel {

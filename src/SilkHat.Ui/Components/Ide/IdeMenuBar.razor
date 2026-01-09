@@ -1,0 +1,217 @@
+@using Fluxor
+@using MudBlazor
+@using System.Linq
+@using SilkHat.Ui.State.Ide
+@using SilkHat.Ui.State.Ide.Actions
+@using SilkHat.Ui.State.Ide.Models
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
+@inject IState<IdeSolutionsState> SolutionsState
+@inject IState<IdeTabsState> TabsState
+@inject IState<IdeLayoutState> LayoutState
+@inject IState<IdeSymbolsState> SymbolsState
+@inject IDispatcher Dispatcher
+@inject IDialogService DialogService
+
+<MudPaper Elevation="1" Class="pa-2">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+        <MudMenu Dense="true" Label="File" ActivationEvent="MouseEvent.LeftClick">
+            <MudMenu Dense="true" Label="Repositories" ActivationEvent="MouseEvent.LeftClick">
+                @if (RepositoryGroups.Count == 0)
+                {
+                    <MudMenuItem Disabled="true">No repositories</MudMenuItem>
+                }
+                else
+                {
+                    @foreach (var group in RepositoryGroups)
+                    {
+                        <MudMenu Dense="true" Label="@group.RepositoryName" ActivationEvent="MouseEvent.LeftClick">
+                            @foreach (var solution in group.Solutions)
+                            {
+                                <MudMenuItem OnClick="@(async () => await SelectSolutionAsync(solution.SolutionId))">
+                                    @solution.Name
+                                </MudMenuItem>
+                            }
+                        </MudMenu>
+                    }
+                }
+            </MudMenu>
+            <MudMenuItem Disabled="true">No actions yet</MudMenuItem>
+        </MudMenu>
+        <MudMenu Dense="true" Label="Tabs" ActivationEvent="MouseEvent.LeftClick">
+            <MudMenuItem OnClick="ReturnToTabs" Disabled="@IsTabsDisabled">Return to Tabs</MudMenuItem>
+            <MudMenu Dense="true" Label="Currently Open Tabs" ActivationEvent="MouseEvent.LeftClick">
+                @if (OpenTabs.Count == 0)
+                {
+                    <MudMenuItem Disabled="true">No open tabs</MudMenuItem>
+                }
+                else
+                {
+                    @foreach (var tab in OpenTabs)
+                    {
+                        <MudMenuItem OnClick="@(async () => await SwitchToTabAsync(tab.Index))">
+                            @tab.Name
+                        </MudMenuItem>
+                    }
+                }
+            </MudMenu>
+        </MudMenu>
+        <MudMenu Dense="true" Label="Symbols" ActivationEvent="MouseEvent.LeftClick">
+            <MudMenuItem OnClick="OpenSymbolsPopup" Disabled="@IsTabsDisabled">Symbols</MudMenuItem>
+            <MudMenuItem Disabled="true">Namespaces</MudMenuItem>
+            <MudMenuItem Disabled="true">Methods</MudMenuItem>
+            <MudMenuItem Disabled="true">Interfaces</MudMenuItem>
+            <MudMenuItem Disabled="true">Records</MudMenuItem>
+            <MudMenuItem Disabled="true">Structs</MudMenuItem>
+            <MudMenuItem Disabled="true">Other</MudMenuItem>
+        </MudMenu>
+        <MudMenu Dense="true" Label="Syntax" ActivationEvent="MouseEvent.LeftClick">
+            <MudMenuItem Disabled="true">Syntax Tree</MudMenuItem>
+        </MudMenu>
+        <MudMenu Dense="true" Label="Domain" ActivationEvent="MouseEvent.LeftClick">
+            <MudMenuItem Disabled="true">Find Terms</MudMenuItem>
+        </MudMenu>
+        <MudMenu Dense="true" Label="Complexity" ActivationEvent="MouseEvent.LeftClick">
+            <MudMenuItem Disabled="true">Cyclomatic</MudMenuItem>
+            <MudMenuItem Disabled="true">Cognitive</MudMenuItem>
+            <MudMenuItem Disabled="true">Indentation</MudMenuItem>
+        </MudMenu>
+        <MudMenu Dense="true" Label="Toolbox" ActivationEvent="MouseEvent.LeftClick">
+            <MudMenuItem OnClick="ToggleToolbox" Disabled="@IsTabsDisabled">
+                @(IsToolboxHidden ? "Show Toolbox" : "Hide Toolbox")
+            </MudMenuItem>
+        </MudMenu>
+    </MudStack>
+</MudPaper>
+
+@code {
+    private IDialogReference? _symbolDialog;
+
+    private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
+    private bool IsTabsDisabled => SelectedSolutionId is null;
+
+    private IdeTabsViewState TabsView
+    {
+        get
+        {
+            if (SelectedSolutionId is null)
+            {
+                return IdeTabsViewState.Empty;
+            }
+
+            return TabsState.Value.Tabs.TryGetValue(SelectedSolutionId, out var view)
+                ? view
+                : IdeTabsViewState.Empty;
+        }
+    }
+
+    private IReadOnlyList<(int Index, string Name)> OpenTabs =>
+        TabsView.OpenFiles
+            .Select((tab, index) => (index, tab.Name))
+            .ToList();
+
+    private IReadOnlyList<(string RepositoryName, IReadOnlyList<IdeSolutionEntry> Solutions)> RepositoryGroups =>
+        SolutionsState.Value.Solutions
+            .GroupBy(solution => solution.RepositoryName)
+            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group => (
+                group.Key,
+                (IReadOnlyList<IdeSolutionEntry>)group
+                    .OrderBy(solution => solution.Name, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(solution => solution.SolutionId, StringComparer.OrdinalIgnoreCase)
+                    .ToList()))
+            .ToList();
+
+    private bool IsToolboxHidden
+    {
+        get
+        {
+            if (SelectedSolutionId is null)
+            {
+                return false;
+            }
+
+            return LayoutState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
+                ? view.IsToolboxHidden
+                : IdeLayoutViewState.Default.IsToolboxHidden;
+        }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (SymbolsState.Value.Views.TryGetValue(SelectedSolutionId ?? string.Empty, out var view)
+            && view.IsOpen != true
+            && _symbolDialog is not null)
+        {
+            _symbolDialog.Close();
+            _symbolDialog = null;
+        }
+    }
+
+    private void ReturnToTabs()
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SetIdeMainViewAction(SelectedSolutionId, IdeMainView.Tabs));
+    }
+
+    private Task SelectSolutionAsync(string solutionId)
+    {
+        Dispatcher.Dispatch(new SelectSolutionAction(solutionId));
+        Dispatcher.Dispatch(new SetIdeMainViewAction(solutionId, IdeMainView.Tabs));
+        return Task.CompletedTask;
+    }
+
+    private Task SwitchToTabAsync(int index)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        Dispatcher.Dispatch(new SetActiveTabAction(SelectedSolutionId, index));
+        Dispatcher.Dispatch(new SetIdeMainViewAction(SelectedSolutionId, IdeMainView.Tabs));
+        return Task.CompletedTask;
+    }
+
+    private async Task OpenSymbolsPopup()
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        if (SymbolsState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
+            && view.IsOpen == true)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new OpenSymbolPopupAction(SelectedSolutionId));
+        _symbolDialog = await DialogService.ShowAsync<IdeSymbolPopup>(
+            "File Symbols",
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true });
+
+        var dialogRef = _symbolDialog;
+        _ = dialogRef.Result.ContinueWith(_ => InvokeAsync(() =>
+        {
+            if (SelectedSolutionId is not null)
+            {
+                Dispatcher.Dispatch(new CloseSymbolPopupAction(SelectedSolutionId));
+            }
+        }));
+    }
+
+    private void ToggleToolbox()
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SetToolboxVisibilityAction(SelectedSolutionId, !IsToolboxHidden));
+    }
+}

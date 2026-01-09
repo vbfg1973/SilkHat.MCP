@@ -126,7 +126,7 @@ public sealed class IdeEffectsTests
                 null,
                 new List<IdeSolutionEntry>
                 {
-                    new("solution-1", "./RepoOne.sln", "./RepoOne.sln", configId, "./RepoOne.sln (Repo One)")
+                    new("solution-1", "./RepoOne.sln", "./RepoOne.sln", "Repo One", configId, "./RepoOne.sln (Repo One)")
                 },
                 "solution-1"));
 

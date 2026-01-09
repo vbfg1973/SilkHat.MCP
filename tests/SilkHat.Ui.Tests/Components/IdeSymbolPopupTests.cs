@@ -26,7 +26,7 @@ public sealed class IdeSymbolPopupTests
             null,
             new List<IdeSolutionEntry>
             {
-                new(solutionId, "./RepoOne.sln", "./RepoOne.sln", Guid.NewGuid(), "./RepoOne.sln (Repo One)")
+                new(solutionId, "./RepoOne.sln", "./RepoOne.sln", "Repo One", Guid.NewGuid(), "./RepoOne.sln (Repo One)")
             },
             solutionId);
 
