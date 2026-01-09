@@ -42,11 +42,12 @@ public static class CodeWorkspaceFactory
 
         var namedTypes = new List<NamedTypeDto>
         {
-            new("sym-alpha", "Foo", "Alpha", "Alpha.Foo", "alpha", "Alpha", NamedTypeKind.Class, false, "./Alpha/Foo.cs"),
-            new("sym-beta", "Bar", "Alpha.Sub", "Alpha.Sub.Bar", "beta", "Beta", NamedTypeKind.Struct, false, "./Beta/Bar.cs")
+            new("sym-alpha", null, "Foo", "Alpha", "Alpha.Foo", "alpha", "Alpha", NamedTypeKind.Class, false, "./Alpha/Foo.cs"),
+            new("sym-beta", null, "Bar", "Alpha.Sub", "Alpha.Sub.Bar", "beta", "Beta", NamedTypeKind.Struct, false, "./Beta/Bar.cs")
         };
 
         var namedTypesByKey = namedTypes.ToDictionary(type => type.SymbolKey, type => type);
+        var namedTypesByDocId = new Dictionary<string, NamedTypeDto>(StringComparer.Ordinal);
 
         var solution = new CodeSolutionWorkspace(
             DefaultSolutionId,
@@ -59,6 +60,7 @@ public static class CodeWorkspaceFactory
             namespaces,
             namedTypes,
             namedTypesByKey,
+            namedTypesByDocId,
             new Dictionary<string, Compilation>());
 
         return new CodeRepositoryWorkspace(

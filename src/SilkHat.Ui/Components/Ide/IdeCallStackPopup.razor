@@ -1,0 +1,377 @@
+@using Fluxor
+@using Fluxor.Blazor.Web.Components
+@using MudBlazor
+@using SilkHat.Ui.Models
+@using SilkHat.Ui.State.Ide
+@using SilkHat.Ui.State.Ide.Actions
+@using SilkHat.Ui.State.Ide.Models
+@inherits FluxorComponent
+@inject IState<IdeSolutionsState> SolutionsState
+@inject IState<IdeCallStackState> CallStackState
+@inject IDispatcher Dispatcher
+
+<MudDialog Style="resize: both; overflow: auto;">
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudText Typo="Typo.h6">Method Call Stack</MudText>
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudCheckBox T="bool"
+                                 @bind-Value="IncludeExternalCalls"
+                                 Color="Color.Default"
+                                 Label="Include external calls" />
+                    <MudSelect T="IdeCallStackShadingMode"
+                               Dense="true"
+                               Value="CurrentView?.ShadingMode ?? IdeCallStackShadingMode.None"
+                               ValueChanged="OnShadingChanged"
+                               Label="Shading">
+                        <MudSelectItem Value="IdeCallStackShadingMode.None">Default</MudSelectItem>
+                        <MudSelectItem Value="IdeCallStackShadingMode.CognitiveComplexity">Cognitive Complexity</MudSelectItem>
+                        <MudSelectItem Value="IdeCallStackShadingMode.CyclomaticComplexity">Cyclomatic Complexity</MudSelectItem>
+                    </MudSelect>
+                </MudStack>
+            </MudStack>
+            @if (!string.IsNullOrWhiteSpace(CurrentView?.Error))
+            {
+                <MudAlert Severity="Severity.Error">@CurrentView!.Error</MudAlert>
+            }
+            <MudTabs Rounded="true" Elevation="0">
+                <MudTabPanel Text="Hierarchy">
+                    <ChildContent>
+                        @if (CurrentView?.IsLoading == true)
+                        {
+                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
+                        }
+                        else if (CurrentView is null || CurrentView.Nodes.Count == 0)
+                        {
+                            <MudText Typo="Typo.body2">No call stack entries available.</MudText>
+                        }
+                        else
+                        {
+                            <MudTreeView T="MethodCallStackNodeModel" Items="@TreeItems">
+                                <ItemTemplate>
+                                    <MudTreeViewItem T="MethodCallStackNodeModel"
+                                                     Value="@context.Value"
+                                                     Items="@context.Children"
+                                                     Text="@context.Text"
+                                                     Expanded="false"
+                                                     CanExpand="@context.Expandable"
+                                                     OnClick="@(() => OnNodeSelected(context.Value!))">
+                                        <BodyContent Context="item">
+                                            @if (item.Value is not null)
+                                            {
+                                                var node = item.Value;
+                                                <MudCard Elevation="0" Class="pa-2">
+                                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                                        <MudStack Spacing="0">
+                                                            <MudText Typo="Typo.subtitle2">@($"{node.TypeName}.{node.MethodName}")</MudText>
+                                                            <MudText Typo="Typo.caption">@node.Namespace</MudText>
+                                                            <MudText Typo="Typo.caption">Line @node.CallSite.LineSpan.StartLine</MudText>
+                                                            @if (node.DecisionRequired)
+                                                            {
+                                                                <MudText Typo="Typo.caption" Color="Color.Warning">Decision required</MudText>
+                                                            }
+                                                        </MudStack>
+                                                        <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                                                       Size="Size.Small"
+                                                                       Color="Color.Primary"
+                                                                       OnClick="@(() => JumpToCallSite(node))" />
+                                                    </MudStack>
+                                                    @if (node.DecisionRequired && node.CandidateTypeNames.Count > 0)
+                                                    {
+                                                        <MudStack Spacing="1" Class="mt-2">
+                                                            <MudSelect T="string"
+                                                                       Dense="true"
+                                                                       Value="@GetDecisionSelection(node.NodeId)"
+                                                                       ValueChanged="value => OnDecisionSelected(node.NodeId, value)"
+                                                                       Label="Implementation">
+                                                                @foreach (var candidate in node.CandidateTypeNames)
+                                                                {
+                                                                    <MudSelectItem Value="@candidate">@candidate</MudSelectItem>
+                                                                }
+                                                            </MudSelect>
+                                                            <MudButton Variant="Variant.Outlined"
+                                                                       Color="Color.Default"
+                                                                       Disabled="@string.IsNullOrWhiteSpace(GetDecisionSelection(node.NodeId))"
+                                                                       OnClick="@(() => SaveDecision(node))">
+                                                                Save decision
+                                                            </MudButton>
+                                                        </MudStack>
+                                                    }
+                                                </MudCard>
+                                            }
+                                        </BodyContent>
+                                    </MudTreeViewItem>
+                                </ItemTemplate>
+                            </MudTreeView>
+                        }
+                    </ChildContent>
+                </MudTabPanel>
+                <MudTabPanel Text="Mermaid">
+                    <ChildContent>
+                        @if (CurrentView?.IsMermaidLoading == true)
+                        {
+                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
+                        }
+                        else if (!string.IsNullOrWhiteSpace(CurrentView?.MermaidError))
+                        {
+                            <MudAlert Severity="Severity.Error">@CurrentView!.MermaidError</MudAlert>
+                        }
+                        else if (string.IsNullOrWhiteSpace(CurrentView?.MermaidDiagram))
+                        {
+                            <MudText Typo="Typo.body2">No Mermaid diagram available.</MudText>
+                        }
+                        else
+                        {
+                            <MudPaper Elevation="0" Class="pa-3">
+                                <IdeMermaidViewer Diagram="@CurrentView!.MermaidDiagram" />
+                            </MudPaper>
+                        }
+                    </ChildContent>
+                </MudTabPanel>
+            </MudTabs>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="ToggleFullScreen">
+            @(_isFullScreen ? "Windowed" : "Full Screen")
+        </MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? Dialog { get; set; }
+
+    private bool _isFullScreen;
+    private readonly Dictionary<string, string> _decisionSelections = new(StringComparer.OrdinalIgnoreCase);
+
+    private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
+    private IdeCallStackViewState? CurrentView => SelectedSolutionId is null
+        ? null
+        : CallStackState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
+            ? view
+            : IdeCallStackViewState.Empty;
+
+    private IReadOnlyList<TreeItemData<MethodCallStackNodeModel>> TreeItems =>
+        CurrentView is null ? Array.Empty<TreeItemData<MethodCallStackNodeModel>>() : BuildTree(CurrentView.Nodes);
+
+    private static IReadOnlyList<TreeItemData<MethodCallStackNodeModel>> BuildTree(
+        IReadOnlyList<MethodCallStackNodeModel> nodes)
+    {
+        var lookup = nodes.GroupBy(node => node.ParentNodeId ?? string.Empty)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        List<TreeItemData<MethodCallStackNodeModel>> BuildChildren(string parentId)
+        {
+            if (!lookup.TryGetValue(parentId, out var children))
+            {
+                return new List<TreeItemData<MethodCallStackNodeModel>>();
+            }
+
+            return children.Select(child => BuildNode(child, BuildChildren(child.NodeId))).ToList();
+        }
+
+        return BuildChildren(string.Empty);
+    }
+
+    private static TreeItemData<MethodCallStackNodeModel> BuildNode(
+        MethodCallStackNodeModel node,
+        List<TreeItemData<MethodCallStackNodeModel>> children)
+    {
+        return new TreeItemData<MethodCallStackNodeModel>
+        {
+            Value = node,
+            Text = $"{node.TypeName}.{node.MethodName}",
+            Expandable = children.Count > 0,
+            Children = children
+        };
+    }
+
+    private void OnNodeSelected(MethodCallStackNodeModel node)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SelectCallStackNodeAction(SelectedSolutionId, node.NodeId));
+    }
+
+    private void JumpToCallSite(MethodCallStackNodeModel node)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        var configId = SolutionsState.Value.Solutions
+            .FirstOrDefault(solution => string.Equals(solution.SolutionId, SelectedSolutionId, StringComparison.OrdinalIgnoreCase))
+            ?.ConfigId;
+        if (!configId.HasValue)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new OpenFileTabByPathAction(
+            SelectedSolutionId,
+            configId.Value,
+            node.CallSite.Path,
+            node.CallSite.LineSpan.StartLine));
+    }
+
+    private void OnShadingChanged(IdeCallStackShadingMode mode)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SetCallStackShadingModeAction(SelectedSolutionId, mode));
+    }
+
+    private void OnIncludeExternalChanged(bool value)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SetCallStackIncludeExternalAction(SelectedSolutionId, value));
+    }
+
+    private bool IncludeExternalCalls
+    {
+        get => CurrentView?.IncludeExternalCalls ?? false;
+        set => OnIncludeExternalChanged(value);
+    }
+
+    private void OnDecisionSelected(string nodeId, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(nodeId))
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            _decisionSelections.Remove(nodeId);
+            return;
+        }
+
+        _decisionSelections[nodeId] = value;
+    }
+
+    private string? GetDecisionSelection(string nodeId)
+    {
+        return _decisionSelections.TryGetValue(nodeId, out var value) ? value : null;
+    }
+
+    private void SaveDecision(MethodCallStackNodeModel node)
+    {
+        if (SelectedSolutionId is null)
+        {
+            return;
+        }
+
+        var configId = SolutionsState.Value.Solutions
+            .FirstOrDefault(solution => string.Equals(solution.SolutionId, SelectedSolutionId, StringComparison.OrdinalIgnoreCase))
+            ?.ConfigId;
+        if (!configId.HasValue)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(node.InterfaceTypeName))
+        {
+            return;
+        }
+
+        var selection = GetDecisionSelection(node.NodeId);
+        if (string.IsNullOrWhiteSpace(selection))
+        {
+            return;
+        }
+
+        var interfaceSignature = BuildInterfaceSignature(
+            node.InterfaceTypeName,
+            node.MethodName,
+            node.ParameterTypes);
+        var candidateMethodDocId = GetCandidateMethodDocId(node, selection);
+
+        Dispatcher.Dispatch(new SaveCallStackDecisionAction(
+            SelectedSolutionId,
+            configId.Value,
+            node.InterfaceTypeName,
+            node.InterfaceTypeDocumentationId,
+            interfaceSignature,
+            node.InterfaceMethodDocumentationId,
+            selection,
+            node.ResolvedTypeDocumentationId,
+            candidateMethodDocId));
+    }
+
+    private static string BuildInterfaceSignature(
+        string interfaceTypeName,
+        string methodName,
+        IReadOnlyList<string> parameterTypes)
+    {
+        var parameterList = parameterTypes.Count == 0
+            ? "none"
+            : string.Join(",", parameterTypes);
+        return $"{interfaceTypeName}.{methodName}.{parameterList}";
+    }
+
+    private static string? GetCandidateMethodDocId(MethodCallStackNodeModel node, string selection)
+    {
+        if (node.CandidateTypeNames.Count == 0)
+        {
+            return null;
+        }
+
+        for (var index = 0; index < node.CandidateTypeNames.Count; index++)
+        {
+            if (!string.Equals(node.CandidateTypeNames[index], selection, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (index < node.CandidateMethodDocumentationIds.Count)
+            {
+                return node.CandidateMethodDocumentationIds[index];
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    private async Task ToggleFullScreen()
+    {
+        if (Dialog is null)
+        {
+            return;
+        }
+
+        _isFullScreen = !_isFullScreen;
+        await Dialog.SetOptionsAsync(new DialogOptions
+        {
+            FullScreen = _isFullScreen,
+            FullWidth = true,
+            MaxWidth = MaxWidth.False
+        });
+    }
+
+    private void Close()
+    {
+        if (SelectedSolutionId is not null)
+        {
+            Dispatcher.Dispatch(new CloseCallStackPopupAction(SelectedSolutionId));
+        }
+
+        Dialog?.Close();
+    }
+}

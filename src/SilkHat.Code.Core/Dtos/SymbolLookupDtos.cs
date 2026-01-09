@@ -1,6 +1,7 @@
 namespace SilkHat.Code.Core.Dtos;
 
 public sealed record SymbolLookupRequest(
+    string? DocumentationId,
     string SymbolKey,
     string ExpectedKind);
 
@@ -9,4 +10,5 @@ public sealed record SymbolLookupResultDto(
     string Kind,
     string Name,
     string? Namespace,
-    string? AssemblyName);
+    string? AssemblyName,
+    string? DocumentationId);

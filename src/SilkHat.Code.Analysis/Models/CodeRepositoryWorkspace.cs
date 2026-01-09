@@ -22,6 +22,7 @@ public sealed record CodeSolutionWorkspace(
     IReadOnlyList<string> Namespaces,
     IReadOnlyList<NamedTypeDto> NamedTypes,
     IReadOnlyDictionary<string, NamedTypeDto> NamedTypesBySymbolKey,
+    IReadOnlyDictionary<string, NamedTypeDto> NamedTypesByDocId,
     IReadOnlyDictionary<string, Compilation> Compilations);
 
 public sealed class CodeRepositoryWorkspace

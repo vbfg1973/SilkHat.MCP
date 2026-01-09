@@ -8,6 +8,7 @@
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeSymbolsState> SymbolsState
 @inject IDispatcher Dispatcher
+@inject IDialogService DialogService
 
 <MudDialog>
     <DialogContent>
@@ -50,6 +51,12 @@
         </MudStack>
     </DialogContent>
     <DialogActions>
+        <MudButton Variant="Variant.Outlined"
+                   Color="Color.Default"
+                   Disabled="@(!CanOpenCallStack)"
+                   OnClick="OpenCallStack">
+            Call Stack
+        </MudButton>
         <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Close">Close</MudButton>
     </DialogActions>
 </MudDialog>
@@ -57,6 +64,8 @@
 @code {
     [CascadingParameter]
     private IMudDialogInstance? Dialog { get; set; }
+
+    private IDialogReference? _callStackDialog;
 
     private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
 
@@ -68,6 +77,13 @@
 
     private IReadOnlyList<TreeItemData<CodeSymbolOutlineNodeModel>> TreeItems =>
         CurrentView is null ? Array.Empty<TreeItemData<CodeSymbolOutlineNodeModel>>() : BuildTree(CurrentView.Nodes);
+
+    private CodeSymbolOutlineNodeModel? SelectedSymbolNode
+        => CurrentView is null
+            ? null
+            : FindNode(CurrentView.Nodes, CurrentView.SelectedDocumentationId, CurrentView.SelectedSymbolKey);
+
+    private bool CanOpenCallStack => SelectedSymbolNode is not null && IsMethodNode(SelectedSymbolNode);
 
     private static IReadOnlyList<TreeItemData<CodeSymbolOutlineNodeModel>> BuildTree(
         IReadOnlyList<CodeSymbolOutlineNodeModel> nodes)
@@ -97,7 +113,42 @@
             return;
         }
 
-        Dispatcher.Dispatch(new SelectSymbolNodeAction(SelectedSolutionId, node.SymbolKey));
+        Dispatcher.Dispatch(new SelectSymbolNodeAction(SelectedSolutionId, node.DocumentationId, node.SymbolKey));
+    }
+
+    private async Task OpenCallStack()
+    {
+        if (SelectedSolutionId is null || SelectedSymbolNode is null)
+        {
+            return;
+        }
+
+        if (!IsMethodNode(SelectedSymbolNode))
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new OpenCallStackPopupAction(
+            SelectedSolutionId,
+            SelectedSymbolNode.DocumentationId,
+            SelectedSymbolNode.SymbolKey));
+        if (_callStackDialog is not null)
+        {
+            return;
+        }
+
+        _callStackDialog = await DialogService.ShowAsync<IdeCallStackPopup>(
+            "Method Call Stack",
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.ExtraLarge, FullWidth = true });
+        var dialogRef = _callStackDialog;
+        _ = dialogRef.Result.ContinueWith(_ => InvokeAsync(() =>
+        {
+            _callStackDialog = null;
+            if (SelectedSolutionId is not null)
+            {
+                Dispatcher.Dispatch(new CloseCallStackPopupAction(SelectedSolutionId));
+            }
+        }));
     }
 
     private void Close()
@@ -108,5 +159,73 @@
         }
 
         Dialog?.Close();
+    }
+
+    private static CodeSymbolOutlineNodeModel? FindNode(
+        IReadOnlyList<CodeSymbolOutlineNodeModel> nodes,
+        string? documentationId,
+        string? symbolKey)
+    {
+        if (!string.IsNullOrWhiteSpace(documentationId))
+        {
+            var docMatch = FindNodeByDocId(nodes, documentationId);
+            if (docMatch is not null)
+            {
+                return docMatch;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(symbolKey))
+        {
+            return null;
+        }
+
+        foreach (var node in nodes)
+        {
+            if (string.Equals(node.SymbolKey, symbolKey, StringComparison.Ordinal))
+            {
+                return node;
+            }
+
+            var child = FindNode(node.Children, documentationId, symbolKey);
+            if (child is not null)
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
+    private static CodeSymbolOutlineNodeModel? FindNodeByDocId(
+        IReadOnlyList<CodeSymbolOutlineNodeModel> nodes,
+        string documentationId)
+    {
+        foreach (var node in nodes)
+        {
+            if (string.Equals(node.DocumentationId, documentationId, StringComparison.Ordinal))
+            {
+                return node;
+            }
+
+            var child = FindNodeByDocId(node.Children, documentationId);
+            if (child is not null)
+            {
+                return child;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsMethodNode(CodeSymbolOutlineNodeModel node)
+    {
+        if (string.Equals(node.SymbolKind, "Method", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return string.Equals(node.RealType, "Method", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(node.RealType, "Constructor", StringComparison.OrdinalIgnoreCase);
     }
 }

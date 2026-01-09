@@ -15,4 +15,4 @@ public sealed record LoadFileSymbolsSuccessAction(
 
 public sealed record LoadFileSymbolsFailureAction(string SolutionId, string RepositoryPath, string Error);
 
-public sealed record SelectSymbolNodeAction(string SolutionId, string SymbolKey);
+public sealed record SelectSymbolNodeAction(string SolutionId, string? DocumentationId, string SymbolKey);

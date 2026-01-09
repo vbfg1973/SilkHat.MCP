@@ -6,6 +6,7 @@ using SilkHat.Analysis.Services;
 using SilkHat.Analysis.Models;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Services;
+using SilkHat.Api.Services;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Git.Analysis.Services;
 using SilkHat.Infrastructure;
@@ -51,6 +52,8 @@ builder.Services.AddSingleton<ICodeWorkspaceLoader, CodeWorkspaceLoader>();
 builder.Services.AddSingleton<ICodeTreeService, CodeTreeService>();
 builder.Services.AddSingleton<ICodeFileService, CodeFileService>();
 builder.Services.AddSingleton<ICodeSymbolOutlineService, CodeSymbolOutlineService>();
+builder.Services.AddScoped<IMethodImplementationDecisionService, MethodImplementationDecisionService>();
+builder.Services.AddScoped<IMethodCallStackService, MethodCallStackService>();
 builder.Services.Configure<RepositoryDiscoveryOptions>(options =>
 {
     options.RepoRoot = builder.Configuration["REPO_ROOT"];

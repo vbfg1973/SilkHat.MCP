@@ -71,6 +71,7 @@ public sealed class CodeFileServiceTests
             new List<string>(),
             new List<NamedTypeDto>(),
             new Dictionary<string, NamedTypeDto>(),
+            new Dictionary<string, NamedTypeDto>(),
             new Dictionary<string, Microsoft.CodeAnalysis.Compilation>());
     }
 }

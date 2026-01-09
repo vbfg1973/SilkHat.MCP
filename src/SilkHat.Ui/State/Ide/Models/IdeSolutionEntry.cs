@@ -1,4 +1,4 @@
-namespace SilkHat.Ui.State.Ide.Models;
+namespace SilkHat.Ui.State.Ide;
 
 public sealed record IdeSolutionEntry(
     string SolutionId,

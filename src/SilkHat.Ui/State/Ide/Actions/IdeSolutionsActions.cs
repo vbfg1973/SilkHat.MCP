@@ -1,4 +1,4 @@
-using SilkHat.Ui.State.Ide.Models;
+using SilkHat.Ui.State.Ide;
 
 namespace SilkHat.Ui.State.Ide.Actions;
 

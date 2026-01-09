@@ -21,6 +21,7 @@ public sealed class CodeWorkspaceStoreTests
             new List<string>(),
             new List<SilkHat.Code.Core.Dtos.NamedTypeDto>(),
             new Dictionary<string, SilkHat.Code.Core.Dtos.NamedTypeDto>(),
+            new Dictionary<string, SilkHat.Code.Core.Dtos.NamedTypeDto>(),
             new Dictionary<string, Microsoft.CodeAnalysis.Compilation>());
         var workspace = new CodeRepositoryWorkspace(
             "/repo",
@@ -49,6 +50,7 @@ public sealed class CodeWorkspaceStoreTests
             new Dictionary<string, IReadOnlyList<SilkHat.Code.Core.Dtos.CodeTreeEntryDto>>(StringComparer.OrdinalIgnoreCase),
             new List<string>(),
             new List<SilkHat.Code.Core.Dtos.NamedTypeDto>(),
+            new Dictionary<string, SilkHat.Code.Core.Dtos.NamedTypeDto>(),
             new Dictionary<string, SilkHat.Code.Core.Dtos.NamedTypeDto>(),
             new Dictionary<string, Microsoft.CodeAnalysis.Compilation>());
         var workspace = new CodeRepositoryWorkspace(

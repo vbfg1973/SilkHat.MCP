@@ -23,6 +23,7 @@ public sealed record IdeSymbolsViewState(
     string? Error,
     string? RepositoryPath,
     IReadOnlyList<CodeSymbolOutlineNodeModel> Nodes,
+    string? SelectedDocumentationId,
     string? SelectedSymbolKey)
 {
     public static IdeSymbolsViewState Empty => new(
@@ -31,5 +32,6 @@ public sealed record IdeSymbolsViewState(
         null,
         null,
         Array.Empty<CodeSymbolOutlineNodeModel>(),
+        null,
         null);
 }

@@ -19,6 +19,57 @@ namespace SilkHat.Infrastructure.Migrations
             modelBuilder.HasAnnotation("Relational:MaxIdentifierLength", 63);
             modelBuilder.HasAnnotation("Npgsql:PostgresVersion", new Version(18, 0));
 
+            modelBuilder.Entity("SilkHat.Infrastructure.Entities.MethodImplementationDecision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ImplementationMethodDocumentationId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImplementationTypeDocumentationId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImplementationTypeName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("InterfaceMethodDocumentationId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("InterfaceMethodSignature")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("InterfaceTypeDocumentationId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("InterfaceTypeName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("RepositoryConfigId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SolutionId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("UpdatedUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RepositoryConfigId", "SolutionId", "InterfaceMethodSignature")
+                        .IsUnique();
+
+                    b.ToTable("MethodImplementationDecisions");
+                });
+
             modelBuilder.Entity("SilkHat.Infrastructure.Entities.RepositoryConfig", b =>
                 {
                     b.Property<Guid>("Id")

@@ -161,6 +161,58 @@ public sealed class RepositoryApiClient
                ?? Array.Empty<CodeSymbolOutlineNodeModel>();
     }
 
+    public async Task<MethodCallStackResponseModel> GetMethodCallStackAsync(
+        Guid repositoryId,
+        string solutionId,
+        MethodCallStackRequestModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"api/repositories/{repositoryId}/code/solutions/{solutionId}/methods/call-stack",
+            request,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<MethodCallStackResponseModel>(cancellationToken: cancellationToken))!;
+    }
+
+    public async Task<MethodCallStackMermaidModel> GetMethodCallStackMermaidAsync(
+        Guid repositoryId,
+        string solutionId,
+        MethodCallStackRequestModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"api/repositories/{repositoryId}/code/solutions/{solutionId}/methods/call-stack/mermaid",
+            request,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<MethodCallStackMermaidModel>(cancellationToken: cancellationToken))!;
+    }
+
+    public async Task<IReadOnlyList<MethodImplementationDecisionModel>> GetMethodImplementationDecisionsAsync(
+        Guid repositoryId,
+        string solutionId,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/{repositoryId}/code/solutions/{solutionId}/decisions/interface-methods";
+        return await GetFromJsonAsync<IReadOnlyList<MethodImplementationDecisionModel>>(url, cancellationToken)
+               ?? Array.Empty<MethodImplementationDecisionModel>();
+    }
+
+    public async Task<MethodImplementationDecisionModel> SaveMethodImplementationDecisionAsync(
+        Guid repositoryId,
+        string solutionId,
+        MethodImplementationDecisionRequestModel request,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.PostAsJsonAsync(
+            $"api/repositories/{repositoryId}/code/solutions/{solutionId}/decisions/interface-methods",
+            request,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<MethodImplementationDecisionModel>(cancellationToken: cancellationToken))!;
+    }
+
     public async Task<PagedResultModel<GitTreeEntryModel>> GetGitTreeAsync(
         Guid repositoryId,
         string? name = null,
