@@ -27,6 +27,7 @@ SilkHat analyzes .NET repositories by loading repository groups, parsing solutio
 - Complexity metrics are computed per solution via `ComplexityMetricsAggregator` using Roslyn syntax trees and strategies.
 - All metrics caches are cleared on repository unload/load to avoid stale values.
 - File author counts roll up as distinct authors across folders/projects (union of file-level authors, not a sum of counts).
+- Graph edges are typed (e.g., Contains, DeclaresType/Member, Inherits, Implements, ImplementsMember, Calls, Changes, AuthoredBy, DependsOnPackage, ExternalReference, HasMetric, PropertyType, FieldType, ReturnType, ParameterType) to allow filtered traversal/degree. Edges are stored as DTOs (SourceId, TargetId, EdgeType, optional payload) for future serialization. Method/constructor metadata captures parameters (name, type DocId/SymbolKey, ordinal, optional) with edges to parameter types.
 
 ## Isolation Rules
 
