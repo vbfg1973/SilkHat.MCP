@@ -3,8 +3,11 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Graph;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace SilkHat.Code.Analysis.Services;
 
@@ -12,13 +15,17 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 {
     private static readonly IReadOnlyList<MetadataReference> DefaultReferences = BuildDefaultReferences();
     private readonly ILogger<CodeWorkspaceLoader> _logger;
+    private readonly IGraphStoreProvider _graphStoreProvider;
     private readonly SolutionParser _solutionParser = new();
     private readonly ProjectParser _projectParser = new();
     private readonly SolutionIdentityResolver _identityResolver = new();
 
-    public CodeWorkspaceLoader(ILogger<CodeWorkspaceLoader> logger)
+    public CodeWorkspaceLoader(
+        ILogger<CodeWorkspaceLoader> logger,
+        IGraphStoreProvider? graphStoreProvider = null)
     {
         _logger = logger;
+        _graphStoreProvider = graphStoreProvider ?? new GraphStoreProvider();
     }
 
     public async Task<CodeRepositoryWorkspace> LoadAsync(
@@ -197,9 +204,93 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 namedTypeByKey,
                 namedTypeByDocId,
                 compilations);
+
+            PopulateGraph(
+                solutionId,
+                parsedSolution.SolutionName,
+                projectIndex,
+                treeEntries,
+                treeChildrenMap,
+                namedTypes);
         }
 
         return new CodeRepositoryWorkspace(rootPath, solutionWorkspaces);
+    }
+
+    private void PopulateGraph(
+        string solutionId,
+        string solutionName,
+        IReadOnlyDictionary<string, ProjectIndex> projects,
+        IReadOnlyList<CodeTreeEntryDto> treeEntries,
+        IReadOnlyDictionary<string, IReadOnlyList<CodeTreeEntryDto>> treeChildrenByParent,
+        IReadOnlyList<NamedTypeDto> namedTypes)
+    {
+        var graph = _graphStoreProvider.GetOrAdd(solutionId);
+
+        var solutionNodeId = CreateStableId($"solution:{solutionId}");
+        graph.AddNode(new GraphNodeDto(solutionNodeId, GraphNodeKind.Solution, solutionName));
+
+        var displayPathToNodeId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var repositoryPathToNodeId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var project in projects.Values)
+        {
+            var projectNodeId = CreateStableId($"project:{project.ProjectKey}");
+            graph.AddNode(new GraphNodeDto(projectNodeId, GraphNodeKind.Project, project.Name));
+            graph.AddEdge(solutionNodeId, projectNodeId, EdgeType.Contains);
+            displayPathToNodeId[project.Name] = projectNodeId;
+        }
+
+        foreach (var entry in treeEntries)
+        {
+            var kind = entry.Type switch
+            {
+                CodeTreeEntryType.Project => GraphNodeKind.Project,
+                CodeTreeEntryType.Directory => GraphNodeKind.Folder,
+                CodeTreeEntryType.File => GraphNodeKind.File,
+                _ => GraphNodeKind.File
+            };
+
+            var nodeId = CreateStableId($"{entry.Type}:{entry.DisplayPath}:{entry.ProjectKey}");
+            graph.AddNode(new GraphNodeDto(nodeId, kind, entry.Name));
+            displayPathToNodeId[entry.DisplayPath] = nodeId;
+            if (entry.Type == CodeTreeEntryType.File)
+            {
+                repositoryPathToNodeId[entry.RepositoryPath] = nodeId;
+            }
+        }
+
+        foreach (var (parent, children) in treeChildrenByParent)
+        {
+            var hasParent = displayPathToNodeId.TryGetValue(parent, out var parentNodeId);
+            // root-level entries hang directly off the solution
+            var rootParentId = hasParent ? parentNodeId : solutionNodeId;
+
+            foreach (var child in children)
+            {
+                if (!displayPathToNodeId.TryGetValue(child.DisplayPath, out var childNodeId))
+                {
+                    continue;
+                }
+
+                graph.AddEdge(rootParentId, childNodeId, EdgeType.Contains);
+            }
+        }
+
+        foreach (var type in namedTypes)
+        {
+            var typeKey = !string.IsNullOrWhiteSpace(type.DocumentationId)
+                ? type.DocumentationId
+                : type.SymbolKey;
+            var typeNodeId = CreateStableId($"type:{typeKey}");
+            graph.AddNode(new GraphNodeDto(typeNodeId, GraphNodeKind.NamedType, type.Name));
+
+            if (!string.IsNullOrWhiteSpace(type.FilePath) &&
+                repositoryPathToNodeId.TryGetValue(type.FilePath, out var fileNodeId))
+            {
+                graph.AddEdge(fileNodeId, typeNodeId, EdgeType.DeclaresType);
+            }
+        }
     }
 
     private Dictionary<string, ParsedProject> LoadProjectsForSolution(ParsedSolution solution)
@@ -628,5 +719,13 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         }
 
         return normalized;
+    }
+
+    private static Guid CreateStableId(string key)
+    {
+        using var md5 = MD5.Create();
+        var bytes = Encoding.UTF8.GetBytes(key);
+        var hash = md5.ComputeHash(bytes);
+        return new Guid(hash);
     }
 }
