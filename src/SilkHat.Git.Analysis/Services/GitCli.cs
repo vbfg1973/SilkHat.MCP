@@ -256,6 +256,12 @@ public sealed class GitCli : IGitCli
             args.Add(merge.Value ? "--merges" : "--no-merges");
         }
 
+        if (!applyShaFilter)
+        {
+            args.Add($"--skip={skip}");
+            args.Add($"--max-count={normalizedPageSize}");
+        }
+
         var normalizedPath = string.Empty;
         if (!string.IsNullOrWhiteSpace(path))
         {
@@ -264,12 +270,6 @@ public sealed class GitCli : IGitCli
             args.Add("--find-renames");
             args.Add("--");
             args.Add(normalizedPath);
-        }
-
-        if (!applyShaFilter)
-        {
-            args.Add($"--skip={skip}");
-            args.Add($"--max-count={normalizedPageSize}");
         }
 
         var result = await _runner.ExecuteAsync(repoRoot, args.ToArray(), cancellationToken);
