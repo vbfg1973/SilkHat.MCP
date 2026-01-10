@@ -127,12 +127,42 @@ public sealed class RepositoryApiClient
         Guid repositoryId,
         string solutionId,
         string? parentId = null,
+        CodeTreeAnnotationKind? annotationKind = null,
+        CodeTreeAnnotationKind? filterMetric = null,
+        CodeTreeFilterOperator? filterOperator = null,
+        int? filterThreshold = null,
         CancellationToken cancellationToken = default)
     {
         var url = $"api/repositories/{repositoryId}/code/solutions/{solutionId}/tree";
+        var query = new List<string>();
         if (!string.IsNullOrWhiteSpace(parentId))
         {
-            url += $"?parentId={Uri.EscapeDataString(parentId)}";
+            query.Add($"parentId={Uri.EscapeDataString(parentId)}");
+        }
+
+        if (annotationKind is not null)
+        {
+            query.Add($"annotationKind={Uri.EscapeDataString(annotationKind.Value.ToString())}");
+        }
+
+        if (filterMetric is not null)
+        {
+            query.Add($"filterMetric={Uri.EscapeDataString(filterMetric.Value.ToString())}");
+        }
+
+        if (filterOperator is not null)
+        {
+            query.Add($"filterOperator={Uri.EscapeDataString(filterOperator.Value.ToString())}");
+        }
+
+        if (filterThreshold is not null)
+        {
+            query.Add($"filterThreshold={filterThreshold.Value}");
+        }
+
+        if (query.Count > 0)
+        {
+            url += "?" + string.Join("&", query);
         }
 
         return await GetFromJsonAsync<PagedResultModel<CodeTreeEntryModel>>(url, cancellationToken)

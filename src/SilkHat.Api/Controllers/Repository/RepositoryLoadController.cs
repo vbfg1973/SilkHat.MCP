@@ -25,6 +25,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
     private readonly ILoadedRepositoryStore _store;
     private readonly ICodeWorkspaceStore _codeStore;
     private readonly IGitRepositoryCacheStore _gitCacheStore;
+    private readonly ICodeTreeMetricsPrecomputeService _metricsPrecomputeService;
     private readonly IRepoCommandProcessor _processor;
     private readonly ICodeWorkspaceLoader _workspaceLoader;
     private readonly IApiCache _cache;
@@ -34,6 +35,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
         ILoadedRepositoryStore store,
         ICodeWorkspaceStore codeStore,
         IGitRepositoryCacheStore gitCacheStore,
+        ICodeTreeMetricsPrecomputeService metricsPrecomputeService,
         IRepoCommandProcessor processor,
         ICodeWorkspaceLoader workspaceLoader,
         IApiCache cache)
@@ -42,6 +44,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
         _store = store;
         _codeStore = codeStore;
         _gitCacheStore = gitCacheStore;
+        _metricsPrecomputeService = metricsPrecomputeService;
         _processor = processor;
         _workspaceLoader = workspaceLoader;
         _cache = cache;
@@ -52,6 +55,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
     public async Task<IActionResult> Load(Guid id, CancellationToken cancellationToken)
     {
         _cache.InvalidateAll();
+        _metricsPrecomputeService.Clear(id);
         var config = await _dbContext.RepositoryConfigs
             .Include(item => item.Solutions)
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
@@ -87,6 +91,8 @@ public sealed class RepositoryLoadController : ApiControllerBase
             await Response.Body.FlushAsync(cancellationToken);
         }
 
+        _ = _metricsPrecomputeService.StartPrecomputeAsync(id, CancellationToken.None);
+
         return new EmptyResult();
     }
 
@@ -105,6 +111,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
         var unloaded = _store.Unload(id);
         _codeStore.Remove(id);
         _gitCacheStore.Remove(id);
+        _metricsPrecomputeService.Clear(id);
         var message = unloaded ? "Repository unloaded." : "Repository was not loaded.";
 
         return Ok(new RepoEventDto(

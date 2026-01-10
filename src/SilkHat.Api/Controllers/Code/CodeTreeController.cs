@@ -4,6 +4,7 @@ using SilkHat.Code.Core.Dtos;
 using SilkHat.Api.Models;
 using SilkHat.Api.Extensions;
 using SilkHat.Core.Dtos;
+using SilkHat.Api.Services;
 
 namespace SilkHat.Api.Controllers;
 
@@ -11,19 +12,20 @@ namespace SilkHat.Api.Controllers;
 public sealed class CodeTreeController : ApiControllerBase
 {
     private readonly ICodeWorkspaceStore _store;
-    private readonly ICodeTreeService _treeService;
+    private readonly ICodeTreeQueryService _queryService;
 
-    public CodeTreeController(ICodeWorkspaceStore store, ICodeTreeService treeService)
+    public CodeTreeController(ICodeWorkspaceStore store, ICodeTreeQueryService queryService)
     {
         _store = store;
-        _treeService = treeService;
+        _queryService = queryService;
     }
 
     [HttpGet]
-    public ActionResult<PagedResult<CodeTreeEntryDto>> GetTree(
+    public async Task<ActionResult<PagedResult<CodeTreeEntryDto>>> GetTree(
         Guid id,
         string solutionId,
-        [FromQuery] CodeTreeQuery query)
+        [FromQuery] CodeTreeQuery query,
+        CancellationToken cancellationToken)
     {
         if (!ModelState.IsValid)
         {
@@ -48,8 +50,7 @@ public sealed class CodeTreeController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
         }
 
-        var paging = new PagingQuery { PageNumber = query.PageNumber, PageSize = query.PageSize }.ResolvePaging();
-        var results = _treeService.GetTree(solution, query.ParentId).ToPagedResult(paging);
+        var results = await _queryService.GetTreeAsync(id, workspace, solution, query, cancellationToken);
         return Ok(results);
     }
 }

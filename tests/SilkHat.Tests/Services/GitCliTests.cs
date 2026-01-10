@@ -132,6 +132,20 @@ M	src/Other.cs
     }
 
     [Fact]
+    public async Task GetFileAuthorCountAsync_ReturnsDistinctAuthorCount()
+    {
+        var runner = new FakeGitCommandRunner();
+        runner.Add("log --follow --pretty=format:%an -- src/Program.cs", "alice\nbob\nalice\n");
+
+        var cacheStore = new GitRepositoryCacheStore();
+        var cli = new GitCli(runner, cacheStore);
+
+        var count = await cli.GetFileAuthorCountAsync(Guid.NewGuid(), "/repo", "src/Program.cs", CancellationToken.None);
+
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
     public async Task GetCurrentBranchAsync_ReturnsBranchName()
     {
         var runner = new FakeGitCommandRunner();

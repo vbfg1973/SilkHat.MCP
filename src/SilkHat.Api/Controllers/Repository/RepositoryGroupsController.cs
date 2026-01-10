@@ -24,6 +24,7 @@ public sealed class RepositoryGroupsController : ApiControllerBase
     private readonly ILoadedRepositoryStore _store;
     private readonly ICodeWorkspaceStore _codeStore;
     private readonly IGitRepositoryCacheStore _gitCacheStore;
+    private readonly ICodeTreeMetricsPrecomputeService _metricsPrecomputeService;
     private readonly IRepoCommandProcessor _processor;
     private readonly ICodeWorkspaceLoader _workspaceLoader;
     private readonly IApiCache _cache;
@@ -33,6 +34,7 @@ public sealed class RepositoryGroupsController : ApiControllerBase
         ILoadedRepositoryStore store,
         ICodeWorkspaceStore codeStore,
         IGitRepositoryCacheStore gitCacheStore,
+        ICodeTreeMetricsPrecomputeService metricsPrecomputeService,
         IRepoCommandProcessor processor,
         ICodeWorkspaceLoader workspaceLoader,
         IApiCache cache)
@@ -41,6 +43,7 @@ public sealed class RepositoryGroupsController : ApiControllerBase
         _store = store;
         _codeStore = codeStore;
         _gitCacheStore = gitCacheStore;
+        _metricsPrecomputeService = metricsPrecomputeService;
         _processor = processor;
         _workspaceLoader = workspaceLoader;
         _cache = cache;
@@ -144,6 +147,7 @@ public sealed class RepositoryGroupsController : ApiControllerBase
             _store.Unload(loaded.ConfigId);
             _codeStore.Remove(loaded.ConfigId);
             _gitCacheStore.Remove(loaded.ConfigId);
+            _metricsPrecomputeService.Clear(loaded.ConfigId);
         }
 
         var results = new List<RepositoryLoadResultDto>();
@@ -176,6 +180,11 @@ public sealed class RepositoryGroupsController : ApiControllerBase
             var loaded = _store.Get(config.Id) is not null;
             var message = lastEvent?.Summary?.Message ?? lastEvent?.Message ?? "No events returned.";
             results.Add(new RepositoryLoadResultDto(config.Id, config.Name, loaded, message));
+
+            if (loaded)
+            {
+                _ = _metricsPrecomputeService.StartPrecomputeAsync(config.Id, CancellationToken.None);
+            }
         }
 
         if (updatedSolutions)

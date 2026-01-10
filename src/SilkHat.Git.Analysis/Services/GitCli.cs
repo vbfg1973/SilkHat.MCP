@@ -601,6 +601,36 @@ public sealed class GitCli : IGitCli
         return new GitFileChangeCountDto(NormalizePath(normalizedKey), count);
     }
 
+    public async Task<int> GetFileAuthorCountAsync(
+        Guid configId,
+        string repoRoot,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var normalizedKey = NormalizePathKey(path);
+        var result = await _runner.ExecuteAsync(
+            repoRoot,
+            new[]
+            {
+                "log",
+                "--follow",
+                "--pretty=format:%an",
+                "--",
+                normalizedKey
+            },
+            cancellationToken);
+        EnsureSuccess(result, "git log");
+
+        var authors = result.StandardOutput
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(author => author.Trim())
+            .Where(author => !string.IsNullOrWhiteSpace(author))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        return authors;
+    }
+
     public async Task<string> GetCurrentBranchAsync(
         Guid configId,
         string repoRoot,

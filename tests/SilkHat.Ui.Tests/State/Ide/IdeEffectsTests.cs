@@ -109,7 +109,13 @@ public sealed class IdeEffectsTests
             "Program.cs",
             CodeTreeEntryType.File,
             "alpha",
-            "Repo One");
+            "Repo One",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
 
         await effects.HandleOpenFile(new OpenFileTabAction("solution-1", configId, entry), dispatcher);
 

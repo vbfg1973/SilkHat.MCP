@@ -21,5 +21,27 @@ public sealed class CodeTreeQueryValidator : AbstractValidator<CodeTreeQuery>
             .WithMessage("PageSize must be at least 1.")
             .Must(value => value is null || value <= PagingDefaults.MaxPageSize)
             .WithMessage($"PageSize must be at most {PagingDefaults.MaxPageSize}.");
+
+        When(HasAnyFilterField, () =>
+        {
+            RuleFor(query => query.FilterMetric)
+                .NotNull()
+                .WithMessage("FilterMetric is required when filtering.");
+            RuleFor(query => query.FilterOperator)
+                .NotNull()
+                .WithMessage("FilterOperator is required when filtering.");
+            RuleFor(query => query.FilterThreshold)
+                .NotNull()
+                .WithMessage("FilterThreshold is required when filtering.")
+                .Must(value => value is null || value >= 0)
+                .WithMessage("FilterThreshold must be at least 0.");
+        });
+    }
+
+    private static bool HasAnyFilterField(CodeTreeQuery query)
+    {
+        return query.FilterMetric is not null
+            || query.FilterOperator is not null
+            || query.FilterThreshold is not null;
     }
 }

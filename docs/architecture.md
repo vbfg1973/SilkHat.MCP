@@ -4,7 +4,7 @@ SilkHat analyzes .NET repositories by loading repository groups, parsing solutio
 
 ## Major Components
 
-- API (`src/SilkHat.Api`): ASP.NET Core controllers, ProblemDetails responses, CORS for the UI, and HybridCache for read-mostly endpoints (invalidated on repository load).
+- API (`src/SilkHat.Api`): ASP.NET Core controllers, ProblemDetails responses, CORS for the UI, HybridCache for read-mostly endpoints, and in-memory code tree metrics caches (invalidated on repository load/unload).
 - Analysis runtime (`src/SilkHat.Analysis`): repository load orchestration, command processing, and runtime state.
 - Code analysis (`src/SilkHat.Code.Analysis`): solution parsing, workspace construction, code tree entries, and code file reads.
 - Git analysis (`src/SilkHat.Git.Analysis`): git CLI integration with caches for history and tree metadata.
@@ -18,6 +18,15 @@ SilkHat analyzes .NET repositories by loading repository groups, parsing solutio
 3. Code endpoints are solution-scoped and query the workspace for projects, namespaces, types, and tree entries.
 4. File contents are read directly from disk using repository roots and tree entries for fast access.
 5. The UI requests tree nodes lazily and opens file tabs when a file node is selected.
+
+## Code Tree Metrics (Annotations/Filters)
+
+- Tree annotation/filter metrics are precomputed per solution on repository load.
+- `CodeTreeMetricsPrecomputeService` triggers parallel metric builds and stores results in `CodeTreeMetricsCacheStore`.
+- Git-derived metrics are computed once per repository via `GitMetricsAggregator` (single `git log --numstat` pass).
+- Complexity metrics are computed per solution via `ComplexityMetricsAggregator` using Roslyn syntax trees and strategies.
+- All metrics caches are cleared on repository unload/load to avoid stale values.
+- File author counts roll up as distinct authors across folders/projects (union of file-level authors, not a sum of counts).
 
 ## Isolation Rules
 
@@ -37,6 +46,7 @@ The IDE view uses Fluxor for state management. Other UI pages remain on local co
 State:
 - Solutions: available solutions, selected solution id (`IdeSolutionsState`).
 - Tree: per-solution tree roots and lazy children (`IdeTreeState`).
+- Tree settings: annotation/filter settings and master toggle (`IdeTreeSettingsState`).
 - Tabs: per-solution open files, active tab index, diff toggle state, commit metadata (`IdeTabsState`).
 - Symbols: per-solution symbol popup state, active file, and symbol outline tree (`IdeSymbolsState`).
 - Call stack: per-solution call stack popup state, call nodes, mermaid diagram, and selected node (`IdeCallStackState`).
@@ -45,14 +55,15 @@ State:
 
 Actions and effects:
 - Load solutions, select solution, load tree root/children, open file tab, close tabs, toggle diff.
-- Effects call API endpoints: `/api/repositories/loaded`, `/api/repositories/{id}/code/solutions/{solutionId}/tree`, `/api/repositories/{id}/code/solutions/{solutionId}/files`.
+- Tree settings actions update annotation/filter state and reload tree nodes.
+- Effects call API endpoints: `/api/repositories/loaded`, `/api/repositories/{id}/code/solutions/{solutionId}/tree` (with optional annotation/filter query params), `/api/repositories/{id}/code/solutions/{solutionId}/files`.
 - Symbol popup effects call `/api/repositories/{id}/code/solutions/{solutionId}/files/symbols?path=...` and reload when the active tab changes while the popup is open.
 - Call stack effects call `/api/repositories/{id}/code/solutions/{solutionId}/methods/call-stack` and `/api/repositories/{id}/code/solutions/{solutionId}/methods/call-stack/mermaid`.
 - Decision effects call `/api/repositories/{id}/code/solutions/{solutionId}/decisions/pending`, `/resolved`, `/discover`, `/resolve`, `/notes`, `/activate`, and `/validate` to manage decision lifecycle and notes.
 
 Components:
 - `IdeSolutionSelector` uses solutions state and dispatches selection actions.
-- `IdeTree` uses solutions + tree state and dispatches tree load and open-file actions.
+- `IdeTree` uses solutions + tree + tree settings state, renders annotation badges, and dispatches tree load and open-file actions.
 - `IdeTabs` uses tabs state and dispatches close/toggle actions.
 - `IdeSymbolPopup` renders the named type/member outline for the active file and dispatches symbol selection.
 - `IdeCallStackPopup` renders the call stack tree and mermaid output and dispatches open-file actions for call sites.

@@ -6,4 +6,5 @@ public sealed record SymbolOutlineNodeDto(
     string Name,
     string SymbolKind,
     string RealType,
+    CodeLocationDto? Location,
     IReadOnlyList<SymbolOutlineNodeDto> Children);

@@ -6,4 +6,5 @@ public sealed record CodeSymbolOutlineNodeModel(
     string Name,
     string SymbolKind,
     string RealType,
+    CodeLocationModel? Location,
     IReadOnlyList<CodeSymbolOutlineNodeModel> Children);

@@ -35,7 +35,7 @@ public sealed class IdeTests
             {
                 new()
                 {
-                    Value = new CodeTreeEntryModel("./RepoOne", "Repo One", "Repo One", CodeTreeEntryType.Project, "alpha", "Repo One"),
+                    Value = new CodeTreeEntryModel("./RepoOne", "Repo One", "Repo One", CodeTreeEntryType.Project, "alpha", "Repo One", null, null, null, null, null, null),
                     Text = "Repo One"
                 }
             })
@@ -43,6 +43,7 @@ public sealed class IdeTests
 
         context.Services.AddScoped<IState<IdeSolutionsState>>(_ => new StateWrapper<IdeSolutionsState>(solutionsState));
         context.Services.AddScoped<IState<IdeTreeState>>(_ => new StateWrapper<IdeTreeState>(treeState));
+        context.Services.AddScoped<IState<IdeTreeSettingsState>>(_ => new StateWrapper<IdeTreeSettingsState>(IdeTreeSettingsState.Default));
         context.Services.AddScoped<IState<IdeDecisionsState>>(_ => new StateWrapper<IdeDecisionsState>(new IdeDecisionsState()));
         context.Services.AddScoped<IState<IdeSymbolsState>>(_ => new StateWrapper<IdeSymbolsState>(new IdeSymbolsState()));
         context.Services.AddScoped<IDispatcher>(_ => new RecordingDispatcher());

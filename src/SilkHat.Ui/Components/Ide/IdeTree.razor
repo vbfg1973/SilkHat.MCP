@@ -8,17 +8,42 @@
 @inherits FluxorComponent
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeTreeState> TreeState
+@inject IState<IdeTreeSettingsState> TreeSettingsState
 @inject IDispatcher Dispatcher
+@inject IDialogService DialogService
 
 @if (!string.IsNullOrWhiteSpace(CurrentTree?.Error))
 {
     <MudAlert Severity="Severity.Error" Class="mb-2">@CurrentTree!.Error</MudAlert>
 }
 
+<div class="ide-tree-container">
+    <div class="ide-tree-toolbar">
+        <MudTooltip Text="Annotate" Placement="Placement.Bottom">
+            <MudIconButton Icon="@Icons.Material.Filled.Label"
+                           Color="Color.Default"
+                           Size="Size.Small"
+                           OnClick="OpenAnnotationDialog" />
+        </MudTooltip>
+        <MudTooltip Text="Filter" Placement="Placement.Bottom">
+            <MudIconButton Icon="@Icons.Material.Filled.FilterAlt"
+                           Color="Color.Default"
+                           Size="Size.Small"
+                           OnClick="OpenFilterDialog" />
+        </MudTooltip>
+        <MudTooltip Text="Toggle Annotations/Filters" Placement="Placement.Bottom">
+            <MudIconButton Icon="@(TreeSettingsState.Value.IsEnabled ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                           Color="Color.Default"
+                           Size="Size.Small"
+                           OnClick="ToggleDecorations" />
+        </MudTooltip>
+    </div>
+
 <div class="ide-tree-scroll">
     <MudTreeView T="CodeTreeEntryModel"
+                 @key="TreeRenderKey"
                  Class="ide-tree-viewer"
-                 Style="font-size: 10px;"
+                 Style="font-size: 9px;"
                  Dense="true"
                  ServerData="LoadTreeChildrenAsync"
                  Items="CurrentTree?.Items">
@@ -32,10 +57,23 @@
                          CanExpand="@context.Expandable"
                          Icon="@context.Icon"
                          LoadingIconColor="Color.Info"
-                         Style="font-size: 10px;"
-                         OnClick="@(async (MouseEventArgs _) => await OnTreeEntrySelected(context.Value))" />
+                         Style="font-size: 9px;"
+                         OnClick="@(async (MouseEventArgs _) => await OnTreeEntrySelected(context.Value))">
+                <BodyContent Context="item">
+                    <div class="ide-tree-item">
+                        <span>@item.Value?.Name</span>
+                        @if (item.Value?.AnnotationKind is not null && item.Value.AnnotationValue is not null)
+                        {
+                            <MudBadge Content="@item.Value.AnnotationValue"
+                                      Color="Color.Info"
+                                      Class="ide-tree-badge" />
+                        }
+                    </div>
+                </BodyContent>
+            </MudTreeViewItem>
     </ItemTemplate>
 </MudTreeView>
+</div>
 </div>
 
 @code {
@@ -46,6 +84,7 @@
             : IdeTreeViewState.Empty;
 
     private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+    private string TreeRenderKey => $"{SelectedSolutionId}:{TreeSettingsState.Value.IsEnabled}:{TreeSettingsState.Value.AnnotationKind}:{TreeSettingsState.Value.FilterMetric}:{TreeSettingsState.Value.FilterOperator}:{TreeSettingsState.Value.FilterThreshold}";
 
     private Guid? CurrentConfigId
     {
@@ -87,8 +126,35 @@
             return Task.CompletedTask;
         }
 
+        if (entry.Type == CodeTreeEntryType.Member && IsMethodEntry(entry))
+        {
+            Dispatcher.Dispatch(new OpenFileTabByPathAction(
+                SelectedSolutionId,
+                CurrentConfigId.Value,
+                entry.RepositoryPath,
+                entry.Location?.LineSpan.StartLine,
+                entry.Location?.LineSpan.StartLine,
+                entry.Location?.LineSpan.EndLine));
+            return Task.CompletedTask;
+        }
+
+        if (entry.Type != CodeTreeEntryType.File)
+        {
+            return Task.CompletedTask;
+        }
+
         Dispatcher.Dispatch(new OpenFileTabAction(SelectedSolutionId, CurrentConfigId.Value, entry));
         return Task.CompletedTask;
+    }
+
+    private static bool IsMethodEntry(CodeTreeEntryModel entry)
+    {
+        return entry.RealType?.ToLowerInvariant() switch
+        {
+            "method" => true,
+            "constructor" => true,
+            _ => false
+        };
     }
 
     private static void OnItemsLoaded(
@@ -96,5 +162,75 @@
         IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>> children)
     {
         treeItemData.Children = children?.ToList() ?? new List<TreeItemData<CodeTreeEntryModel>>();
+    }
+
+    private async Task OpenAnnotationDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            { nameof(IdeTreeAnnotationDialog.AnnotationKind), TreeSettingsState.Value.AnnotationKind }
+        };
+
+        var dialog = await DialogService.ShowAsync<IdeTreeAnnotationDialog>(
+            "Annotations",
+            parameters,
+            new DialogOptions
+            {
+                CloseOnEscapeKey = true,
+                MaxWidth = MaxWidth.Small
+            });
+
+        if (dialog is null)
+        {
+            return;
+        }
+
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not CodeTreeAnnotationSelection selection)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SetTreeAnnotationAction(selection.AnnotationKind));
+        Dispatcher.Dispatch(new SetTreeDecorationsEnabledAction(true));
+    }
+
+    private async Task OpenFilterDialog()
+    {
+        var settings = TreeSettingsState.Value;
+        var parameters = new DialogParameters
+        {
+            { nameof(IdeTreeFilterDialog.Metric), settings.FilterMetric },
+            { nameof(IdeTreeFilterDialog.Operator), settings.FilterOperator },
+            { nameof(IdeTreeFilterDialog.Threshold), settings.FilterThreshold }
+        };
+
+        var dialog = await DialogService.ShowAsync<IdeTreeFilterDialog>(
+            "Filter",
+            parameters,
+            new DialogOptions
+            {
+                CloseOnEscapeKey = true,
+                MaxWidth = MaxWidth.Small
+            });
+
+        if (dialog is null)
+        {
+            return;
+        }
+
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not CodeTreeFilterSelection selection)
+        {
+            return;
+        }
+
+        Dispatcher.Dispatch(new SetTreeFilterAction(selection.Metric, selection.Operator, selection.Threshold));
+        Dispatcher.Dispatch(new SetTreeDecorationsEnabledAction(true));
+    }
+
+    private void ToggleDecorations()
+    {
+        Dispatcher.Dispatch(new SetTreeDecorationsEnabledAction(!TreeSettingsState.Value.IsEnabled));
     }
 }

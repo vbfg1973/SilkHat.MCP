@@ -165,6 +165,20 @@ public sealed class GitCommitIntegrationTests
         Assert.True(count.ChangeCount > 0);
     }
 
+    [Fact]
+    public async Task GetFileAuthorCount_ReturnsPositiveCount()
+    {
+        var git = BuildGitCli();
+
+        var count = await git.GetFileAuthorCountAsync(
+            Guid.NewGuid(),
+            RepoRoot,
+            "docs/README.md",
+            CancellationToken.None);
+
+        Assert.True(count > 0);
+    }
+
     private static GitCli BuildGitCli()
     {
         return new GitCli(new GitCommandRunner(), new GitRepositoryCacheStore());
