@@ -219,7 +219,9 @@
             SelectedSolutionId,
             configId.Value,
             node.CallSite.Path,
-            node.CallSite.LineSpan.StartLine));
+            node.CallSite.LineSpan.StartLine,
+            null,
+            null));
     }
 
     private void OnShadingChanged(IdeCallStackShadingMode mode)

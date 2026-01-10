@@ -5,5 +5,9 @@ namespace SilkHat.Code.Analysis.Abstractions;
 
 public interface ICodeTreeService
 {
-    IReadOnlyList<CodeTreeEntryDto> GetTree(CodeSolutionWorkspace solution, string? parentId);
+    Task<IReadOnlyList<CodeTreeEntryDto>> GetTreeAsync(
+        CodeRepositoryWorkspace workspace,
+        CodeSolutionWorkspace solution,
+        string? parentId,
+        CancellationToken cancellationToken);
 }

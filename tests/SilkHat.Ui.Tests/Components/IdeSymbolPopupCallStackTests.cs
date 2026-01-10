@@ -23,7 +23,7 @@ public sealed class IdeSymbolPopupCallStackTests
         var solutionId = "solution-1";
         var nodes = new List<CodeSymbolOutlineNodeModel>
         {
-            new("symbol-key", "M:Samples.Program.Run", "Run", "Method", "Method", Array.Empty<CodeSymbolOutlineNodeModel>())
+            new("symbol-key", "M:Samples.Program.Run", "Run", "Method", "Method", null, Array.Empty<CodeSymbolOutlineNodeModel>())
         };
         var symbolsState = new IdeSymbolsState(new Dictionary<string, IdeSymbolsViewState>(StringComparer.OrdinalIgnoreCase)
         {

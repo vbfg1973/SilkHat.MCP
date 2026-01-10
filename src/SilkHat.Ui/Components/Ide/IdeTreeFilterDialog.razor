@@ -1,0 +1,83 @@
+@using MudBlazor
+@using SilkHat.Ui.Models
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.subtitle2">Filter</MudText>
+            <MudSelect T="CodeTreeAnnotationKind?" Label="Metric" Dense="true" @bind-Value="_metric">
+                <MudSelectItem T="CodeTreeAnnotationKind?" Value="@(null)">None</MudSelectItem>
+                @foreach (var metric in Enum.GetValues<CodeTreeAnnotationKind>())
+                {
+                    <MudSelectItem T="CodeTreeAnnotationKind?" Value="@metric">@metric</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="CodeTreeFilterOperator?" Label="Operator" Dense="true" @bind-Value="_operator" Disabled="@(_metric is null)">
+                <MudSelectItem T="CodeTreeFilterOperator?" Value="@(null)">None</MudSelectItem>
+                @foreach (var op in Enum.GetValues<CodeTreeFilterOperator>())
+                {
+                    <MudSelectItem T="CodeTreeFilterOperator?" Value="@op">@op</MudSelectItem>
+                }
+            </MudSelect>
+            <MudNumericField T="int?"
+                             Label="Threshold"
+                             Min="0"
+                             @bind-Value="_threshold"
+                             Disabled="@(_metric is null)" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="Clear">Clear</MudButton>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">Apply</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance? Dialog { get; set; }
+
+    [Parameter]
+    public CodeTreeAnnotationKind? Metric { get; set; }
+
+    [Parameter]
+    public CodeTreeFilterOperator? Operator { get; set; }
+
+    [Parameter]
+    public int? Threshold { get; set; }
+
+    private CodeTreeAnnotationKind? _metric;
+    private CodeTreeFilterOperator? _operator;
+    private int? _threshold;
+
+    protected override void OnInitialized()
+    {
+        _metric = Metric;
+        _operator = Operator;
+        _threshold = Threshold;
+    }
+
+    private void Save()
+    {
+        if (_metric is null)
+        {
+            Dialog?.Close(DialogResult.Ok(new CodeTreeFilterSelection(null, null, null)));
+            return;
+        }
+
+        Dialog?.Close(DialogResult.Ok(new CodeTreeFilterSelection(_metric, _operator, _threshold)));
+    }
+
+    private void Cancel()
+    {
+        Dialog?.Cancel();
+    }
+
+    private void Clear()
+    {
+        _metric = null;
+        _operator = null;
+        _threshold = null;
+        Dialog?.Close(DialogResult.Ok(new CodeTreeFilterSelection(null, null, null)));
+    }
+}

@@ -535,7 +535,10 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         string name,
         CodeTreeEntryType type,
         string projectKey,
-        string projectName)
+        string projectName,
+        string? documentationId = null,
+        string? symbolKind = null,
+        string? realType = null)
     {
         var key = $"{type}:{repositoryPath}:{projectKey}";
         if (!keys.Add(key))
@@ -549,7 +552,13 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             name,
             type,
             projectKey,
-            projectName));
+            projectName,
+            documentationId,
+            symbolKind,
+            realType,
+            null,
+            null,
+            null));
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<CodeTreeEntryDto>> BuildTreeChildrenMap(

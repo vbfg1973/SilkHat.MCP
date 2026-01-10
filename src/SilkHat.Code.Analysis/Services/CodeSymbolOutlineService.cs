@@ -146,13 +146,14 @@ public sealed class CodeSymbolOutlineService : ICodeSymbolOutlineService
             .ThenBy(child => child.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return new SymbolOutlineNodeDto(
-            SymbolKeyUtility.GetSymbolKeyString(symbol, compilation),
-            DocumentationIdUtility.GetDocumentationId(symbol),
-            symbol.Name,
-            symbol.Kind.ToString(),
-            GetRealType(symbol),
-            orderedChildren);
+            return new SymbolOutlineNodeDto(
+                SymbolKeyUtility.GetSymbolKeyString(symbol, compilation),
+                DocumentationIdUtility.GetDocumentationId(symbol),
+                symbol.Name,
+                symbol.Kind.ToString(),
+                GetRealType(symbol),
+                CreateLocation(symbol),
+                orderedChildren);
     }
 
     private static SymbolOutlineNodeDto BuildMemberNode(ISymbol symbol, Compilation compilation)
@@ -163,6 +164,7 @@ public sealed class CodeSymbolOutlineService : ICodeSymbolOutlineService
             symbol.Name,
             symbol.Kind.ToString(),
             GetRealType(symbol),
+            CreateLocation(symbol),
             Array.Empty<SymbolOutlineNodeDto>());
     }
 
@@ -190,6 +192,26 @@ public sealed class CodeSymbolOutlineService : ICodeSymbolOutlineService
             IEventSymbol => "Event",
             _ => symbol.Kind.ToString()
         };
+    }
+
+    private static CodeLocationDto? CreateLocation(ISymbol symbol)
+    {
+        var location = symbol.Locations.FirstOrDefault(candidate => candidate.IsInSource);
+        if (location?.SourceTree is null)
+        {
+            return null;
+        }
+
+        var span = location.SourceSpan;
+        var lineSpan = location.GetLineSpan();
+        return new CodeLocationDto(
+            location.SourceTree.FilePath,
+            new CodeTextSpanDto(span.Start, span.Length),
+            new CodeLineSpanDto(
+                lineSpan.StartLinePosition.Line + 1,
+                lineSpan.StartLinePosition.Character + 1,
+                lineSpan.EndLinePosition.Line + 1,
+                lineSpan.EndLinePosition.Character + 1));
     }
 
     private static string GetNamedTypeKind(INamedTypeSymbol symbol)

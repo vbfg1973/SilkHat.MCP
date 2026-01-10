@@ -84,7 +84,12 @@ public sealed class IdeTabsEffects
                 string.Equals(file.RepositoryPath, action.RepositoryPath, StringComparison.OrdinalIgnoreCase));
             if (existingIndex >= 0)
             {
-                dispatcher.Dispatch(new FocusFileTabAction(action.SolutionId, existingIndex, action.HighlightLine));
+                dispatcher.Dispatch(new FocusFileTabAction(
+                    action.SolutionId,
+                    existingIndex,
+                    action.HighlightLine,
+                    action.HighlightStartLine,
+                    action.HighlightEndLine));
                 return;
             }
         }
@@ -101,10 +106,18 @@ public sealed class IdeTabsEffects
                 name,
                 content.Content)
             {
-                HighlightLine = action.HighlightLine
+                HighlightLine = action.HighlightLine,
+                HighlightStartLine = action.HighlightStartLine,
+                HighlightEndLine = action.HighlightEndLine
             };
 
-            tab.RenderLines = IdeTabHelpers.BuildAnnotatedLines(tab.Content, tab.DiffLines, tab.ShowDiff, tab.HighlightLine);
+            tab.RenderLines = IdeTabHelpers.BuildAnnotatedLines(
+                tab.Content,
+                tab.DiffLines,
+                tab.ShowDiff,
+                tab.HighlightLine,
+                tab.HighlightStartLine,
+                tab.HighlightEndLine);
 
             try
             {
@@ -137,7 +150,12 @@ public sealed class IdeTabsEffects
                         string.Equals(file.RepositoryPath, tab.RepositoryPath, StringComparison.OrdinalIgnoreCase));
                     if (newIndex >= 0)
                     {
-                        dispatcher.Dispatch(new FocusFileTabAction(action.SolutionId, newIndex, action.HighlightLine));
+                        dispatcher.Dispatch(new FocusFileTabAction(
+                            action.SolutionId,
+                            newIndex,
+                            action.HighlightLine,
+                            action.HighlightStartLine,
+                            action.HighlightEndLine));
                     }
                 }
             }
@@ -197,7 +215,13 @@ public sealed class IdeTabsEffects
             file.LastCommitSubject = lastChange.Subject;
             file.DiffLines = lastChange.DiffLines.ToList();
             file.DiffLoaded = true;
-            file.RenderLines = IdeTabHelpers.BuildAnnotatedLines(file.Content, file.DiffLines, file.ShowDiff, file.HighlightLine);
+            file.RenderLines = IdeTabHelpers.BuildAnnotatedLines(
+                file.Content,
+                file.DiffLines,
+                file.ShowDiff,
+                file.HighlightLine,
+                file.HighlightStartLine,
+                file.HighlightEndLine);
 
             if (file.ChangeCount is null)
             {

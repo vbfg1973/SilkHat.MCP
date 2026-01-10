@@ -9,13 +9,15 @@ public sealed record OpenFileTabByPathAction(
     string SolutionId,
     Guid ConfigId,
     string RepositoryPath,
-    int? HighlightLine);
+    int? HighlightLine,
+    int? HighlightStartLine,
+    int? HighlightEndLine);
 
 public sealed record OpenFileTabSuccessAction(string SolutionId, IdeOpenFileTab Tab);
 
 public sealed record OpenFileTabFailureAction(string SolutionId, string Error);
 
-public sealed record FocusFileTabAction(string SolutionId, int Index, int? HighlightLine);
+public sealed record FocusFileTabAction(string SolutionId, int Index, int? HighlightLine, int? HighlightStartLine, int? HighlightEndLine);
 
 public sealed record CloseFileTabAction(string SolutionId, int Index);
 

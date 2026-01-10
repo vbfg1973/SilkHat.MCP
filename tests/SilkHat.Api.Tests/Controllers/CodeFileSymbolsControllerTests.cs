@@ -51,7 +51,7 @@ public sealed class CodeFileSymbolsControllerTests
                 CodeFileSymbolsStatus.Success,
                 new List<SymbolOutlineNodeDto>
                 {
-                    new("sym-1", null, "Foo", "NamedType", "Class", Array.Empty<SymbolOutlineNodeDto>())
+                    new("sym-1", null, "Foo", "NamedType", "Class", null, Array.Empty<SymbolOutlineNodeDto>())
                 },
                 null));
 

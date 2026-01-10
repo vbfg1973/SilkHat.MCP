@@ -1,3 +1,5 @@
+using Moq;
+using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Analysis.Services;
 using SilkHat.Code.Core.Dtos;
@@ -7,12 +9,16 @@ namespace SilkHat.Tests.Services;
 public sealed class CodeTreeServiceTests
 {
     [Fact]
-    public void GetTree_ReturnsProjects_WhenParentIdIsNull()
+    public async Task GetTree_ReturnsProjects_WhenParentIdIsNull()
     {
-        var service = new CodeTreeService();
+        var service = new CodeTreeService(Mock.Of<ICodeSymbolOutlineService>());
         var solution = BuildSolutionWorkspace();
+        var workspace = new CodeRepositoryWorkspace("/repo", new Dictionary<string, CodeSolutionWorkspace>
+        {
+            [solution.SolutionId] = solution
+        });
 
-        var results = service.GetTree(solution, null);
+        var results = await service.GetTreeAsync(workspace, solution, null, CancellationToken.None);
 
         Assert.Single(results);
         Assert.Equal(CodeTreeEntryType.Project, results[0].Type);
@@ -20,12 +26,16 @@ public sealed class CodeTreeServiceTests
     }
 
     [Fact]
-    public void GetTree_ReturnsDirectChildren_WhenParentIdProvided()
+    public async Task GetTree_ReturnsDirectChildren_WhenParentIdProvided()
     {
-        var service = new CodeTreeService();
+        var service = new CodeTreeService(Mock.Of<ICodeSymbolOutlineService>());
         var solution = BuildSolutionWorkspace();
+        var workspace = new CodeRepositoryWorkspace("/repo", new Dictionary<string, CodeSolutionWorkspace>
+        {
+            [solution.SolutionId] = solution
+        });
 
-        var results = service.GetTree(solution, "Repo");
+        var results = await service.GetTreeAsync(workspace, solution, "Repo", CancellationToken.None);
 
         Assert.Equal(2, results.Count);
         Assert.Equal(CodeTreeEntryType.Directory, results[0].Type);
@@ -38,11 +48,11 @@ public sealed class CodeTreeServiceTests
     {
         var entries = new List<CodeTreeEntryDto>
         {
-            new("./Repo", "Repo", "Repo", CodeTreeEntryType.Project, "repo", "Repo"),
-            new("./Repo/src", "Repo/src", "src", CodeTreeEntryType.Directory, "repo", "Repo"),
-            new("./Repo/src/Program.cs", "Repo/src/Program.cs", "Program.cs", CodeTreeEntryType.File, "repo", "Repo"),
-            new("./Repo/Program.cs", "Repo/Program.cs", "Program.cs", CodeTreeEntryType.File, "repo", "Repo"),
-            new("./Repo/src/Nested/Thing.cs", "Repo/src/Nested/Thing.cs", "Thing.cs", CodeTreeEntryType.File, "repo", "Repo")
+            new("./Repo", "Repo", "Repo", CodeTreeEntryType.Project, "repo", "Repo", null, null, null, null, null, null),
+            new("./Repo/src", "Repo/src", "src", CodeTreeEntryType.Directory, "repo", "Repo", null, null, null, null, null, null),
+            new("./Repo/src/Program.cs", "Repo/src/Program.cs", "Program.cs", CodeTreeEntryType.File, "repo", "Repo", null, null, null, null, null, null),
+            new("./Repo/Program.cs", "Repo/Program.cs", "Program.cs", CodeTreeEntryType.File, "repo", "Repo", null, null, null, null, null, null),
+            new("./Repo/src/Nested/Thing.cs", "Repo/src/Nested/Thing.cs", "Thing.cs", CodeTreeEntryType.File, "repo", "Repo", null, null, null, null, null, null)
         };
         var treeMap = BuildTreeChildrenMap(entries);
 

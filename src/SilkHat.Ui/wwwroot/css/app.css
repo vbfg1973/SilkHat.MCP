@@ -148,24 +148,81 @@ code {
     overflow: hidden;
 }
 
+.ide-tree-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    height: 100%;
+    min-height: 0;
+}
+
+.ide-tree-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.ide-tree-container:hover .ide-tree-toolbar {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ide-tree-toolbar .mud-icon-root {
+    font-size: 10px;
+}
+
 .ide-tree-scroll {
     height: 100%;
+    min-height: 0;
+    flex: 1;
     overflow: auto;
 }
 
 .ide-tree-viewer {
-    font-size: 10px;
+    font-size: 9px;
     white-space: nowrap;
+    min-width: max-content;
 }
 
 .ide-tree-viewer .mud-icon-root {
-    font-size: 10px !important;
+    font-size: 9px !important;
 }
 
 .ide-tree-panel .mud-treeview-item-content,
 .ide-tree-panel .mud-treeview-item-label {
     white-space: nowrap;
-    font-size: 10px !important;
+    font-size: 9px !important;
+}
+
+.ide-tree-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+    position: relative;
+}
+
+.ide-tree-panel .mud-treeview-item-content {
+    column-gap: 4px;
+    padding-left: 2px;
+}
+
+.ide-tree-panel .mud-treeview-item-toggle {
+    margin-right: 2px;
+}
+
+.ide-tree-panel .mud-treeview-item-icon {
+    margin-right: 2px;
+}
+
+.ide-tree-badge .mud-badge {
+    font-size: 8px;
+    min-width: 18px;
+    height: 16px;
+    z-index: 2;
 }
 
 .ide-tabs-panel {

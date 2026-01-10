@@ -50,6 +50,12 @@ public interface IGitCli
         bool includeDiff,
         CancellationToken cancellationToken);
 
+    Task<int> GetFileAuthorCountAsync(
+        Guid configId,
+        string repoRoot,
+        string path,
+        CancellationToken cancellationToken);
+
     Task<GitFileChangeCountDto> GetFileChangeCountAsync(
         Guid configId,
         string repoRoot,

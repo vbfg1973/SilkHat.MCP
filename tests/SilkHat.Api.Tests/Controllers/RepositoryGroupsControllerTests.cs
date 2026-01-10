@@ -4,6 +4,7 @@ using Moq;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Models;
 using SilkHat.Api.Controllers;
+using SilkHat.Api.Services;
 using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
@@ -26,6 +27,7 @@ public sealed class RepositoryGroupsControllerTests
         });
         var codeStore = new Mock<ICodeWorkspaceStore>();
         var gitCache = new Mock<IGitRepositoryCacheStore>();
+        var precompute = new Mock<ICodeTreeMetricsPrecomputeService>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
         var cache = new FakeApiCache();
@@ -34,6 +36,7 @@ public sealed class RepositoryGroupsControllerTests
             store.Object,
             codeStore.Object,
             gitCache.Object,
+            precompute.Object,
             processor.Object,
             loader.Object,
             cache)
@@ -72,6 +75,7 @@ public sealed class RepositoryGroupsControllerTests
         });
         var codeStore = new Mock<ICodeWorkspaceStore>();
         var gitCache = new Mock<IGitRepositoryCacheStore>();
+        var precompute = new Mock<ICodeTreeMetricsPrecomputeService>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
         var cache = new FakeApiCache();
@@ -80,6 +84,7 @@ public sealed class RepositoryGroupsControllerTests
             store.Object,
             codeStore.Object,
             gitCache.Object,
+            precompute.Object,
             processor.Object,
             loader.Object,
             cache)
@@ -104,6 +109,7 @@ public sealed class RepositoryGroupsControllerTests
         var store = new Mock<ILoadedRepositoryStore>();
         var codeStore = new Mock<ICodeWorkspaceStore>();
         var gitCache = new Mock<IGitRepositoryCacheStore>();
+        var precompute = new Mock<ICodeTreeMetricsPrecomputeService>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
         var cache = new FakeApiCache();
@@ -112,6 +118,7 @@ public sealed class RepositoryGroupsControllerTests
             store.Object,
             codeStore.Object,
             gitCache.Object,
+            precompute.Object,
             processor.Object,
             loader.Object,
             cache)
@@ -167,6 +174,7 @@ public sealed class RepositoryGroupsControllerTests
         });
         var codeStore = new Mock<ICodeWorkspaceStore>();
         var gitCache = new Mock<IGitRepositoryCacheStore>();
+        var precompute = new Mock<ICodeTreeMetricsPrecomputeService>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
         processor.Setup(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()))
@@ -178,6 +186,7 @@ public sealed class RepositoryGroupsControllerTests
             store.Object,
             codeStore.Object,
             gitCache.Object,
+            precompute.Object,
             processor.Object,
             loader.Object,
             cache)

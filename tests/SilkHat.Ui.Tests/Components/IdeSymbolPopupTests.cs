@@ -38,9 +38,10 @@ public sealed class IdeSymbolPopupTests
                 "ComplexitySamples",
                 "NamedType",
                 "Class",
+                null,
                 new List<CodeSymbolOutlineNodeModel>
                 {
-                    new("sym-2", "M:Samples.ComplexitySamples.CalculateScore(System.Int32)", "CalculateScore", "Method", "Method", Array.Empty<CodeSymbolOutlineNodeModel>())
+                    new("sym-2", "M:Samples.ComplexitySamples.CalculateScore(System.Int32)", "CalculateScore", "Method", "Method", null, Array.Empty<CodeSymbolOutlineNodeModel>())
                 })
         };
 

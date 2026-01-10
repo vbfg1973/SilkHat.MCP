@@ -51,6 +51,10 @@ builder.Services.AddSingleton<IRepoCommandProcessor, RepoCommandProcessor>();
 builder.Services.AddSingleton<ICodeWorkspaceStore, CodeWorkspaceStore>();
 builder.Services.AddSingleton<ICodeWorkspaceLoader, CodeWorkspaceLoader>();
 builder.Services.AddSingleton<ICodeTreeService, CodeTreeService>();
+builder.Services.AddSingleton<ICodeTreeMetricsService, CodeTreeMetricsService>();
+builder.Services.AddSingleton<ICodeTreeQueryService, CodeTreeQueryService>();
+builder.Services.AddSingleton<ICodeTreeMetricsCacheStore, CodeTreeMetricsCacheStore>();
+builder.Services.AddSingleton<ICodeTreeMetricsPrecomputeService, CodeTreeMetricsPrecomputeService>();
 builder.Services.AddSingleton<ICodeFileService, CodeFileService>();
 builder.Services.AddSingleton<ICodeSymbolOutlineService, CodeSymbolOutlineService>();
 builder.Services.AddSingleton<ISymbolDescriptionService, SymbolDescriptionService>();
@@ -60,6 +64,7 @@ builder.Services.AddSingleton<IComplexityStrategy, SilkHat.Code.Analysis.Service
 builder.Services.AddSingleton<IComplexityStrategyFactory, SilkHat.Code.Analysis.Services.Complexity.ComplexityStrategyFactory>();
 builder.Services.AddSingleton<IMethodComplexityService, MethodComplexityService>();
 builder.Services.AddSingleton<ITypeComplexityService, TypeComplexityService>();
+builder.Services.AddSingleton<IComplexityMetricsAggregator, SilkHat.Code.Analysis.Services.Complexity.ComplexityMetricsAggregator>();
 builder.Services.AddScoped<IMethodImplementationDecisionService, MethodImplementationDecisionService>();
 builder.Services.AddScoped<IDecisionService, DecisionService>();
 builder.Services.AddScoped<IMethodCallStackService, MethodCallStackService>();
@@ -72,6 +77,7 @@ builder.Services.AddSingleton<IRepositoryDiscoveryService, RepositoryDiscoverySe
 builder.Services.AddSingleton<IGitCommandRunner, GitCommandRunner>();
 builder.Services.AddSingleton<IGitRepositoryCacheStore, GitRepositoryCacheStore>();
 builder.Services.AddSingleton<IGitCli, GitCli>();
+builder.Services.AddSingleton<IGitMetricsAggregator, GitMetricsAggregator>();
 builder.Services.AddHybridCache();
 builder.Services.AddSingleton<IApiCache, ApiCache>();
 

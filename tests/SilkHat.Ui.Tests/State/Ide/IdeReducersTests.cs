@@ -39,7 +39,7 @@ public sealed class IdeReducersTests
         {
             new()
             {
-                Value = new CodeTreeEntryModel("./RepoOne", "Repo One", "Repo One", CodeTreeEntryType.Project, "alpha", "Repo One"),
+                Value = new CodeTreeEntryModel("./RepoOne", "Repo One", "Repo One", CodeTreeEntryType.Project, "alpha", "Repo One", null, null, null, null, null, null),
                 Text = "Repo One"
             }
         };
@@ -51,7 +51,7 @@ public sealed class IdeReducersTests
         {
             new()
             {
-                Value = new CodeTreeEntryModel("./RepoOne/Program.cs", "Repo One/Program.cs", "Program.cs", CodeTreeEntryType.File, "alpha", "Repo One"),
+                Value = new CodeTreeEntryModel("./RepoOne/Program.cs", "Repo One/Program.cs", "Program.cs", CodeTreeEntryType.File, "alpha", "Repo One", null, null, null, null, null, null),
                 Text = "Program.cs"
             }
         };

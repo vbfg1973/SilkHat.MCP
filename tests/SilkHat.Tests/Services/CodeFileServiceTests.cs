@@ -59,7 +59,19 @@ public sealed class CodeFileServiceTests
 
     private static CodeSolutionWorkspace BuildSolution(string repositoryPath, string displayPath)
     {
-        var entry = new CodeTreeEntryDto(repositoryPath, displayPath, Path.GetFileName(displayPath), CodeTreeEntryType.File, "alpha", "Alpha");
+        var entry = new CodeTreeEntryDto(
+            repositoryPath,
+            displayPath,
+            Path.GetFileName(displayPath),
+            CodeTreeEntryType.File,
+            "alpha",
+            "Alpha",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
         return new CodeSolutionWorkspace(
             "solution-1",
             "Repo",

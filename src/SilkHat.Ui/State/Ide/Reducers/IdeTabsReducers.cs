@@ -129,7 +129,15 @@ public static class IdeTabsReducers
         var files = view.OpenFiles.ToList();
         var file = files[action.Index];
         file.HighlightLine = action.HighlightLine;
-        file.RenderLines = IdeTabHelpers.BuildAnnotatedLines(file.Content, file.DiffLines, file.ShowDiff, file.HighlightLine);
+        file.HighlightStartLine = action.HighlightStartLine;
+        file.HighlightEndLine = action.HighlightEndLine;
+        file.RenderLines = IdeTabHelpers.BuildAnnotatedLines(
+            file.Content,
+            file.DiffLines,
+            file.ShowDiff,
+            file.HighlightLine,
+            file.HighlightStartLine,
+            file.HighlightEndLine);
         files[action.Index] = file;
         tabs[action.SolutionId] = view with { OpenFiles = files, ActiveTabIndex = action.Index };
         return new IdeTabsState(tabs);
@@ -155,7 +163,13 @@ public static class IdeTabsReducers
 
         var file = files[index];
         file.ShowDiff = action.Enabled;
-        file.RenderLines = IdeTabHelpers.BuildAnnotatedLines(file.Content, file.DiffLines, file.ShowDiff, file.HighlightLine);
+        file.RenderLines = IdeTabHelpers.BuildAnnotatedLines(
+            file.Content,
+            file.DiffLines,
+            file.ShowDiff,
+            file.HighlightLine,
+            file.HighlightStartLine,
+            file.HighlightEndLine);
         tabs[action.SolutionId] = view with { OpenFiles = files };
         return new IdeTabsState(tabs);
     }
