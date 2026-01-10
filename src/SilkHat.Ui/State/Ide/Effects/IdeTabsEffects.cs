@@ -54,6 +54,9 @@ public sealed class IdeTabsEffects
                     ? lastChange.CommitSha
                     : lastChange.AbbreviatedSha;
                 tab.LastCommitSubject = lastChange.Subject;
+
+                var changeCount = await _api.GetGitFileChangeCountAsync(action.ConfigId, action.Entry.RepositoryPath);
+                tab.ChangeCount = changeCount.ChangeCount;
             }
             catch (Exception ex)
             {
@@ -113,6 +116,9 @@ public sealed class IdeTabsEffects
                     ? lastChange.CommitSha
                     : lastChange.AbbreviatedSha;
                 tab.LastCommitSubject = lastChange.Subject;
+
+                var changeCount = await _api.GetGitFileChangeCountAsync(action.ConfigId, tab.RepositoryPath);
+                tab.ChangeCount = changeCount.ChangeCount;
             }
             catch (Exception ex)
             {
@@ -192,6 +198,12 @@ public sealed class IdeTabsEffects
             file.DiffLines = lastChange.DiffLines.ToList();
             file.DiffLoaded = true;
             file.RenderLines = IdeTabHelpers.BuildAnnotatedLines(file.Content, file.DiffLines, file.ShowDiff, file.HighlightLine);
+
+            if (file.ChangeCount is null)
+            {
+                var changeCount = await _api.GetGitFileChangeCountAsync(solutionEntry.ConfigId, file.RepositoryPath);
+                file.ChangeCount = changeCount.ChangeCount;
+            }
 
             dispatcher.Dispatch(new ToggleDiffSuccessAction(action.SolutionId, file));
         }

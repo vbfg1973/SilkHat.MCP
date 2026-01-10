@@ -4,7 +4,7 @@ SilkHat analyzes .NET repositories by loading repository groups, parsing solutio
 
 ## Major Components
 
-- API (`src/SilkHat.Api`): ASP.NET Core controllers, ProblemDetails responses, and CORS for the UI.
+- API (`src/SilkHat.Api`): ASP.NET Core controllers, ProblemDetails responses, CORS for the UI, and HybridCache for read-mostly endpoints (invalidated on repository load).
 - Analysis runtime (`src/SilkHat.Analysis`): repository load orchestration, command processing, and runtime state.
 - Code analysis (`src/SilkHat.Code.Analysis`): solution parsing, workspace construction, code tree entries, and code file reads.
 - Git analysis (`src/SilkHat.Git.Analysis`): git CLI integration with caches for history and tree metadata.

@@ -76,3 +76,7 @@ public sealed record GitFileLastChangeModel(
     DateTimeOffset CommitDateUtc,
     string Subject,
     IReadOnlyList<GitFileDiffLineModel> DiffLines);
+
+public sealed record GitFileChangeCountModel(
+    string Path,
+    int ChangeCount);

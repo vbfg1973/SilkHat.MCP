@@ -8,6 +8,7 @@ using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
 using System.Linq;
+using SilkHat.Api.Services;
 
 namespace SilkHat.Api.Controllers;
 
@@ -17,16 +18,19 @@ public sealed class RepositoryConfigsController : ApiControllerBase
     private readonly SilkHatDbContext _dbContext;
     private readonly ILoadedRepositoryStore _store;
     private readonly IRepositoryDiscoveryService _discovery;
+    private readonly IApiCache _cache;
     private readonly SolutionIdentityResolver _solutionIdentityResolver = new();
 
     public RepositoryConfigsController(
         SilkHatDbContext dbContext,
         ILoadedRepositoryStore store,
-        IRepositoryDiscoveryService discovery)
+        IRepositoryDiscoveryService discovery,
+        IApiCache cache)
     {
         _dbContext = dbContext;
         _store = store;
         _discovery = discovery;
+        _cache = cache;
     }
 
     [HttpGet]
@@ -50,15 +54,24 @@ public sealed class RepositoryConfigsController : ApiControllerBase
         CancellationToken cancellationToken)
     {
         var paging = pagingQuery.ResolvePaging();
-        var loadedIds = _store.GetAll().Select(repo => repo.ConfigId).ToHashSet();
-        var configsQuery = _dbContext.RepositoryConfigs
-            .Include(config => config.Solutions)
-            .AsNoTracking()
-            .Where(config => loadedIds.Contains(config.Id))
-            .OrderBy(config => config.Name)
-            .Select(config => config.ToDto());
+        var cacheKey = $"repositories:loaded:{paging.PageNumber}:{paging.PageSize}";
+        var result = await _cache.GetOrCreateAsync(
+            cacheKey,
+            async token =>
+            {
+                var loadedIds = _store.GetAll().Select(repo => repo.ConfigId).ToHashSet();
+                var configsQuery = _dbContext.RepositoryConfigs
+                    .Include(config => config.Solutions)
+                    .AsNoTracking()
+                    .Where(config => loadedIds.Contains(config.Id))
+                    .OrderBy(config => config.Name)
+                    .Select(config => config.ToDto());
 
-        return Ok(await configsQuery.ToPagedResultAsync(paging, cancellationToken));
+                return await configsQuery.ToPagedResultAsync(paging, token);
+            },
+            cancellationToken);
+
+        return Ok(result);
     }
 
     [HttpGet("{id:guid}")]

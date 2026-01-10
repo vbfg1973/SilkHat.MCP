@@ -26,6 +26,7 @@ public sealed class IdeOpenFileTab
     public DateTimeOffset? LastCommitDateUtc { get; set; }
     public string? AbbreviatedSha { get; set; }
     public string? LastCommitSubject { get; set; }
+    public int? ChangeCount { get; set; }
     public bool ShowDiff { get; set; }
     public bool DiffLoaded { get; set; }
     public List<GitFileDiffLineModel> DiffLines { get; set; } = new();

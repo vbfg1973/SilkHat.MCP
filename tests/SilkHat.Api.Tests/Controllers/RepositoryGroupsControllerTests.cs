@@ -28,13 +28,15 @@ public sealed class RepositoryGroupsControllerTests
         var gitCache = new Mock<IGitRepositoryCacheStore>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
+        var cache = new FakeApiCache();
         var controller = new RepositoryGroupsController(
             dbContext,
             store.Object,
             codeStore.Object,
             gitCache.Object,
             processor.Object,
-            loader.Object)
+            loader.Object,
+            cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -72,13 +74,15 @@ public sealed class RepositoryGroupsControllerTests
         var gitCache = new Mock<IGitRepositoryCacheStore>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
+        var cache = new FakeApiCache();
         var controller = new RepositoryGroupsController(
             dbContext,
             store.Object,
             codeStore.Object,
             gitCache.Object,
             processor.Object,
-            loader.Object)
+            loader.Object,
+            cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -102,13 +106,15 @@ public sealed class RepositoryGroupsControllerTests
         var gitCache = new Mock<IGitRepositoryCacheStore>();
         var processor = new Mock<IRepoCommandProcessor>();
         var loader = new Mock<ICodeWorkspaceLoader>();
+        var cache = new FakeApiCache();
         var controller = new RepositoryGroupsController(
             dbContext,
             store.Object,
             codeStore.Object,
             gitCache.Object,
             processor.Object,
-            loader.Object)
+            loader.Object,
+            cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -166,13 +172,15 @@ public sealed class RepositoryGroupsControllerTests
         processor.Setup(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()))
             .Returns(StreamEvents());
 
+        var cache = new FakeApiCache();
         var controller = new RepositoryGroupsController(
             dbContext,
             store.Object,
             codeStore.Object,
             gitCache.Object,
             processor.Object,
-            loader.Object)
+            loader.Object,
+            cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -182,6 +190,7 @@ public sealed class RepositoryGroupsControllerTests
         var ok = Assert.IsType<OkObjectResult>(result.Result);
         var dto = Assert.IsType<RepositoryGroupLoadResultDto>(ok.Value);
         Assert.Equal(2, dto.Repositories.Count);
+        Assert.Equal(1, cache.InvalidateCount);
         processor.Verify(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
         store.Verify(s => s.Unload(It.IsAny<Guid>()), Times.AtLeastOnce);
         codeStore.Verify(s => s.Remove(It.IsAny<Guid>()), Times.AtLeastOnce);

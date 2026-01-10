@@ -21,7 +21,8 @@ public sealed class RepositoryConfigsControllerTests
         var store = new Mock<ILoadedRepositoryStore>();
         var discovery = new Mock<IRepositoryDiscoveryService>();
         discovery.Setup(d => d.TryValidateRepositoryPath("/tmp/repo", out It.Ref<string?>.IsAny)).Returns(true);
-        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object)
+        var cache = new FakeApiCache();
+        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object, cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -61,7 +62,8 @@ public sealed class RepositoryConfigsControllerTests
         var store = new Mock<ILoadedRepositoryStore>();
         var discovery = new Mock<IRepositoryDiscoveryService>();
         discovery.Setup(d => d.TryValidateRepositoryPath("/tmp/repo", out It.Ref<string?>.IsAny)).Returns(true);
-        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object)
+        var cache = new FakeApiCache();
+        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object, cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -89,7 +91,8 @@ public sealed class RepositoryConfigsControllerTests
         await using var dbContext = DbContextTestFactory.CreateInMemory();
         var store = new Mock<ILoadedRepositoryStore>();
         var discovery = new Mock<IRepositoryDiscoveryService>();
-        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object)
+        var cache = new FakeApiCache();
+        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object, cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -112,7 +115,8 @@ public sealed class RepositoryConfigsControllerTests
         var discovery = new Mock<IRepositoryDiscoveryService>();
         discovery.Setup(d => d.TryValidateRepositoryPath("/tmp/repo", out It.Ref<string?>.IsAny)).Returns(false);
 
-        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object)
+        var cache = new FakeApiCache();
+        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object, cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -147,7 +151,8 @@ public sealed class RepositoryConfigsControllerTests
         });
         var discovery = new Mock<IRepositoryDiscoveryService>();
 
-        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object)
+        var cache = new FakeApiCache();
+        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object, cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -168,7 +173,8 @@ public sealed class RepositoryConfigsControllerTests
         var store = new Mock<ILoadedRepositoryStore>();
         var discovery = new Mock<IRepositoryDiscoveryService>();
         discovery.Setup(d => d.TryValidateRepositoryPath("/tmp/repo", out It.Ref<string?>.IsAny)).Returns(true);
-        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object)
+        var cache = new FakeApiCache();
+        var controller = new RepositoryConfigsController(dbContext, store.Object, discovery.Object, cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };

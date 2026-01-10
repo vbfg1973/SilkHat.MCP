@@ -49,4 +49,20 @@ public interface IGitCli
         string path,
         bool includeDiff,
         CancellationToken cancellationToken);
+
+    Task<GitFileChangeCountDto> GetFileChangeCountAsync(
+        Guid configId,
+        string repoRoot,
+        string path,
+        CancellationToken cancellationToken);
+
+    Task<string> GetCurrentBranchAsync(
+        Guid configId,
+        string repoRoot,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<string>> ListLocalBranchesAsync(
+        Guid configId,
+        string repoRoot,
+        CancellationToken cancellationToken);
 }

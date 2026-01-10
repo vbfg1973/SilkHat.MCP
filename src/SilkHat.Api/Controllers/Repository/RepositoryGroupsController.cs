@@ -13,6 +13,7 @@ using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
 using System.Linq;
 using SilkHat.Api.Models;
+using SilkHat.Api.Services;
 
 namespace SilkHat.Api.Controllers;
 
@@ -25,6 +26,7 @@ public sealed class RepositoryGroupsController : ApiControllerBase
     private readonly IGitRepositoryCacheStore _gitCacheStore;
     private readonly IRepoCommandProcessor _processor;
     private readonly ICodeWorkspaceLoader _workspaceLoader;
+    private readonly IApiCache _cache;
 
     public RepositoryGroupsController(
         SilkHatDbContext dbContext,
@@ -32,7 +34,8 @@ public sealed class RepositoryGroupsController : ApiControllerBase
         ICodeWorkspaceStore codeStore,
         IGitRepositoryCacheStore gitCacheStore,
         IRepoCommandProcessor processor,
-        ICodeWorkspaceLoader workspaceLoader)
+        ICodeWorkspaceLoader workspaceLoader,
+        IApiCache cache)
     {
         _dbContext = dbContext;
         _store = store;
@@ -40,6 +43,7 @@ public sealed class RepositoryGroupsController : ApiControllerBase
         _gitCacheStore = gitCacheStore;
         _processor = processor;
         _workspaceLoader = workspaceLoader;
+        _cache = cache;
     }
 
     [HttpGet]
@@ -124,6 +128,7 @@ public sealed class RepositoryGroupsController : ApiControllerBase
         Guid id,
         CancellationToken cancellationToken)
     {
+        _cache.InvalidateAll();
         var group = await _dbContext.RepositoryGroups
             .Include(group => group.RepositoryConfigs)
             .ThenInclude(config => config.Solutions)

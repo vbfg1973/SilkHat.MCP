@@ -130,6 +130,41 @@ public sealed class GitCommitIntegrationTests
         Assert.Contains(commit!.Changes, change => change.Path == "./docs/README.md");
     }
 
+    [Fact]
+    public async Task GetCurrentBranch_ReturnsBranchName()
+    {
+        var git = BuildGitCli();
+
+        var branch = await git.GetCurrentBranchAsync(Guid.NewGuid(), RepoRoot, CancellationToken.None);
+
+        Assert.False(string.IsNullOrWhiteSpace(branch));
+    }
+
+    [Fact]
+    public async Task ListLocalBranches_IncludesCurrentBranch()
+    {
+        var git = BuildGitCli();
+
+        var current = await git.GetCurrentBranchAsync(Guid.NewGuid(), RepoRoot, CancellationToken.None);
+        var branches = await git.ListLocalBranchesAsync(Guid.NewGuid(), RepoRoot, CancellationToken.None);
+
+        Assert.Contains(current, branches);
+    }
+
+    [Fact]
+    public async Task GetFileChangeCount_ReturnsPositiveCount()
+    {
+        var git = BuildGitCli();
+
+        var count = await git.GetFileChangeCountAsync(
+            Guid.NewGuid(),
+            RepoRoot,
+            "docs/README.md",
+            CancellationToken.None);
+
+        Assert.True(count.ChangeCount > 0);
+    }
+
     private static GitCli BuildGitCli()
     {
         return new GitCli(new GitCommandRunner(), new GitRepositoryCacheStore());

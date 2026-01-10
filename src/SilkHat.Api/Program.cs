@@ -7,6 +7,7 @@ using SilkHat.Analysis.Models;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Services;
 using SilkHat.Api.Services;
+using Microsoft.Extensions.Caching.Hybrid;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Git.Analysis.Services;
 using SilkHat.Infrastructure;
@@ -71,6 +72,8 @@ builder.Services.AddSingleton<IRepositoryDiscoveryService, RepositoryDiscoverySe
 builder.Services.AddSingleton<IGitCommandRunner, GitCommandRunner>();
 builder.Services.AddSingleton<IGitRepositoryCacheStore, GitRepositoryCacheStore>();
 builder.Services.AddSingleton<IGitCli, GitCli>();
+builder.Services.AddHybridCache();
+builder.Services.AddSingleton<IApiCache, ApiCache>();
 
 var app = builder.Build();
 

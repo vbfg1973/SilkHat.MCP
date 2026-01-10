@@ -20,6 +20,10 @@
             <MudText Typo="Typo.body2">@FormatCommitDate(ActiveTab.LastCommitDateUtc)</MudText>
             <MudText Typo="Typo.body2">@ActiveTab.LastCommitAuthor</MudText>
             <MudText Typo="Typo.body2">@ActiveTab.LastCommitAuthorEmail</MudText>
+            @if (ActiveTab.ChangeCount is not null)
+            {
+                <MudText Typo="Typo.body2">Changes: @ActiveTab.ChangeCount</MudText>
+            }
         }
         <MudCheckBox T="bool"
                      Label="Show diff"

@@ -83,6 +83,14 @@ public sealed class IdeEffectsTests
   "diffLines": []
 }
 """);
+        handler.AddJsonResponse(
+            $"api/repositories/{configId}/git/files/.%2FProgram.cs/change-count",
+            """
+{
+  "path": "./Program.cs",
+  "changeCount": 4
+}
+""");
 
         var api = new RepositoryApiClient(new HttpClient(handler)
         {

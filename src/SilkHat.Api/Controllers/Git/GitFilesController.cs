@@ -112,4 +112,32 @@ public sealed class GitFilesController : ApiControllerBase
             return ProblemWithCategory(StatusCodes.Status500InternalServerError, "Git Error", ex.Message, "Git");
         }
     }
+
+    [HttpGet("{path}/change-count")]
+    public async Task<ActionResult<GitFileChangeCountDto>> GetChangeCount(
+        Guid id,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var repo = _store.Get(id);
+        if (repo is null)
+        {
+            return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository is not loaded.", "Git");
+        }
+
+        try
+        {
+            var decodedPath = path.Contains('%') ? Uri.UnescapeDataString(path) : path;
+            var count = await _gitCli.GetFileChangeCountAsync(
+                id,
+                repo.RootPath,
+                decodedPath,
+                cancellationToken);
+            return Ok(count);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return ProblemWithCategory(StatusCodes.Status500InternalServerError, "Git Error", ex.Message, "Git");
+        }
+    }
 }

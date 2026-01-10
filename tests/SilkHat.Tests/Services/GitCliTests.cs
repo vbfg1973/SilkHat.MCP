@@ -116,6 +116,49 @@ M	src/Other.cs
         Assert.Equal(2, change.DiffLines[2].LineNumber);
     }
 
+    [Fact]
+    public async Task GetFileChangeCountAsync_ReturnsCommitCount()
+    {
+        var runner = new FakeGitCommandRunner();
+        runner.Add("log --follow --pretty=format:%H -- src/Program.cs", "sha1\nsha2\n");
+
+        var cacheStore = new GitRepositoryCacheStore();
+        var cli = new GitCli(runner, cacheStore);
+
+        var count = await cli.GetFileChangeCountAsync(Guid.NewGuid(), "/repo", "src/Program.cs", CancellationToken.None);
+
+        Assert.Equal("./src/Program.cs", count.Path);
+        Assert.Equal(2, count.ChangeCount);
+    }
+
+    [Fact]
+    public async Task GetCurrentBranchAsync_ReturnsBranchName()
+    {
+        var runner = new FakeGitCommandRunner();
+        runner.Add("rev-parse --abbrev-ref HEAD", "feature/demo\n");
+
+        var cacheStore = new GitRepositoryCacheStore();
+        var cli = new GitCli(runner, cacheStore);
+
+        var branch = await cli.GetCurrentBranchAsync(Guid.NewGuid(), "/repo", CancellationToken.None);
+
+        Assert.Equal("feature/demo", branch);
+    }
+
+    [Fact]
+    public async Task ListLocalBranchesAsync_ReturnsSortedBranches()
+    {
+        var runner = new FakeGitCommandRunner();
+        runner.Add("for-each-ref refs/heads --format=%(refname:short)", "master\nfeature/demo\ndevelop\n");
+
+        var cacheStore = new GitRepositoryCacheStore();
+        var cli = new GitCli(runner, cacheStore);
+
+        var branches = await cli.ListLocalBranchesAsync(Guid.NewGuid(), "/repo", CancellationToken.None);
+
+        Assert.Equal(new[] { "develop", "feature/demo", "master" }, branches);
+    }
+
     private sealed class FakeGitCommandRunner : IGitCommandRunner
     {
         private readonly Dictionary<string, string> _responses = new(StringComparer.Ordinal);

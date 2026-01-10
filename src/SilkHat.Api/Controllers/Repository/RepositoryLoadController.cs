@@ -12,6 +12,7 @@ using SilkHat.Core.Dtos;
 using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
 using System.Linq;
+using SilkHat.Api.Services;
 
 namespace SilkHat.Api.Controllers;
 
@@ -26,6 +27,7 @@ public sealed class RepositoryLoadController : ApiControllerBase
     private readonly IGitRepositoryCacheStore _gitCacheStore;
     private readonly IRepoCommandProcessor _processor;
     private readonly ICodeWorkspaceLoader _workspaceLoader;
+    private readonly IApiCache _cache;
 
     public RepositoryLoadController(
         SilkHatDbContext dbContext,
@@ -33,7 +35,8 @@ public sealed class RepositoryLoadController : ApiControllerBase
         ICodeWorkspaceStore codeStore,
         IGitRepositoryCacheStore gitCacheStore,
         IRepoCommandProcessor processor,
-        ICodeWorkspaceLoader workspaceLoader)
+        ICodeWorkspaceLoader workspaceLoader,
+        IApiCache cache)
     {
         _dbContext = dbContext;
         _store = store;
@@ -41,12 +44,14 @@ public sealed class RepositoryLoadController : ApiControllerBase
         _gitCacheStore = gitCacheStore;
         _processor = processor;
         _workspaceLoader = workspaceLoader;
+        _cache = cache;
     }
 
     [HttpPost("{id:guid}/load")]
     [Produces("application/x-ndjson")]
     public async Task<IActionResult> Load(Guid id, CancellationToken cancellationToken)
     {
+        _cache.InvalidateAll();
         var config = await _dbContext.RepositoryConfigs
             .Include(item => item.Solutions)
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);

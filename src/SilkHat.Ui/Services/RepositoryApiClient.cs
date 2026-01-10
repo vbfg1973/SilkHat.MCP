@@ -414,6 +414,15 @@ public sealed class RepositoryApiClient
         return (await GetFromJsonAsync<GitFileLastChangeModel>(url, cancellationToken))!;
     }
 
+    public async Task<GitFileChangeCountModel> GetGitFileChangeCountAsync(
+        Guid repositoryId,
+        string path,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/{repositoryId}/git/files/{Uri.EscapeDataString(path)}/change-count";
+        return (await GetFromJsonAsync<GitFileChangeCountModel>(url, cancellationToken))!;
+    }
+
     public async IAsyncEnumerable<RepoEventModel> LoadRepositoryAsync(
         Guid id,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)

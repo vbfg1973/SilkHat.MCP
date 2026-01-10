@@ -24,7 +24,8 @@ public sealed class RepositoryLoadControllerTests
         var loader = new Mock<ICodeWorkspaceLoader>();
         var gitCache = new Mock<IGitRepositoryCacheStore>();
 
-        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object)
+        var cache = new FakeApiCache();
+        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object, cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -33,6 +34,7 @@ public sealed class RepositoryLoadControllerTests
 
         var problem = Assert.IsType<ObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, problem.StatusCode);
+        Assert.Equal(1, cache.InvalidateCount);
         processor.Verify(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -62,7 +64,8 @@ public sealed class RepositoryLoadControllerTests
         processor.Setup(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()))
             .Returns(StreamEvents());
 
-        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object)
+        var cache = new FakeApiCache();
+        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object, cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -70,6 +73,7 @@ public sealed class RepositoryLoadControllerTests
         var result = await controller.Load(config.Id, CancellationToken.None);
 
         Assert.IsType<EmptyResult>(result);
+        Assert.Equal(1, cache.InvalidateCount);
         processor.Verify(p => p.ExecuteAsync(It.IsAny<IRepoCommand>(), It.IsAny<RepoCommandContext>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -96,7 +100,8 @@ public sealed class RepositoryLoadControllerTests
         var loader = new Mock<ICodeWorkspaceLoader>();
         var gitCache = new Mock<IGitRepositoryCacheStore>();
 
-        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object)
+        var cache = new FakeApiCache();
+        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object, cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -128,7 +133,8 @@ public sealed class RepositoryLoadControllerTests
         var loader = new Mock<ICodeWorkspaceLoader>();
         var gitCache = new Mock<IGitRepositoryCacheStore>();
 
-        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object)
+        var cache = new FakeApiCache();
+        var controller = new RepositoryLoadController(dbContext, store.Object, codeStore.Object, gitCache.Object, processor.Object, loader.Object, cache)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };

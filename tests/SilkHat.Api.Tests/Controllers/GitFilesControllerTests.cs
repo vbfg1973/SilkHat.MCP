@@ -143,4 +143,26 @@ public sealed class GitFilesControllerTests
         Assert.Equal("sha1", change.CommitSha);
         gitCli.Verify(c => c.GetFileLastChangeAsync(configId, "/repo", "src/Program.cs", true, It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact]
+    public async Task GetChangeCount_ReturnsCount()
+    {
+        var configId = Guid.NewGuid();
+        var store = new Mock<ILoadedRepositoryStore>();
+        store.Setup(s => s.Get(configId)).Returns(new LoadedRepository(configId, "/repo", DateTimeOffset.UtcNow));
+        var gitCli = new Mock<IGitCli>();
+        gitCli.Setup(c => c.GetFileChangeCountAsync(configId, "/repo", "src/Program.cs", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new GitFileChangeCountDto("./src/Program.cs", 3));
+
+        var controller = new GitFilesController(store.Object, gitCli.Object)
+        {
+            ControllerContext = ControllerTestFactory.CreateContext()
+        };
+
+        var result = await controller.GetChangeCount(configId, "src/Program.cs", CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var count = Assert.IsType<GitFileChangeCountDto>(ok.Value);
+        Assert.Equal(3, count.ChangeCount);
+    }
 }

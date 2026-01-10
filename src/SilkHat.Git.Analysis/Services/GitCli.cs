@@ -574,6 +574,78 @@ public sealed class GitCli : IGitCli
         return change;
     }
 
+    public async Task<GitFileChangeCountDto> GetFileChangeCountAsync(
+        Guid configId,
+        string repoRoot,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        var normalizedKey = NormalizePathKey(path);
+        var result = await _runner.ExecuteAsync(
+            repoRoot,
+            new[]
+            {
+                "log",
+                "--follow",
+                "--pretty=format:%H",
+                "--",
+                normalizedKey
+            },
+            cancellationToken);
+        EnsureSuccess(result, "git log");
+
+        var count = result.StandardOutput
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Length;
+
+        return new GitFileChangeCountDto(NormalizePath(normalizedKey), count);
+    }
+
+    public async Task<string> GetCurrentBranchAsync(
+        Guid configId,
+        string repoRoot,
+        CancellationToken cancellationToken)
+    {
+        var result = await _runner.ExecuteAsync(
+            repoRoot,
+            new[]
+            {
+                "rev-parse",
+                "--abbrev-ref",
+                "HEAD"
+            },
+            cancellationToken);
+        EnsureSuccess(result, "git rev-parse");
+
+        return result.StandardOutput.Trim();
+    }
+
+    public async Task<IReadOnlyList<string>> ListLocalBranchesAsync(
+        Guid configId,
+        string repoRoot,
+        CancellationToken cancellationToken)
+    {
+        var result = await _runner.ExecuteAsync(
+            repoRoot,
+            new[]
+            {
+                "for-each-ref",
+                "refs/heads",
+                "--format=%(refname:short)"
+            },
+            cancellationToken);
+        EnsureSuccess(result, "git for-each-ref");
+
+        var branches = result.StandardOutput
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(branch => branch.Trim())
+            .Where(branch => !string.IsNullOrWhiteSpace(branch))
+            .OrderBy(branch => branch, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return branches;
+    }
+
     private static List<GitFileHistoryEntryDto> ParseHistory(
         string output,
         string targetPath,
