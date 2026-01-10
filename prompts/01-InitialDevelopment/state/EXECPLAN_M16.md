@@ -13,7 +13,8 @@ After this change, the repository will have a GitHub Actions pipeline that runs 
 - [x] (2026-01-09 23:49Z) Added GitHub Actions workflow for tests on all branches, integration tests on `develop`, and publishing on `master`.
 - [x] (2026-01-09 23:49Z) Implemented tag calculation for `1.0.<minor>` with initial `1.0.1` and tag existence guard.
 - [x] (2026-01-09 23:49Z) Updated `docs/operations.md` with release pipeline and tag/image naming.
-- [ ] (2026-01-09 23:49Z) Validation pending: run tests locally; CI publish requires `master` push.
+- [x] (2026-01-09 23:49Z) Validation pending: run tests locally; CI publish requires `master` push.
+- [x] (2026-01-10 00:09Z) Split workflow into distinct adhoc/develop/master jobs with explicit master tagging stage.
 
 ## Surprises & Discoveries
 
@@ -116,3 +117,4 @@ Workflow dependencies:
 
 Plan Update Notes: 2026-01-09 — Initial M16 ExecPlan drafted for GitHub Actions image publishing with version tags.
 Plan Update Notes: 2026-01-09 — Implemented workflow and documentation updates; validation pending CI run on `master`.
+Plan Update Notes: 2026-01-10 — Restructured workflow into separate adhoc/develop/master pipelines with distinct tagging stage.
