@@ -228,7 +228,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         var graph = _graphStoreProvider.GetOrAdd(solutionId);
 
         var solutionNodeId = CreateStableId($"solution:{solutionId}");
-        graph.AddNode(new GraphNodeDto(solutionNodeId, GraphNodeKind.Solution, solutionName));
+        graph.AddNode(new GraphNodeDto(solutionNodeId, GraphNodeKind.Solution, solutionId, solutionName));
 
         var displayPathToNodeId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         var repositoryPathToNodeId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
@@ -236,7 +236,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         foreach (var project in projects.Values)
         {
             var projectNodeId = CreateStableId($"project:{project.ProjectKey}");
-            graph.AddNode(new GraphNodeDto(projectNodeId, GraphNodeKind.Project, project.Name));
+            graph.AddNode(new GraphNodeDto(projectNodeId, GraphNodeKind.Project, project.ProjectKey, project.Name));
             graph.AddEdge(solutionNodeId, projectNodeId, EdgeType.Contains);
             displayPathToNodeId[project.Name] = projectNodeId;
         }
@@ -252,7 +252,16 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             };
 
             var nodeId = CreateStableId($"{entry.Type}:{entry.DisplayPath}:{entry.ProjectKey}");
-            graph.AddNode(new GraphNodeDto(nodeId, kind, entry.Name));
+            var attributes = new Dictionary<string, string>
+            {
+                ["DisplayPath"] = entry.DisplayPath
+            };
+            if (entry.Type == CodeTreeEntryType.File)
+            {
+                attributes["RepositoryPath"] = entry.RepositoryPath;
+            }
+
+            graph.AddNode(new GraphNodeDto(nodeId, kind, entry.DisplayPath, entry.Name, attributes));
             displayPathToNodeId[entry.DisplayPath] = nodeId;
             if (entry.Type == CodeTreeEntryType.File)
             {
@@ -283,7 +292,14 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 ? type.DocumentationId
                 : type.SymbolKey;
             var typeNodeId = CreateStableId($"type:{typeKey}");
-            graph.AddNode(new GraphNodeDto(typeNodeId, GraphNodeKind.NamedType, type.Name));
+            var attributes = new Dictionary<string, string>
+            {
+                ["DocumentationId"] = type.DocumentationId ?? string.Empty,
+                ["SymbolKey"] = type.SymbolKey,
+                ["RealType"] = type.Kind.ToString(),
+                ["Name"] = type.Name
+            };
+            graph.AddNode(new GraphNodeDto(typeNodeId, GraphNodeKind.NamedType, typeKey, type.Name, attributes));
 
             if (!string.IsNullOrWhiteSpace(type.FilePath) &&
                 repositoryPathToNodeId.TryGetValue(type.FilePath, out var fileNodeId))
