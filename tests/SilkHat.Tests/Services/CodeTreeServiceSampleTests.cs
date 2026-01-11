@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using SilkHat.Code.Analysis.Graph;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Analysis.Services;
 using SilkHat.Code.Core.Dtos;
@@ -11,7 +12,8 @@ public sealed class CodeTreeServiceSampleTests
     public async Task GetTree_ReturnsTypeMembers_FromSampleSolution()
     {
         var sampleRoot = LocateSampleRoot();
-        var loader = new CodeWorkspaceLoader(NullLogger<CodeWorkspaceLoader>.Instance);
+        var provider = new GraphStoreProvider();
+        var loader = new CodeWorkspaceLoader(NullLogger<CodeWorkspaceLoader>.Instance, provider);
         var workspace = await loader.LoadAsync(
             sampleRoot,
             new[] { new SolutionReference("./SilkHat.Sample.sln", "solution-1") },
@@ -22,7 +24,7 @@ public sealed class CodeTreeServiceSampleTests
             item.Type == CodeTreeEntryType.File
             && item.DisplayPath.EndsWith("AnalysisSamples.cs", StringComparison.OrdinalIgnoreCase));
 
-        var service = new CodeTreeService(new CodeSymbolOutlineService());
+        var service = new CodeTreeService(provider, new CodeSymbolOutlineService());
         var types = await service.GetTreeAsync(workspace, solution, entry.DisplayPath, CancellationToken.None);
 
         var complexityType = types.FirstOrDefault(type => type.Name == "ComplexitySamples");

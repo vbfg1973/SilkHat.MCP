@@ -1,10 +1,13 @@
-M20: planned — QuikGraph-backed solution index with job orchestration and status polling
+M20: in-flight — QuikGraph-backed solution index with job orchestration and status polling
 
-Plan highlights:
-- Build in-memory QuikGraph index per solution load (projects/files, types/members, packages, git commits/authors, complexity metrics) with typed edges.
-- Run dependency-aware jobs (projects/files; types/members; packages; git; complexity) with per-job status/progress.
-- Expose index status API; UI Status dialog polls every second during solution load while jobs are running and stops when complete.
-- Keep existing API shapes (tree, symbols, annotations) and re-source them from the graph.
-- Graph edges carry EdgeType (e.g., Contains, DeclaresType/Member, Inherits, Implements, Calls, Changes, AuthoredBy, DependsOnPackage, ExternalReference, HasMetric, PropertyType, FieldType, ReturnType, ParameterType) via serialization-friendly edge DTOs; method/constructor metadata captures parameters (name, type DocId/SymbolKey, ordinal, optional) with edges to parameter types.
+What’s implemented so far
+- Graph store + query service with keyed lookups and neighbor traversal.
+- Workspace loader now builds graph nodes/edges for solution → project → folder/file, file → type, type → member/parameter (with locations, project metadata, namespaces/assemblies, return/value type links).
+- CodeTreeService now reads tree data from the graph (members included); fallbacks remain only as safety.
+- CodeSymbolsController now resolves symbols graph-first (docId/symbolKey), with legacy map fallback for compatibility.
+- Tests updated and all suites passing; docker build/smoke verified.
 
-Status: Documentation and execution plan created; implementation to follow in M20.
+Still to do in M20
+- Job orchestration + status endpoints + UI polling.
+- Migrate metrics/filtering/annotations to graph-backed data; remove outline fallback once member nodes proven.
+- Update docs once the above lands.

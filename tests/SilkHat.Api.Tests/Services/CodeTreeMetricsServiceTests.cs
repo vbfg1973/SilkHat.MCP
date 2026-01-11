@@ -1,6 +1,7 @@
 using Moq;
 using SilkHat.Api.Services;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Graph;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
 using SilkHat.Git.Analysis.Abstractions;
@@ -43,7 +44,10 @@ public sealed class CodeTreeMetricsServiceTests
 
         var complexityAggregator = new Mock<IComplexityMetricsAggregator>();
         var cacheStore = new CodeTreeMetricsCacheStore();
-        var service = new CodeTreeMetricsService(cacheStore, complexityAggregator.Object, gitAggregator.Object);
+        var graph = new Mock<IGraphQueryService>();
+        graph.Setup(g => g.GetSnapshot(It.IsAny<string>()))
+            .Returns(new GraphSnapshot(Array.Empty<GraphNodeDto>(), Array.Empty<GraphEdgeDto>()));
+        var service = new CodeTreeMetricsService(cacheStore, complexityAggregator.Object, gitAggregator.Object, graph.Object);
 
         var metrics = await service.GetMetricsAsync(
             Guid.NewGuid(),
@@ -91,7 +95,10 @@ public sealed class CodeTreeMetricsServiceTests
 
         var complexityAggregator = new Mock<IComplexityMetricsAggregator>();
         var cacheStore = new CodeTreeMetricsCacheStore();
-        var service = new CodeTreeMetricsService(cacheStore, complexityAggregator.Object, gitAggregator.Object);
+        var graph = new Mock<IGraphQueryService>();
+        graph.Setup(g => g.GetSnapshot(It.IsAny<string>()))
+            .Returns(new GraphSnapshot(Array.Empty<GraphNodeDto>(), Array.Empty<GraphEdgeDto>()));
+        var service = new CodeTreeMetricsService(cacheStore, complexityAggregator.Object, gitAggregator.Object, graph.Object);
 
         var metrics = await service.GetMetricsAsync(
             Guid.NewGuid(),
@@ -138,7 +145,10 @@ public sealed class CodeTreeMetricsServiceTests
 
         var gitAggregator = new Mock<IGitMetricsAggregator>();
         var cacheStore = new CodeTreeMetricsCacheStore();
-        var service = new CodeTreeMetricsService(cacheStore, complexityAggregator.Object, gitAggregator.Object);
+        var graph = new Mock<IGraphQueryService>();
+        graph.Setup(g => g.GetSnapshot(It.IsAny<string>()))
+            .Returns(new GraphSnapshot(Array.Empty<GraphNodeDto>(), Array.Empty<GraphEdgeDto>()));
+        var service = new CodeTreeMetricsService(cacheStore, complexityAggregator.Object, gitAggregator.Object, graph.Object);
 
         var metrics = await service.GetMetricsAsync(
             Guid.NewGuid(),

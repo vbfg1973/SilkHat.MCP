@@ -1,6 +1,7 @@
 using SilkHat.Api.Extensions;
 using SilkHat.Api.Models;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Graph;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
 using SilkHat.Core.Dtos;
@@ -21,13 +22,16 @@ public sealed class CodeTreeQueryService : ICodeTreeQueryService
 {
     private readonly ICodeTreeService _treeService;
     private readonly ICodeTreeMetricsService _metricsService;
+    private readonly IGraphQueryService _graphQueryService;
 
     public CodeTreeQueryService(
         ICodeTreeService treeService,
-        ICodeTreeMetricsService metricsService)
+        ICodeTreeMetricsService metricsService,
+        IGraphQueryService graphQueryService)
     {
         _treeService = treeService;
         _metricsService = metricsService;
+        _graphQueryService = graphQueryService;
     }
 
     public async Task<PagedResult<CodeTreeEntryDto>> GetTreeAsync(
@@ -66,8 +70,9 @@ public sealed class CodeTreeQueryService : ICodeTreeQueryService
                 query.FilterMetric!.Value,
                 cancellationToken);
 
+            var snapshot = _graphQueryService.GetSnapshot(solution.SolutionId);
             includedNodes = BuildIncludedSet(
-                solution.TreeEntries,
+                snapshot,
                 filterMetrics.FileValues,
                 query.FilterOperator!.Value,
                 query.FilterThreshold!.Value);
@@ -161,19 +166,47 @@ public sealed class CodeTreeQueryService : ICodeTreeQueryService
     }
 
     private static HashSet<string> BuildIncludedSet(
-        IReadOnlyList<CodeTreeEntryDto> entries,
+        GraphSnapshot snapshot,
         IReadOnlyDictionary<string, int> fileValues,
         CodeTreeFilterOperator filterOperator,
         int threshold)
     {
         var included = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var entry in entries.Where(entry => entry.Type == CodeTreeEntryType.File))
+        if (fileValues.Count == 0 || snapshot.Nodes.Count == 0)
         {
-            var value = fileValues.TryGetValue(entry.DisplayPath, out var stored)
-                ? stored
-                : 0;
+            return included;
+        }
 
+        var parentsByChild = BuildParentMap(snapshot.Edges);
+        var nodesById = snapshot.Nodes.ToDictionary(n => n.Id);
+
+        var fileNodeIdsByRepositoryPath = snapshot.Nodes
+            .Where(node => node.Kind == GraphNodeKind.File
+                           && node.Attributes?.TryGetValue("RepositoryPath", out _) == true)
+            .SelectMany(node =>
+            {
+                var repoPath = node.Attributes!["RepositoryPath"];
+                var normalized = NormalizePath(repoPath);
+                var display = node.Attributes!.GetValueOrDefault("DisplayPath");
+                var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    repoPath,
+                    normalized
+                };
+
+                if (!string.IsNullOrWhiteSpace(display))
+                {
+                    keys.Add(display!);
+                    keys.Add(NormalizePath(display!));
+                }
+
+                return keys.Select(key => new KeyValuePair<string, Guid>(key, node.Id));
+            })
+            .GroupBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First().Value, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (repositoryPath, value) in fileValues)
+        {
             var matches = filterOperator switch
             {
                 CodeTreeFilterOperator.LessThanOrEqual => value <= threshold,
@@ -186,35 +219,77 @@ public sealed class CodeTreeQueryService : ICodeTreeQueryService
                 continue;
             }
 
-            AddWithAncestors(included, entry.DisplayPath);
+            var normalizedPath = NormalizePath(repositoryPath);
+            if (!fileNodeIdsByRepositoryPath.TryGetValue(repositoryPath, out var nodeId)
+                && !fileNodeIdsByRepositoryPath.TryGetValue(normalizedPath, out nodeId))
+            {
+                continue;
+            }
+
+            AddWithAncestors(included, nodeId, parentsByChild, nodesById);
         }
 
         return included;
     }
 
-    private static void AddWithAncestors(ISet<string> included, string displayPath)
+    private static void AddWithAncestors(
+        ISet<string> included,
+        Guid nodeId,
+        IReadOnlyDictionary<Guid, List<Guid>> parentsByChild,
+        IReadOnlyDictionary<Guid, GraphNodeDto> nodesById)
     {
-        if (!included.Add(displayPath))
-        {
-            return;
-        }
+        var queue = new Queue<Guid>();
+        queue.Enqueue(nodeId);
 
-        var parent = GetParentDisplayPath(displayPath);
-        while (!string.IsNullOrEmpty(parent))
+        while (queue.Count > 0)
         {
-            included.Add(parent);
-            parent = GetParentDisplayPath(parent);
+            var current = queue.Dequeue();
+            var key = nodesById.TryGetValue(current, out var node)
+                ? node.Attributes?.GetValueOrDefault("DisplayPath") ?? node.Key
+                : null;
+
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                included.Add(key);
+            }
+
+            if (parentsByChild.TryGetValue(current, out var parents))
+            {
+                foreach (var parent in parents)
+                {
+                    queue.Enqueue(parent);
+                }
+            }
         }
     }
 
-    private static string GetParentDisplayPath(string displayPath)
+    private static Dictionary<Guid, List<Guid>> BuildParentMap(IEnumerable<GraphEdgeDto> edges)
     {
-        if (string.IsNullOrWhiteSpace(displayPath))
+        var map = new Dictionary<Guid, List<Guid>>();
+        foreach (var edge in edges.Where(e => e.EdgeType == EdgeType.Contains))
+        {
+            if (!map.TryGetValue(edge.TargetId, out var list))
+            {
+                list = new List<Guid>();
+                map[edge.TargetId] = list;
+            }
+
+            list.Add(edge.SourceId);
+        }
+
+        return map;
+    }
+
+    private static string NormalizePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
         {
             return string.Empty;
         }
 
-        var lastSeparator = displayPath.LastIndexOf('/');
-        return lastSeparator <= 0 ? string.Empty : displayPath[..lastSeparator];
+        var normalized = path.Replace('\\', '/').Trim();
+        normalized = normalized.TrimStart('.');
+        normalized = normalized.TrimStart('/');
+        return normalized;
     }
 }

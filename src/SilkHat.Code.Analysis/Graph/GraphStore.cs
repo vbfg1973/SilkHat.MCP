@@ -10,6 +10,7 @@ public sealed class GraphStore
 {
     private readonly AdjacencyGraph<Guid, TaggedEdge<Guid, EdgeType>> _graph = new();
     private readonly ConcurrentDictionary<Guid, GraphNodeDto> _nodes = new();
+    private readonly ConcurrentDictionary<string, Guid> _nodeIdsByKey = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentBag<GraphEdgeDto> _edges = new();
 
     public bool AddNode(GraphNodeDto node)
@@ -22,6 +23,7 @@ public sealed class GraphStore
         if (_nodes.TryAdd(node.Id, node))
         {
             _graph.AddVertex(node.Id);
+            _nodeIdsByKey[node.Key] = node.Id;
             return true;
         }
 
@@ -48,6 +50,35 @@ public sealed class GraphStore
     public IEnumerable<GraphNodeDto> Nodes => _nodes.Values;
 
     public IEnumerable<GraphEdgeDto> Edges => _edges;
+
+    public bool TryGetNode(Guid id, out GraphNodeDto? node)
+    {
+        if (_nodes.TryGetValue(id, out var value))
+        {
+            node = value;
+            return true;
+        }
+
+        node = null;
+        return false;
+    }
+
+    public bool TryGetNodeByKey(string key, out GraphNodeDto? node)
+    {
+        node = null;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return false;
+        }
+
+        if (_nodeIdsByKey.TryGetValue(key, out var id) && _nodes.TryGetValue(id, out var found))
+        {
+            node = found;
+            return true;
+        }
+
+        return false;
+    }
 
     public IEnumerable<GraphEdgeDto> GetOutEdges(Guid nodeId, EdgeType? type = null)
     {

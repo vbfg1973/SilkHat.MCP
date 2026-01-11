@@ -8,22 +8,25 @@ Replace ad-hoc indexing with a rich in-memory graph (QuikGraph) built at solutio
 
 ## Progress
 
-- [ ] Draft graph model (nodes/edges) and job orchestration design.
-- [ ] Implement graph container and lookup indices.
-- [ ] Implement indexing jobs (projects/files; types/members; packages; git; complexity) with status reporting.
+- [x] Draft graph model (nodes/edges) and job orchestration design (graph model settled; orchestration still pending).
+- [x] Implement graph container and lookup indices (GraphStore + GraphQueryService with keyed lookups and in/out edges).
+- [ ] Implement indexing jobs (projects/files; types/members; packages; git; complexity) with status reporting. *Partial*: workspace loader now builds graph nodes/edges for solution/project/folder/file/type/member/parameter with locations; other jobs + status remain.
 - [ ] Expose status endpoint and wire UI polling dialog (start on solution load if jobs running; stop on completion).
-- [ ] Adapt existing services (tree, symbols, annotations) to read from the graph.
-- [ ] Tests (unit/API/UI) and docs.
+- [ ] Adapt existing services (tree, symbols, annotations) to read from the graph. *Partial*: CodeTreeService now reads from graph (members included); CodeSymbolsController is graph-first with legacy fallback; metrics/filtering still legacy.
+- [ ] Tests (unit/API/UI) and docs. *Partial*: all suites currently passing after graph/tree/symbol changes; docs not yet updated.
 
 ## Surprises & Discoveries
 
-- None yet.
+- Graph member nodes (fields/properties/methods/events/parameters) plus location/project data allow tree queries without outline fallback; outline fallback retained as temporary safety.
+- Symbol lookup works via graph docId/symbolKey; legacy maps kept as fallback until full migration.
 
 ## Decision Log
 
 - Graph engine: QuikGraph in-memory; keep payloads serializable for future persistence.
 - Status polling: UI starts polling when a solution load begins and any index job is running; stops when all jobs reach completed/failed.
 - Keep existing API shapes stable; swap internals to graph-backed data.
+- Type nodes now include namespace/assembly; nodes carry project metadata and locations.
+- GraphQueryService exposes keyed node lookup and neighbor traversal; controllers/services should use it going forward.
 
 ## Outcomes & Retrospective
 
@@ -93,10 +96,12 @@ Each job reports status: state (pending/running/completed/failed), percent, mess
 ## Implementation Steps
 
 1) Graph scaffolding: define node/edge types, IDs, graph container, and lookup dictionaries for fast queries.
+   - DONE for container/lookups and file/type/member/parameter nodes with locations.
 2) Job orchestration: job base + state model + orchestrator; implement job workers (projects/files; types/members; packages; git; complexity).
 3) Status API: controller + models returning per-job status; hook into orchestrator.
 4) UI: Status dialog component + polling tied to solution load; surfaces job state/progress.
 5) Service adaptation: back tree/symbol/annotation services with graph queries.
+   - PARTIAL: tree service graph-backed; symbol lookup graph-first; metrics/filters still legacy.
 6) Tests:
    - Unit: graph builders per job, inheritance/implementation edges, distinct author rollups, complexity attachment.
    - API: status endpoint; regression on tree/symbol endpoints to ensure unchanged behavior.
@@ -111,6 +116,7 @@ Each job reports status: state (pending/running/completed/failed), percent, mess
 
 Plan Update Notes: 2026-01-10 15:08Z — Initial plan for M20 (graph index + job orchestration + UI polling).
 Plan Update Notes: 2026-01-10 15:13Z — Added typed edges, serialization-friendly edge DTOs, and method/constructor parameters with ordinal.
+Plan Update Notes: 2026-01-17 15:58Z — Graph-backed tree/symbol lookup implemented; graph now includes members/parameters/locations/project metadata. Status/metrics/filter migration and job orchestration still pending.
 
 ## Graph Extensions (Edge Types + Method Parameters)
 
