@@ -64,8 +64,18 @@ public sealed class ComplexityMetricsAggregator : IComplexityMetricsAggregator
         var cognitive = new ConcurrentDictionary<string, int>(PathComparer);
         var cyclomatic = new ConcurrentDictionary<string, int>(PathComparer);
         var indentation = new ConcurrentDictionary<string, int>(PathComparer);
-        var types = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var methods = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var types = new Dictionary<ComplexityMeasureType, ConcurrentDictionary<string, int>>
+        {
+            [ComplexityMeasureType.Cognitive] = new(StringComparer.OrdinalIgnoreCase),
+            [ComplexityMeasureType.Cyclomatic] = new(StringComparer.OrdinalIgnoreCase),
+            [ComplexityMeasureType.Indentation] = new(StringComparer.OrdinalIgnoreCase)
+        };
+        var methods = new Dictionary<ComplexityMeasureType, ConcurrentDictionary<string, int>>
+        {
+            [ComplexityMeasureType.Cognitive] = new(StringComparer.OrdinalIgnoreCase),
+            [ComplexityMeasureType.Cyclomatic] = new(StringComparer.OrdinalIgnoreCase),
+            [ComplexityMeasureType.Indentation] = new(StringComparer.OrdinalIgnoreCase)
+        };
 
         var strategies = new Dictionary<ComplexityMeasureType, IComplexityStrategy>
         {
@@ -136,7 +146,19 @@ public sealed class ComplexityMetricsAggregator : IComplexityMetricsAggregator
                 }
             });
 
-        return new FileComplexityMetrics(cognitive, cyclomatic, indentation, types, methods);
+        var typeSnapshot = new Dictionary<ComplexityMeasureType, IReadOnlyDictionary<string, int>>(types.Count);
+        foreach (var kvp in types)
+        {
+            typeSnapshot[kvp.Key] = kvp.Value;
+        }
+
+        var methodSnapshot = new Dictionary<ComplexityMeasureType, IReadOnlyDictionary<string, int>>(methods.Count);
+        foreach (var kvp in methods)
+        {
+            methodSnapshot[kvp.Key] = kvp.Value;
+        }
+
+        return new FileComplexityMetrics(cognitive, cyclomatic, indentation, typeSnapshot, methodSnapshot);
     }
 
     private static void AddValue(
@@ -167,8 +189,8 @@ public sealed class ComplexityMetricsAggregator : IComplexityMetricsAggregator
         ComplexityMeasureType measure,
         string docId,
         int value,
-        ConcurrentDictionary<string, int> types,
-        ConcurrentDictionary<string, int> methods,
+        IReadOnlyDictionary<ComplexityMeasureType, ConcurrentDictionary<string, int>> types,
+        IReadOnlyDictionary<ComplexityMeasureType, ConcurrentDictionary<string, int>> methods,
         bool isMethod)
     {
         if (value == 0 || string.IsNullOrWhiteSpace(docId))
@@ -176,7 +198,7 @@ public sealed class ComplexityMetricsAggregator : IComplexityMetricsAggregator
             return;
         }
 
-        var target = isMethod ? methods : types;
+        var target = isMethod ? methods[measure] : types[measure];
         target.AddOrUpdate(docId, value, (_, existing) => existing + value);
     }
 

@@ -31,6 +31,7 @@ public sealed class ComplexityMathTests
 
     private static async Task<(BaseMethodDeclarationSyntax MethodSyntax, SemanticModel SemanticModel)> CompileMethodAsync(string methodText)
     {
+        await Task.Yield();
         var code = $$"""
         namespace TestHarness
         {

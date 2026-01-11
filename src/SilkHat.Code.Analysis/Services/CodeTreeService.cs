@@ -65,7 +65,7 @@ public sealed class CodeTreeService : ICodeTreeService
             .Select(node => MapNodeToEntry(node!, solution))
             .Where(dto => dto is not null)
             .Select(dto => dto!)
-            .GroupBy(dto => dto.DisplayPath ?? dto.RepositoryPath ?? dto.Name, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(dto => NormalizeGroupKey(dto), StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First()) // de-duplicate by key
             .OrderBy(entry => GetNodeSortOrder(entry))
             .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
@@ -204,6 +204,12 @@ public sealed class CodeTreeService : ICodeTreeService
             },
             _ => 10
         };
+    }
+
+    private static string NormalizeGroupKey(CodeTreeEntryDto dto)
+    {
+        var key = dto.DisplayPath ?? dto.RepositoryPath ?? dto.Name;
+        return key.Trim().TrimEnd('/').TrimStart('.', '/');
     }
 
     private static CodeLocationDto? BuildLocation(IReadOnlyDictionary<string, string> attributes)

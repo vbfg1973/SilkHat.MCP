@@ -64,7 +64,7 @@
                         <span>@item.Value?.Name</span>
                         @if (item.Value?.AnnotationKind is not null && item.Value.AnnotationValue is not null)
                         {
-                            <MudBadge Content="@item.Value.AnnotationValue"
+                            <MudBadge Content="@($"{item.Value.AnnotationValue}")"
                                       Color="Color.Info"
                                       Class="ide-tree-badge" />
                         }

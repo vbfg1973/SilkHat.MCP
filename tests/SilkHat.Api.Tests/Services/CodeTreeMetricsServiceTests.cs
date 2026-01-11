@@ -135,8 +135,18 @@ public sealed class CodeTreeMetricsServiceTests
             {
                 ["./Repo/Foo/A.cs"] = 8
             },
-            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
-            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
+            new Dictionary<SilkHat.Code.Core.Dtos.ComplexityMeasureType, IReadOnlyDictionary<string, int>>
+            {
+                [SilkHat.Code.Core.Dtos.ComplexityMeasureType.Cognitive] = new Dictionary<string, int>(),
+                [SilkHat.Code.Core.Dtos.ComplexityMeasureType.Cyclomatic] = new Dictionary<string, int>(),
+                [SilkHat.Code.Core.Dtos.ComplexityMeasureType.Indentation] = new Dictionary<string, int>()
+            },
+            new Dictionary<SilkHat.Code.Core.Dtos.ComplexityMeasureType, IReadOnlyDictionary<string, int>>
+            {
+                [SilkHat.Code.Core.Dtos.ComplexityMeasureType.Cognitive] = new Dictionary<string, int>(),
+                [SilkHat.Code.Core.Dtos.ComplexityMeasureType.Cyclomatic] = new Dictionary<string, int>(),
+                [SilkHat.Code.Core.Dtos.ComplexityMeasureType.Indentation] = new Dictionary<string, int>()
+            });
 
         var complexityAggregator = new Mock<IComplexityMetricsAggregator>();
         complexityAggregator

@@ -150,12 +150,14 @@ public sealed class CodeTreeMetricsService : ICodeTreeMetricsService
 
         if (complexityMetrics is not null)
         {
-            foreach (var kvp in complexityMetrics.TypesByDocId)
+            var measure = MapComplexityMeasure(kind);
+
+            foreach (var kvp in complexityMetrics.GetTypes(measure))
             {
                 typeValues[kvp.Key] = kvp.Value;
             }
 
-            foreach (var kvp in complexityMetrics.MethodsByDocId)
+            foreach (var kvp in complexityMetrics.GetMethods(measure))
             {
                 memberValues[kvp.Key] = kvp.Value;
             }
@@ -228,12 +230,14 @@ public sealed class CodeTreeMetricsService : ICodeTreeMetricsService
 
         if (complexityMetrics is not null)
         {
-            foreach (var kvp in complexityMetrics.TypesByDocId)
+            var measure = MapComplexityMeasure(kind);
+
+            foreach (var kvp in complexityMetrics.GetTypes(measure))
             {
                 typeValues[kvp.Key] = kvp.Value;
             }
 
-            foreach (var kvp in complexityMetrics.MethodsByDocId)
+            foreach (var kvp in complexityMetrics.GetMethods(measure))
             {
                 memberValues[kvp.Key] = kvp.Value;
             }
