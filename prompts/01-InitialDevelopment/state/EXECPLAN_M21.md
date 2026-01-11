@@ -52,3 +52,4 @@ Replace placeholder status updates with real indexing work during solution load:
 - Graph now owns packages, git authors/commits/changes, and complexity metrics; tree/annotations use graph data only.
 - Status store reflects real work for packages/git/complexity jobs.
 - All unit tests pass (`dotnet test -m:1` per suite); one existing nullable warning remains in `IdeTabs.razor`.
+- Base load stops after projects/files/types; expensive package/git/complexity indexing runs in deferred background jobs with status updates so the IDE can appear quickly.

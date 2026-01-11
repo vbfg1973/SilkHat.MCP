@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Threading.Tasks;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Graph;
 using SilkHat.Code.Analysis.Models;
@@ -229,17 +230,6 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             }
             _statusStore?.SetJobCompleted(solutionId, IndexJobType.TypesAndMembers, "Types and members indexed.");
 
-            try
-            {
-                _statusStore?.SetJobRunning(solutionId, IndexJobType.Packages, "Indexing packages.");
-                packageReferences = BuildPackageReferences(solutionProjects, projectPathToKey, projectIndex);
-            }
-            catch (Exception ex)
-            {
-                _statusStore?.SetJobFailed(solutionId, IndexJobType.Packages, $"Package indexing failed: {ex.Message}");
-                throw;
-            }
-
             var treeEntries = BuildCodeTreeEntries(workspace, rootPath, projectKeyMap);
             var treeChildrenMap = await Task.Run(() => BuildTreeChildrenMap(treeEntries), cancellationToken);
             var relativeSolutionPath = SolutionIdentity.NormalizeRelativePath(rootPath, parsedSolution.SolutionPath);
@@ -258,48 +248,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 namedTypeByDocId,
                 compilations);
 
-            GitLogData? gitData = null;
-            if (_gitCommandRunner is null)
-            {
-                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git runner not configured (skipped).");
-            }
-            else
-            {
-                try
-                {
-                    _statusStore?.SetJobRunning(solutionId, IndexJobType.Git, "Indexing git.");
-                    gitData = await BuildGitDataAsync(rootPath, cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _statusStore?.SetJobFailed(solutionId, IndexJobType.Git, $"Git indexing failed: {ex.Message}");
-                    _logger.LogWarning(ex, "Git indexing failed for solution {SolutionPath}.", parsedSolution.SolutionPath);
-                }
-            }
-
-            ComplexityGraphData? complexityData = null;
-            if (_complexityStrategyFactory is null)
-            {
-                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity strategies not configured (skipped).");
-            }
-            else
-            {
-                try
-                {
-                    _statusStore?.SetJobRunning(solutionId, IndexJobType.Complexity, "Computing complexity.");
-                    complexityData = await BuildComplexityDataAsync(
-                        rootPath,
-                        solutionWorkspaces[solutionId],
-                        cancellationToken);
-                }
-                catch (Exception ex)
-                {
-                    _statusStore?.SetJobFailed(solutionId, IndexJobType.Complexity, $"Complexity indexing failed: {ex.Message}");
-                    _logger.LogWarning(ex, "Complexity indexing failed for solution {SolutionPath}.", parsedSolution.SolutionPath);
-                }
-            }
-
-            PopulateGraph(
+            var graphContext = PopulateGraphBase(
                 solutionId,
                 parsedSolution.SolutionName,
                 projectIndex,
@@ -307,26 +256,22 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 treeChildrenMap,
                 namedTypes,
                 typeLocationAttributes,
-                memberNodes,
-                packageReferences,
-                gitData,
-                complexityData);
+                memberNodes);
 
-            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Packages, "Packages indexed.");
-            if (gitData is not null)
-            {
-                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git indexed.");
-            }
-            if (complexityData is not null)
-            {
-                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity indexed.");
-            }
+            _ = Task.Run(() => RunDeferredIndexingAsync(
+                rootPath,
+                solutionId,
+                parsedSolution.SolutionPath,
+                graphContext,
+                () => BuildPackageReferences(solutionProjects, projectPathToKey, projectIndex),
+                solutionWorkspaces[solutionId],
+                cancellationToken), CancellationToken.None);
         }
 
         return new CodeRepositoryWorkspace(rootPath, solutionWorkspaces);
     }
 
-    private void PopulateGraph(
+    private GraphContext PopulateGraphBase(
         string solutionId,
         string solutionName,
         IReadOnlyDictionary<string, ProjectIndex> projects,
@@ -334,10 +279,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         IReadOnlyDictionary<string, IReadOnlyList<CodeTreeEntryDto>> treeChildrenByParent,
         IReadOnlyList<NamedTypeDto> namedTypes,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> typeLocationAttributes,
-        IReadOnlyList<MemberNodeInfo> memberNodes,
-        IReadOnlyList<ProjectPackageReference> packageReferences,
-        GitLogData? gitData,
-        ComplexityGraphData? complexityData)
+        IReadOnlyList<MemberNodeInfo> memberNodes)
     {
         var graph = _graphStoreProvider.GetOrAdd(solutionId);
 
@@ -358,54 +300,37 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             projectNodeIds[project.ProjectKey] = projectNodeId;
         }
 
-        foreach (var entry in treeEntries)
+        foreach (var treeEntry in treeEntries)
         {
-            if (entry.Type == CodeTreeEntryType.Project)
+            if (!displayPathToNodeId.TryGetValue(treeEntry.DisplayPath, out var nodeId))
             {
-                // Bind project display path to the existing project node; do not create duplicates.
-                if (displayPathToNodeId.TryGetValue(entry.Name, out var existingProjectId))
-                {
-                    displayPathToNodeId[entry.DisplayPath] = existingProjectId;
-                }
-                continue;
+                nodeId = CreateStableId(treeEntry.DisplayPath);
+                displayPathToNodeId[treeEntry.DisplayPath] = nodeId;
             }
 
-            var kind = entry.Type switch
-            {
-                CodeTreeEntryType.Project => GraphNodeKind.Project,
-                CodeTreeEntryType.Directory => GraphNodeKind.Folder,
-                CodeTreeEntryType.File => GraphNodeKind.File,
-                _ => GraphNodeKind.File
-            };
+            var kind = treeEntry.Type == CodeTreeEntryType.Directory
+                ? GraphNodeKind.Folder
+                : GraphNodeKind.File;
 
-            var nodeId = CreateStableId($"{entry.Type}:{entry.DisplayPath}:{entry.ProjectKey}");
             var attributes = new Dictionary<string, string>
             {
-                ["DisplayPath"] = entry.DisplayPath,
-                ["ProjectKey"] = entry.ProjectKey,
-                ["ProjectName"] = entry.ProjectName
+                ["DisplayPath"] = treeEntry.DisplayPath,
+                ["Name"] = treeEntry.Name,
+                ["ProjectKey"] = treeEntry.ProjectKey,
+                ["ProjectName"] = treeEntry.ProjectName,
+                ["RepositoryPath"] = treeEntry.RepositoryPath
             };
-            if (entry.Type == CodeTreeEntryType.File)
-            {
-                attributes["RepositoryPath"] = entry.RepositoryPath;
-            }
-            else if (entry.Type == CodeTreeEntryType.Directory)
-            {
-                attributes["RepositoryPath"] = entry.RepositoryPath;
-            }
 
-            graph.AddNode(new GraphNodeDto(nodeId, kind, entry.DisplayPath, entry.Name, attributes));
-            displayPathToNodeId[entry.DisplayPath] = nodeId;
-            if (entry.Type == CodeTreeEntryType.File)
+            graph.AddNode(new GraphNodeDto(nodeId, kind, treeEntry.DisplayPath, treeEntry.Name, attributes));
+            if (treeEntry.Type == CodeTreeEntryType.File)
             {
-                repositoryPathToNodeId[entry.RepositoryPath] = nodeId;
+                repositoryPathToNodeId[treeEntry.RepositoryPath] = nodeId;
             }
         }
 
         foreach (var (parent, children) in treeChildrenByParent)
         {
             var hasParent = displayPathToNodeId.TryGetValue(parent, out var parentNodeId);
-            // root-level entries hang directly off the solution
             var rootParentId = hasParent ? parentNodeId : solutionNodeId;
 
             foreach (var child in children)
@@ -416,49 +341,6 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 }
 
                 graph.AddEdge(rootParentId, childNodeId, EdgeType.Contains);
-            }
-        }
-
-        var packageNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
-        var packageVersionNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var reference in packageReferences)
-        {
-            var packageKey = reference.PackageId.Trim();
-            if (!packageNodeIds.TryGetValue(packageKey, out var packageNodeId))
-            {
-                packageNodeId = CreateStableId($"package:{packageKey}");
-                var packageAttributes = new Dictionary<string, string>
-                {
-                    ["PackageId"] = packageKey
-                };
-                graph.AddNode(new GraphNodeDto(packageNodeId, GraphNodeKind.Package, packageKey, packageKey, packageAttributes));
-                packageNodeIds[packageKey] = packageNodeId;
-            }
-
-            var versionKey = $"{packageKey}@{reference.Version}";
-            if (!packageVersionNodeIds.TryGetValue(versionKey, out var packageVersionNodeId))
-            {
-                packageVersionNodeId = CreateStableId($"package-version:{versionKey}");
-                var versionAttributes = new Dictionary<string, string>
-                {
-                    ["PackageId"] = packageKey,
-                    ["Version"] = reference.Version
-                };
-                graph.AddNode(new GraphNodeDto(
-                    packageVersionNodeId,
-                    GraphNodeKind.PackageVersion,
-                    versionKey,
-                    reference.Version,
-                    versionAttributes));
-                packageVersionNodeIds[versionKey] = packageVersionNodeId;
-
-                graph.AddEdge(packageVersionNodeId, packageNodeId, EdgeType.PackageVersion);
-            }
-
-            if (projectNodeIds.TryGetValue(reference.ProjectKey, out var projectNodeId))
-            {
-                graph.AddEdge(projectNodeId, packageVersionNodeId, EdgeType.DependsOnPackage);
             }
         }
 
@@ -550,106 +432,18 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 
                 if (!string.IsNullOrWhiteSpace(parameter.TypeDocumentationId)
                     && typeNodeIds.TryGetValue(parameter.TypeDocumentationId, out var parameterTypeId))
-            {
-                graph.AddEdge(parameterNodeId, parameterTypeId, EdgeType.ParameterType);
-            }
-        }
-
-        if (gitData is not null)
-        {
-            var authorNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var commit in gitData.Commits)
-            {
-                var commitNodeId = CreateStableId($"git-commit:{commit.Sha}");
-                var commitAttributes = new Dictionary<string, string>
                 {
-                    ["Sha"] = commit.Sha,
-                    ["AuthorName"] = commit.AuthorName,
-                    ["AuthorEmail"] = commit.AuthorEmail ?? string.Empty
-                };
-                if (commit.Date.HasValue)
-                {
-                    commitAttributes["Date"] = commit.Date.Value.ToString("O");
-                }
-
-                graph.AddNode(new GraphNodeDto(commitNodeId, GraphNodeKind.GitCommit, commit.Sha, commit.Sha, commitAttributes));
-                graph.AddEdge(solutionNodeId, commitNodeId, EdgeType.Contains);
-
-                var authorKey = string.IsNullOrWhiteSpace(commit.AuthorEmail) ? commit.AuthorName : commit.AuthorEmail!;
-                if (!authorNodeIds.TryGetValue(authorKey, out var authorNodeId))
-                {
-                    authorNodeId = CreateStableId($"git-author:{authorKey}");
-                    var authorAttributes = new Dictionary<string, string>
-                    {
-                        ["Name"] = commit.AuthorName,
-                        ["Email"] = commit.AuthorEmail ?? string.Empty
-                    };
-                    graph.AddNode(new GraphNodeDto(authorNodeId, GraphNodeKind.GitAuthor, authorKey, commit.AuthorName, authorAttributes));
-                    authorNodeIds[authorKey] = authorNodeId;
-                }
-
-                graph.AddEdge(commitNodeId, authorNodeId, EdgeType.AuthoredBy);
-
-                foreach (var change in commit.Changes)
-                {
-                    var normalizedPath = NormalizePathKey(change.Path);
-                    if (!repositoryPathToNodeId.TryGetValue(normalizedPath, out var fileNodeId))
-                    {
-                        continue;
-                    }
-
-                    var changeAttributes = new Dictionary<string, string>
-                    {
-                        ["Added"] = change.Added.ToString(CultureInfo.InvariantCulture),
-                        ["Deleted"] = change.Deleted.ToString(CultureInfo.InvariantCulture),
-                        ["RepositoryPath"] = normalizedPath
-                    };
-
-                    graph.AddEdge(commitNodeId, fileNodeId, EdgeType.Changes, changeAttributes);
+                    graph.AddEdge(parameterNodeId, parameterTypeId, EdgeType.ParameterType);
                 }
             }
         }
 
-        if (complexityData is not null)
-        {
-            foreach (var metric in complexityData.MethodMetrics)
-            {
-                var metricNodeId = CreateStableId($"complexity:method:{metric.DocId}:{metric.Measure}");
-                var metricAttributes = new Dictionary<string, string>
-                {
-                    ["DocId"] = metric.DocId,
-                    ["Measure"] = metric.Measure.ToString(),
-                    ["Value"] = metric.Value.ToString(CultureInfo.InvariantCulture),
-                    ["TargetKind"] = "Method"
-                };
-                graph.AddNode(new GraphNodeDto(metricNodeId, GraphNodeKind.ComplexityMetric, $"{metric.DocId}:{metric.Measure}", metric.Measure.ToString(), metricAttributes));
-
-                if (typeNodeIds.TryGetValue(metric.DocId, out var methodNodeId))
-                {
-                    graph.AddEdge(methodNodeId, metricNodeId, EdgeType.HasMetric);
-                }
-            }
-
-            foreach (var metric in complexityData.TypeMetrics)
-            {
-                var metricNodeId = CreateStableId($"complexity:type:{metric.DocId}:{metric.Measure}");
-                var metricAttributes = new Dictionary<string, string>
-                {
-                    ["DocId"] = metric.DocId,
-                    ["Measure"] = metric.Measure.ToString(),
-                    ["Value"] = metric.Value.ToString(CultureInfo.InvariantCulture),
-                    ["TargetKind"] = "Type"
-                };
-                graph.AddNode(new GraphNodeDto(metricNodeId, GraphNodeKind.ComplexityMetric, $"{metric.DocId}:{metric.Measure}", metric.Measure.ToString(), metricAttributes));
-
-                if (typeNodeIds.TryGetValue(metric.DocId, out var typeNodeId))
-                {
-                    graph.AddEdge(typeNodeId, metricNodeId, EdgeType.HasMetric);
-                }
-            }
-        }
-    }
+        return new GraphContext(
+            graph,
+            solutionNodeId,
+            projectNodeIds,
+            repositoryPathToNodeId,
+            typeNodeIds);
     }
 
     private Dictionary<string, ParsedProject> LoadProjectsForSolution(ParsedSolution solution)
@@ -711,6 +505,257 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 
         workspace.TryApplyChanges(solution);
         return workspace;
+    }
+
+    private async Task RunDeferredIndexingAsync(
+        string rootPath,
+        string solutionId,
+        string solutionPath,
+        GraphContext graphContext,
+        Func<IReadOnlyList<ProjectPackageReference>> packageBuilder,
+        CodeSolutionWorkspace workspace,
+        CancellationToken cancellationToken)
+    {
+        await RunPackagesAsync(solutionId, solutionPath, packageBuilder, graphContext).ConfigureAwait(false);
+        await RunGitAsync(rootPath, solutionId, solutionPath, graphContext, cancellationToken).ConfigureAwait(false);
+        await RunComplexityAsync(rootPath, solutionId, solutionPath, workspace, graphContext, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task RunPackagesAsync(
+        string solutionId,
+        string solutionPath,
+        Func<IReadOnlyList<ProjectPackageReference>> packageBuilder,
+        GraphContext context)
+    {
+        await Task.Yield();
+        _statusStore?.SetJobRunning(solutionId, IndexJobType.Packages, "Indexing packages.");
+        try
+        {
+            var packageReferences = packageBuilder();
+            AddPackageData(packageReferences, context);
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Packages, "Packages indexed.");
+        }
+        catch (Exception ex)
+        {
+            _statusStore?.SetJobFailed(solutionId, IndexJobType.Packages, $"Package indexing failed: {ex.Message}");
+            _logger.LogWarning(ex, "Package indexing failed for solution {SolutionPath}.", solutionPath);
+        }
+    }
+
+    private async Task RunGitAsync(
+        string rootPath,
+        string solutionId,
+        string solutionPath,
+        GraphContext context,
+        CancellationToken cancellationToken)
+    {
+        if (_gitCommandRunner is null)
+        {
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git runner not configured (skipped).");
+            return;
+        }
+
+        try
+        {
+            _statusStore?.SetJobRunning(solutionId, IndexJobType.Git, "Indexing git.");
+            var gitData = await BuildGitDataAsync(rootPath, cancellationToken).ConfigureAwait(false);
+            if (gitData is not null)
+            {
+                AddGitData(gitData, context);
+                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git indexed.");
+            }
+            else
+            {
+                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git indexing produced no data.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusStore?.SetJobFailed(solutionId, IndexJobType.Git, $"Git indexing failed: {ex.Message}");
+            _logger.LogWarning(ex, "Git indexing failed for solution {SolutionPath}.", solutionPath);
+        }
+    }
+
+    private async Task RunComplexityAsync(
+        string rootPath,
+        string solutionId,
+        string solutionPath,
+        CodeSolutionWorkspace workspace,
+        GraphContext context,
+        CancellationToken cancellationToken)
+    {
+        if (_complexityStrategyFactory is null)
+        {
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity strategies not configured (skipped).");
+            return;
+        }
+
+        try
+        {
+            _statusStore?.SetJobRunning(solutionId, IndexJobType.Complexity, "Computing complexity.");
+            var complexityData = await BuildComplexityDataAsync(rootPath, workspace, cancellationToken).ConfigureAwait(false);
+            if (complexityData is not null)
+            {
+                AddComplexityData(complexityData, context);
+                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity indexed.");
+            }
+            else
+            {
+                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity produced no data.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusStore?.SetJobFailed(solutionId, IndexJobType.Complexity, $"Complexity indexing failed: {ex.Message}");
+            _logger.LogWarning(ex, "Complexity indexing failed for solution {SolutionPath}.", solutionPath);
+        }
+    }
+
+    private void AddPackageData(
+        IReadOnlyList<ProjectPackageReference> packageReferences,
+        GraphContext context)
+    {
+        var packageNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var packageVersionNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var reference in packageReferences)
+        {
+            var packageKey = reference.PackageId.Trim();
+            if (!packageNodeIds.TryGetValue(packageKey, out var packageNodeId))
+            {
+                packageNodeId = CreateStableId($"package:{packageKey}");
+                var packageAttributes = new Dictionary<string, string>
+                {
+                    ["PackageId"] = packageKey
+                };
+                context.Graph.AddNode(new GraphNodeDto(packageNodeId, GraphNodeKind.Package, packageKey, packageKey, packageAttributes));
+                packageNodeIds[packageKey] = packageNodeId;
+            }
+
+            var versionKey = $"{packageKey}@{reference.Version}";
+            if (!packageVersionNodeIds.TryGetValue(versionKey, out var packageVersionNodeId))
+            {
+                packageVersionNodeId = CreateStableId($"package-version:{versionKey}");
+                var versionAttributes = new Dictionary<string, string>
+                {
+                    ["PackageId"] = packageKey,
+                    ["Version"] = reference.Version
+                };
+                context.Graph.AddNode(new GraphNodeDto(
+                    packageVersionNodeId,
+                    GraphNodeKind.PackageVersion,
+                    versionKey,
+                    reference.Version,
+                    versionAttributes));
+                packageVersionNodeIds[versionKey] = packageVersionNodeId;
+
+                context.Graph.AddEdge(packageVersionNodeId, packageNodeId, EdgeType.PackageVersion);
+            }
+
+            if (context.ProjectNodeIds.TryGetValue(reference.ProjectKey, out var projectNodeId))
+            {
+                context.Graph.AddEdge(projectNodeId, packageVersionNodeId, EdgeType.DependsOnPackage);
+            }
+        }
+    }
+
+    private void AddGitData(
+        GitLogData gitData,
+        GraphContext context)
+    {
+        var authorNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var commit in gitData.Commits)
+        {
+            var commitNodeId = CreateStableId($"git-commit:{commit.Sha}");
+            var commitAttributes = new Dictionary<string, string>
+            {
+                ["Sha"] = commit.Sha,
+                ["AuthorName"] = commit.AuthorName,
+                ["AuthorEmail"] = commit.AuthorEmail ?? string.Empty
+            };
+            if (commit.Date.HasValue)
+            {
+                commitAttributes["Date"] = commit.Date.Value.ToString("O");
+            }
+
+            context.Graph.AddNode(new GraphNodeDto(commitNodeId, GraphNodeKind.GitCommit, commit.Sha, commit.Sha, commitAttributes));
+            context.Graph.AddEdge(context.SolutionNodeId, commitNodeId, EdgeType.Contains);
+
+            var authorKey = string.IsNullOrWhiteSpace(commit.AuthorEmail) ? commit.AuthorName : commit.AuthorEmail!;
+            if (!authorNodeIds.TryGetValue(authorKey, out var authorNodeId))
+            {
+                authorNodeId = CreateStableId($"git-author:{authorKey}");
+                var authorAttributes = new Dictionary<string, string>
+                {
+                    ["Name"] = commit.AuthorName,
+                    ["Email"] = commit.AuthorEmail ?? string.Empty
+                };
+                context.Graph.AddNode(new GraphNodeDto(authorNodeId, GraphNodeKind.GitAuthor, authorKey, commit.AuthorName, authorAttributes));
+                authorNodeIds[authorKey] = authorNodeId;
+            }
+
+            context.Graph.AddEdge(commitNodeId, authorNodeId, EdgeType.AuthoredBy);
+
+            foreach (var change in commit.Changes)
+            {
+                var normalizedPath = NormalizePathKey(change.Path);
+                if (!context.RepositoryPathToNodeId.TryGetValue(normalizedPath, out var fileNodeId))
+                {
+                    continue;
+                }
+
+                var changeAttributes = new Dictionary<string, string>
+                {
+                    ["Added"] = change.Added.ToString(CultureInfo.InvariantCulture),
+                    ["Deleted"] = change.Deleted.ToString(CultureInfo.InvariantCulture),
+                    ["RepositoryPath"] = normalizedPath
+                };
+
+                context.Graph.AddEdge(commitNodeId, fileNodeId, EdgeType.Changes, changeAttributes);
+            }
+        }
+    }
+
+    private void AddComplexityData(
+        ComplexityGraphData complexityData,
+        GraphContext context)
+    {
+        foreach (var metric in complexityData.MethodMetrics)
+        {
+            var metricNodeId = CreateStableId($"complexity:method:{metric.DocId}:{metric.Measure}");
+            var metricAttributes = new Dictionary<string, string>
+            {
+                ["DocId"] = metric.DocId,
+                ["Measure"] = metric.Measure.ToString(),
+                ["Value"] = metric.Value.ToString(CultureInfo.InvariantCulture),
+                ["TargetKind"] = "Method"
+            };
+            context.Graph.AddNode(new GraphNodeDto(metricNodeId, GraphNodeKind.ComplexityMetric, $"{metric.DocId}:{metric.Measure}", metric.Measure.ToString(), metricAttributes));
+
+            if (context.TypeNodeIds.TryGetValue(metric.DocId, out var methodNodeId))
+            {
+                context.Graph.AddEdge(methodNodeId, metricNodeId, EdgeType.HasMetric);
+            }
+        }
+
+        foreach (var metric in complexityData.TypeMetrics)
+        {
+            var metricNodeId = CreateStableId($"complexity:type:{metric.DocId}:{metric.Measure}");
+            var metricAttributes = new Dictionary<string, string>
+            {
+                ["DocId"] = metric.DocId,
+                ["Measure"] = metric.Measure.ToString(),
+                ["Value"] = metric.Value.ToString(CultureInfo.InvariantCulture),
+                ["TargetKind"] = "Type"
+            };
+            context.Graph.AddNode(new GraphNodeDto(metricNodeId, GraphNodeKind.ComplexityMetric, $"{metric.DocId}:{metric.Measure}", metric.Measure.ToString(), metricAttributes));
+
+            if (context.TypeNodeIds.TryGetValue(metric.DocId, out var typeNodeId))
+            {
+                context.Graph.AddEdge(typeNodeId, metricNodeId, EdgeType.HasMetric);
+            }
+        }
     }
 
     private static ProjectInfo CreateProjectInfo(ParsedProject project, ProjectId projectId)
@@ -826,6 +871,13 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 
         return references;
     }
+
+    private sealed record GraphContext(
+        GraphStore Graph,
+        Guid SolutionNodeId,
+        IReadOnlyDictionary<string, Guid> ProjectNodeIds,
+        IReadOnlyDictionary<string, Guid> RepositoryPathToNodeId,
+        IReadOnlyDictionary<string, Guid> TypeNodeIds);
 
     private static IEnumerable<INamedTypeSymbol> EnumerateNamedTypes(INamespaceSymbol root)
     {
