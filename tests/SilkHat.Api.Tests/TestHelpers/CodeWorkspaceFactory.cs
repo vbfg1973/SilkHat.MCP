@@ -7,8 +7,14 @@ namespace SilkHat.Api.Tests.TestHelpers;
 public static class CodeWorkspaceFactory
 {
     public const string DefaultSolutionId = "solution-1";
+    private static readonly Lazy<CodeRepositoryWorkspace> CachedWorkspace = new(CreateWorkspaceInternal, true);
 
     public static CodeRepositoryWorkspace CreateWorkspace()
+    {
+        return CachedWorkspace.Value;
+    }
+
+    private static CodeRepositoryWorkspace CreateWorkspaceInternal()
     {
         var projectAlpha = new ProjectIndex(
             "alpha",

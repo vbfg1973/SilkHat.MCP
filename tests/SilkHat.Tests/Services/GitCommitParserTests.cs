@@ -1,5 +1,5 @@
-using SilkHat.Git.Analysis.Services;
 using SilkHat.Git.Core.Dtos;
+using SilkHat.Tests.Helpers;
 
 namespace SilkHat.Tests.Services;
 
@@ -24,7 +24,7 @@ public sealed class GitCommitParserTests
             "BODY_END"
         });
 
-        var commits = GitCommitParser.Parse(output);
+        var commits = GitParserCache.Parse(output);
 
         Assert.Equal(2, commits.Count);
 
