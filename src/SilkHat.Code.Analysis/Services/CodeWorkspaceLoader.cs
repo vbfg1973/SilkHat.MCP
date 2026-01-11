@@ -16,16 +16,19 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
     private static readonly IReadOnlyList<MetadataReference> DefaultReferences = BuildDefaultReferences();
     private readonly ILogger<CodeWorkspaceLoader> _logger;
     private readonly IGraphStoreProvider _graphStoreProvider;
+    private readonly IIndexingStatusStore? _statusStore;
     private readonly SolutionParser _solutionParser = new();
     private readonly ProjectParser _projectParser = new();
     private readonly SolutionIdentityResolver _identityResolver = new();
 
     public CodeWorkspaceLoader(
         ILogger<CodeWorkspaceLoader> logger,
-        IGraphStoreProvider? graphStoreProvider = null)
+        IGraphStoreProvider? graphStoreProvider = null,
+        IIndexingStatusStore? statusStore = null)
     {
         _logger = logger;
         _graphStoreProvider = graphStoreProvider ?? new GraphStoreProvider();
+        _statusStore = statusStore;
     }
 
     public async Task<CodeRepositoryWorkspace> LoadAsync(
@@ -85,6 +88,8 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 throw new InvalidOperationException($"No C# projects were found in solution '{parsedSolution.SolutionPath}'.");
             }
 
+            _statusStore?.InitializeSolution(solutionId);
+
             var workspace = BuildWorkspace(solutionProjects);
             var workspaceProjects = workspace.CurrentSolution.Projects
                 .Where(project => !string.IsNullOrWhiteSpace(project.FilePath))
@@ -97,6 +102,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             foreach (var project in workspaceProjects)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                _statusStore?.SetJobRunning(solutionId, IndexJobType.ProjectsAndFiles, "Building project compilations.");
                 var compilation = await project.GetCompilationAsync(cancellationToken);
                 if (compilation is null)
                 {
@@ -106,6 +112,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 
                 compilations[projectKeyMap[project.Id]] = compilation;
             }
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.ProjectsAndFiles, "Projects loaded.");
 
             var referenceMap = new Dictionary<string, HashSet<string>>();
             var referencedByMap = new Dictionary<string, HashSet<string>>();
@@ -163,6 +170,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             var memberNodes = new List<MemberNodeInfo>();
             var typeLocationAttributes = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
 
+            _statusStore?.SetJobRunning(solutionId, IndexJobType.TypesAndMembers, "Indexing types and members.");
             foreach (var compilationEntry in compilations)
             {
                 var projectKey = compilationEntry.Key;
@@ -200,6 +208,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                     memberNodes.AddRange(CollectMemberNodes(symbol, compilation, dto, projectIndex[projectKey].Name, rootPath));
                 }
             }
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.TypesAndMembers, "Types and members indexed.");
 
             var treeEntries = BuildCodeTreeEntries(workspace, rootPath, projectKeyMap);
             var treeChildrenMap = await Task.Run(() => BuildTreeChildrenMap(treeEntries), cancellationToken);
@@ -228,6 +237,10 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 namedTypes,
                 typeLocationAttributes,
                 memberNodes);
+
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Packages, "Package indexing not yet implemented (marked complete).");
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git indexing not yet implemented (marked complete).");
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity indexing not yet implemented (marked complete).");
         }
 
         return new CodeRepositoryWorkspace(rootPath, solutionWorkspaces);

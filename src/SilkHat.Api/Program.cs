@@ -57,6 +57,7 @@ builder.Services.AddSingleton<ICodeTreeMetricsCacheStore, CodeTreeMetricsCacheSt
 builder.Services.AddSingleton<ICodeTreeMetricsPrecomputeService, CodeTreeMetricsPrecomputeService>();
 builder.Services.AddSingleton<IGraphStoreProvider, GraphStoreProvider>();
 builder.Services.AddSingleton<IGraphQueryService, GraphQueryService>();
+builder.Services.AddSingleton<IIndexingStatusStore, IndexingStatusStore>();
 builder.Services.AddSingleton<ICodeFileService, CodeFileService>();
 builder.Services.AddSingleton<ICodeSymbolOutlineService, CodeSymbolOutlineService>();
 builder.Services.AddSingleton<ISymbolDescriptionService, SymbolDescriptionService>();
