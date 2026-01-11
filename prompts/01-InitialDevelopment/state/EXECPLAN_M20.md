@@ -12,12 +12,12 @@ Replace ad-hoc indexing with a rich in-memory graph (QuikGraph) built at solutio
 - [x] Implement graph container and lookup indices (GraphStore + GraphQueryService with keyed lookups and in/out edges).
 - [ ] Implement indexing jobs (projects/files; types/members; packages; git; complexity) with status reporting. *Partial*: workspace loader now builds graph nodes/edges for solution/project/folder/file/type/member/parameter with locations; other jobs + status remain.
 - [ ] Expose status endpoint and wire UI polling dialog (start on solution load if jobs running; stop on completion).
-- [ ] Adapt existing services (tree, symbols, annotations) to read from the graph. *Partial*: CodeTreeService now reads from graph (members included); CodeSymbolsController is graph-first with legacy fallback; metrics/filtering still legacy.
+- [x] Adapt existing services (tree, symbols, annotations) to read from the graph. CodeTreeService is graph-only (outline fallback removed); CodeSymbolsController is graph-first with legacy fallback; metrics/filtering/annotations are graph-backed.
 - [ ] Tests (unit/API/UI) and docs. *Partial*: all suites currently passing after graph/tree/symbol changes; docs not yet updated.
 
 ## Surprises & Discoveries
 
-- Graph member nodes (fields/properties/methods/events/parameters) plus location/project data allow tree queries without outline fallback; outline fallback retained as temporary safety.
+- Graph member nodes (fields/properties/methods/events/parameters) plus location/project data allow tree queries without outline fallback.
 - Symbol lookup works via graph docId/symbolKey; legacy maps kept as fallback until full migration.
 
 ## Decision Log
@@ -117,6 +117,7 @@ Each job reports status: state (pending/running/completed/failed), percent, mess
 Plan Update Notes: 2026-01-10 15:08Z — Initial plan for M20 (graph index + job orchestration + UI polling).
 Plan Update Notes: 2026-01-10 15:13Z — Added typed edges, serialization-friendly edge DTOs, and method/constructor parameters with ordinal.
 Plan Update Notes: 2026-01-17 15:58Z — Graph-backed tree/symbol lookup implemented; graph now includes members/parameters/locations/project metadata. Status/metrics/filter migration and job orchestration still pending.
+Plan Update Notes: 2026-01-17 17:10Z — Tree filtering/annotations now use graph metrics; CodeTreeService is graph-only (outline fallback removed); tests passing.
 
 ## Graph Extensions (Edge Types + Method Parameters)
 

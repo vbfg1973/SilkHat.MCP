@@ -8,12 +8,10 @@ namespace SilkHat.Code.Analysis.Services;
 public sealed class CodeTreeService : ICodeTreeService
 {
     private readonly IGraphStoreProvider _graphStoreProvider;
-    private readonly ICodeSymbolOutlineService? _symbolOutlineService;
 
-    public CodeTreeService(IGraphStoreProvider graphStoreProvider, ICodeSymbolOutlineService? symbolOutlineService = null)
+    public CodeTreeService(IGraphStoreProvider graphStoreProvider)
     {
         _graphStoreProvider = graphStoreProvider;
-        _symbolOutlineService = symbolOutlineService;
     }
 
     public Task<IReadOnlyList<CodeTreeEntryDto>> GetTreeAsync(
@@ -58,14 +56,6 @@ public sealed class CodeTreeService : ICodeTreeService
             .OrderBy(entry => GetNodeSortOrder(entry.Type))
             .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-
-        // If this is a type node and we have no graph children, fall back to symbol outline for members.
-        if (children.Count == 0 &&
-            parentNode.Kind == GraphNodeKind.NamedType &&
-            _symbolOutlineService is not null)
-        {
-            return BuildMemberNodesFromOutline(workspace, solution, parentKey, cancellationToken);
-        }
 
         return Task.FromResult<IReadOnlyList<CodeTreeEntryDto>>(children);
     }
@@ -186,69 +176,6 @@ public sealed class CodeTreeService : ICodeTreeService
         };
     }
 
-    private async Task<IReadOnlyList<CodeTreeEntryDto>> BuildMemberNodesFromOutline(
-        CodeRepositoryWorkspace workspace,
-        CodeSolutionWorkspace solution,
-        string typeIdentifier,
-        CancellationToken cancellationToken)
-    {
-        if (_symbolOutlineService is null || string.IsNullOrWhiteSpace(typeIdentifier))
-        {
-            return Array.Empty<CodeTreeEntryDto>();
-        }
-
-        var matchingType = solution.NamedTypesByDocId.TryGetValue(typeIdentifier, out var namedType)
-            ? namedType
-            : solution.NamedTypesBySymbolKey.TryGetValue(typeIdentifier, out var namedTypeByKey)
-                ? namedTypeByKey
-                : null;
-        if (matchingType is null || string.IsNullOrWhiteSpace(matchingType.FilePath))
-        {
-            return Array.Empty<CodeTreeEntryDto>();
-        }
-
-        var projectName = solution.Projects.TryGetValue(matchingType.ProjectKey, out var project)
-            ? project.Name
-            : matchingType.ProjectKey;
-        var parentTypeEntry = new CodeTreeEntryDto(
-            matchingType.FilePath,
-            typeIdentifier,
-            matchingType.Name,
-            CodeTreeEntryType.Type,
-            matchingType.ProjectKey,
-            projectName,
-            matchingType.DocumentationId ?? typeIdentifier,
-            "NamedType",
-            matchingType.Kind.ToString(),
-            null,
-            null,
-            null);
-
-        var outline = await _symbolOutlineService.GetFileSymbolsAsync(
-            workspace,
-            solution,
-            matchingType.FilePath,
-            cancellationToken);
-
-        if (outline.Status != CodeFileSymbolsStatus.Success || outline.Symbols is null)
-        {
-            return Array.Empty<CodeTreeEntryDto>();
-        }
-
-        var node = FindNodeByIdentifier(outline.Symbols, typeIdentifier);
-        if (node is null)
-        {
-            return Array.Empty<CodeTreeEntryDto>();
-        }
-
-        return node.Children
-            .Select(child => CreateChildEntry(child, parentTypeEntry))
-            .OrderBy(entry => entry.Type == CodeTreeEntryType.Type ? 0 : 1)
-            .ThenBy(entry => GetMemberOrder(entry))
-            .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
     private static CodeLocationDto? BuildLocation(IReadOnlyDictionary<string, string> attributes)
     {
         if (!attributes.TryGetValue("FilePath", out var path) || string.IsNullOrWhiteSpace(path))
@@ -293,61 +220,6 @@ public sealed class CodeTreeService : ICodeTreeService
             "method" => 4,
             _ => 5
         };
-    }
-
-    private static SymbolOutlineNodeDto? FindNodeByIdentifier(
-        IEnumerable<SymbolOutlineNodeDto> nodes,
-        string identifier)
-    {
-        foreach (var node in nodes)
-        {
-            if (string.Equals(node.DocumentationId, identifier, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(node.SymbolKey, identifier, StringComparison.OrdinalIgnoreCase))
-            {
-                return node;
-            }
-
-            var child = FindNodeByIdentifier(node.Children, identifier);
-            if (child is not null)
-            {
-                return child;
-            }
-        }
-
-        return null;
-    }
-
-    private static CodeTreeEntryDto CreateChildEntry(
-        SymbolOutlineNodeDto node,
-        CodeTreeEntryDto parentType)
-    {
-        var entryType = node.SymbolKind?.Equals("NamedType", StringComparison.OrdinalIgnoreCase) == true
-            ? CodeTreeEntryType.Type
-            : CodeTreeEntryType.Member;
-
-        return new CodeTreeEntryDto(
-            parentType.RepositoryPath,
-            node.DocumentationId ?? node.SymbolKey,
-            node.Name,
-            entryType,
-            parentType.ProjectKey,
-            parentType.ProjectName,
-            node.DocumentationId ?? node.SymbolKey,
-            node.SymbolKind,
-            node.RealType,
-            BuildTreeLocation(node.Location, parentType.RepositoryPath),
-            null,
-            null);
-    }
-
-    private static CodeLocationDto? BuildTreeLocation(CodeLocationDto? location, string repositoryPath)
-    {
-        if (location is null)
-        {
-            return null;
-        }
-
-        return location with { Path = repositoryPath };
     }
 
 }

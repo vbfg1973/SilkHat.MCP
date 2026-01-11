@@ -24,7 +24,7 @@ public sealed class CodeTreeServiceSampleTests
             item.Type == CodeTreeEntryType.File
             && item.DisplayPath.EndsWith("AnalysisSamples.cs", StringComparison.OrdinalIgnoreCase));
 
-        var service = new CodeTreeService(provider, new CodeSymbolOutlineService());
+        var service = new CodeTreeService(provider);
         var types = await service.GetTreeAsync(workspace, solution, entry.DisplayPath, CancellationToken.None);
 
         var complexityType = types.FirstOrDefault(type => type.Name == "ComplexitySamples");
