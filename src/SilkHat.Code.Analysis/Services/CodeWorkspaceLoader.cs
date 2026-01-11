@@ -1,11 +1,14 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Graph;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
+using SilkHat.Code.Analysis.Services.Complexity;
 using SilkHat.Git.Analysis.Abstractions;
 using System.Security.Cryptography;
 using System.Text;
@@ -20,6 +23,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
     private readonly IGraphStoreProvider _graphStoreProvider;
     private readonly IIndexingStatusStore? _statusStore;
     private readonly IGitCommandRunner? _gitCommandRunner;
+    private readonly IComplexityStrategyFactory? _complexityStrategyFactory;
     private readonly SolutionParser _solutionParser = new();
     private readonly ProjectParser _projectParser = new();
     private readonly SolutionIdentityResolver _identityResolver = new();
@@ -29,12 +33,14 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         ILogger<CodeWorkspaceLoader> logger,
         IGraphStoreProvider? graphStoreProvider = null,
         IIndexingStatusStore? statusStore = null,
-        IGitCommandRunner? gitCommandRunner = null)
+        IGitCommandRunner? gitCommandRunner = null,
+        IComplexityStrategyFactory? complexityStrategyFactory = null)
     {
         _logger = logger;
         _graphStoreProvider = graphStoreProvider ?? new GraphStoreProvider();
         _statusStore = statusStore;
         _gitCommandRunner = gitCommandRunner;
+        _complexityStrategyFactory = complexityStrategyFactory;
     }
 
     public async Task<CodeRepositoryWorkspace> LoadAsync(
@@ -271,6 +277,28 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 }
             }
 
+            ComplexityGraphData? complexityData = null;
+            if (_complexityStrategyFactory is null)
+            {
+                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity strategies not configured (skipped).");
+            }
+            else
+            {
+                try
+                {
+                    _statusStore?.SetJobRunning(solutionId, IndexJobType.Complexity, "Computing complexity.");
+                    complexityData = await BuildComplexityDataAsync(
+                        rootPath,
+                        solutionWorkspaces[solutionId],
+                        cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _statusStore?.SetJobFailed(solutionId, IndexJobType.Complexity, $"Complexity indexing failed: {ex.Message}");
+                    _logger.LogWarning(ex, "Complexity indexing failed for solution {SolutionPath}.", parsedSolution.SolutionPath);
+                }
+            }
+
             PopulateGraph(
                 solutionId,
                 parsedSolution.SolutionName,
@@ -281,14 +309,18 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 typeLocationAttributes,
                 memberNodes,
                 packageReferences,
-                gitData);
+                gitData,
+                complexityData);
 
             _statusStore?.SetJobCompleted(solutionId, IndexJobType.Packages, "Packages indexed.");
             if (gitData is not null)
             {
                 _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git indexed.");
             }
-            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity indexing not yet implemented (marked complete).");
+            if (complexityData is not null)
+            {
+                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity indexed.");
+            }
         }
 
         return new CodeRepositoryWorkspace(rootPath, solutionWorkspaces);
@@ -304,7 +336,8 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> typeLocationAttributes,
         IReadOnlyList<MemberNodeInfo> memberNodes,
         IReadOnlyList<ProjectPackageReference> packageReferences,
-        GitLogData? gitData)
+        GitLogData? gitData,
+        ComplexityGraphData? complexityData)
     {
         var graph = _graphStoreProvider.GetOrAdd(solutionId);
 
@@ -435,7 +468,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 ? type.DocumentationId
                 : type.SymbolKey;
             var typeNodeId = CreateStableId($"type:{typeKey}");
-            var attributes = new Dictionary<string, string>
+            var typeAttributes = new Dictionary<string, string>
             {
                 ["DocumentationId"] = type.DocumentationId ?? string.Empty,
                 ["SymbolKey"] = type.SymbolKey,
@@ -448,18 +481,18 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             };
             if (!string.IsNullOrWhiteSpace(type.FilePath))
             {
-                attributes["RepositoryPath"] = type.FilePath;
+                typeAttributes["RepositoryPath"] = type.FilePath;
             }
 
             if (typeLocationAttributes.TryGetValue(typeKey, out var locationAttrs))
             {
                 foreach (var pair in locationAttrs)
                 {
-                    attributes[pair.Key] = pair.Value;
+                    typeAttributes[pair.Key] = pair.Value;
                 }
             }
 
-            graph.AddNode(new GraphNodeDto(typeNodeId, GraphNodeKind.NamedType, typeKey, type.Name, attributes));
+            graph.AddNode(new GraphNodeDto(typeNodeId, GraphNodeKind.NamedType, typeKey, type.Name, typeAttributes));
             typeNodeIds[typeKey] = typeNodeId;
 
             if (!string.IsNullOrWhiteSpace(type.FilePath) &&
@@ -574,6 +607,45 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                     };
 
                     graph.AddEdge(commitNodeId, fileNodeId, EdgeType.Changes, changeAttributes);
+                }
+            }
+        }
+
+        if (complexityData is not null)
+        {
+            foreach (var metric in complexityData.MethodMetrics)
+            {
+                var metricNodeId = CreateStableId($"complexity:method:{metric.DocId}:{metric.Measure}");
+                var metricAttributes = new Dictionary<string, string>
+                {
+                    ["DocId"] = metric.DocId,
+                    ["Measure"] = metric.Measure.ToString(),
+                    ["Value"] = metric.Value.ToString(CultureInfo.InvariantCulture),
+                    ["TargetKind"] = "Method"
+                };
+                graph.AddNode(new GraphNodeDto(metricNodeId, GraphNodeKind.ComplexityMetric, $"{metric.DocId}:{metric.Measure}", metric.Measure.ToString(), metricAttributes));
+
+                if (typeNodeIds.TryGetValue(metric.DocId, out var methodNodeId))
+                {
+                    graph.AddEdge(methodNodeId, metricNodeId, EdgeType.HasMetric);
+                }
+            }
+
+            foreach (var metric in complexityData.TypeMetrics)
+            {
+                var metricNodeId = CreateStableId($"complexity:type:{metric.DocId}:{metric.Measure}");
+                var metricAttributes = new Dictionary<string, string>
+                {
+                    ["DocId"] = metric.DocId,
+                    ["Measure"] = metric.Measure.ToString(),
+                    ["Value"] = metric.Value.ToString(CultureInfo.InvariantCulture),
+                    ["TargetKind"] = "Type"
+                };
+                graph.AddNode(new GraphNodeDto(metricNodeId, GraphNodeKind.ComplexityMetric, $"{metric.DocId}:{metric.Measure}", metric.Measure.ToString(), metricAttributes));
+
+                if (typeNodeIds.TryGetValue(metric.DocId, out var typeNodeId))
+                {
+                    graph.AddEdge(typeNodeId, metricNodeId, EdgeType.HasMetric);
                 }
             }
         }
@@ -906,7 +978,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             continue;
                         }
 
-                        var attributes = new Dictionary<string, string>
+                        var memberAttributes = new Dictionary<string, string>
                         {
                             ["DocumentationId"] = docId ?? string.Empty,
                             ["SymbolKey"] = symbolKey,
@@ -914,12 +986,12 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             ["Name"] = field.Name
                         };
 
-                        var location = BuildLocationAttributes(field, rootPath);
-                        if (location is not null)
+                        var locationField = BuildLocationAttributes(field, rootPath);
+                        if (locationField is not null)
                         {
-                            foreach (var pair in location)
+                            foreach (var pair in locationField)
                             {
-                                attributes[pair.Key] = pair.Value;
+                                memberAttributes[pair.Key] = pair.Value;
                             }
                         }
 
@@ -930,10 +1002,10 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             parentKey,
                             typeDto.ProjectKey,
                             projectName,
-                            attributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
+                            memberAttributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
                             DocumentationIdUtility.GetDocumentationId(field.Type),
                             new List<ParameterNodeInfo>(),
-                            attributes));
+                            memberAttributes));
                         break;
                     }
                 case IPropertySymbol property:
@@ -946,7 +1018,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             continue;
                         }
 
-                        var attributes = new Dictionary<string, string>
+                        var memberAttributes = new Dictionary<string, string>
                         {
                             ["DocumentationId"] = docId ?? string.Empty,
                             ["SymbolKey"] = symbolKey,
@@ -954,12 +1026,12 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             ["Name"] = property.Name
                         };
 
-                        var location = BuildLocationAttributes(property, rootPath);
-                        if (location is not null)
+                        var locationProperty = BuildLocationAttributes(property, rootPath);
+                        if (locationProperty is not null)
                         {
-                            foreach (var pair in location)
+                            foreach (var pair in locationProperty)
                             {
-                                attributes[pair.Key] = pair.Value;
+                                memberAttributes[pair.Key] = pair.Value;
                             }
                         }
 
@@ -970,10 +1042,10 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             parentKey,
                             typeDto.ProjectKey,
                             projectName,
-                            attributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
+                            memberAttributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
                             DocumentationIdUtility.GetDocumentationId(property.Type),
                             new List<ParameterNodeInfo>(),
-                            attributes));
+                            memberAttributes));
                         break;
                     }
                 case IEventSymbol @event:
@@ -986,7 +1058,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             continue;
                         }
 
-                        var attributes = new Dictionary<string, string>
+                        var memberAttributes = new Dictionary<string, string>
                         {
                             ["DocumentationId"] = docId ?? string.Empty,
                             ["SymbolKey"] = symbolKey,
@@ -994,12 +1066,12 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             ["Name"] = @event.Name
                         };
 
-                        var location = BuildLocationAttributes(@event, rootPath);
-                        if (location is not null)
+                        var locationEvent = BuildLocationAttributes(@event, rootPath);
+                        if (locationEvent is not null)
                         {
-                            foreach (var pair in location)
+                            foreach (var pair in locationEvent)
                             {
-                                attributes[pair.Key] = pair.Value;
+                                memberAttributes[pair.Key] = pair.Value;
                             }
                         }
 
@@ -1010,10 +1082,10 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             parentKey,
                             typeDto.ProjectKey,
                             projectName,
-                            attributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
+                            memberAttributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
                             DocumentationIdUtility.GetDocumentationId(@event.Type),
                             new List<ParameterNodeInfo>(),
-                            attributes));
+                            memberAttributes));
                         break;
                     }
                 case IMethodSymbol method:
@@ -1038,7 +1110,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             _ => "Method"
                         };
 
-                        var attributes = new Dictionary<string, string>
+                        var memberAttributes = new Dictionary<string, string>
                         {
                             ["DocumentationId"] = docId ?? string.Empty,
                             ["SymbolKey"] = symbolKey,
@@ -1051,7 +1123,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                         {
                             foreach (var pair in location)
                             {
-                                attributes[pair.Key] = pair.Value;
+                                memberAttributes[pair.Key] = pair.Value;
                             }
                         }
 
@@ -1090,10 +1162,10 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                             parentKey,
                             typeDto.ProjectKey,
                             projectName,
-                            attributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
+                            memberAttributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
                             DocumentationIdUtility.GetDocumentationId(method.ReturnType),
                             parameters,
-                            attributes));
+                            memberAttributes));
                         break;
                     }
             }
@@ -1345,6 +1417,15 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
     private sealed record GitLogData(
         IReadOnlyList<GitCommitData> Commits);
 
+    private sealed record ComplexityMetricData(
+        string DocId,
+        ComplexityMeasureType Measure,
+        int Value);
+
+    private sealed record ComplexityGraphData(
+        IReadOnlyList<ComplexityMetricData> MethodMetrics,
+        IReadOnlyList<ComplexityMetricData> TypeMetrics);
+
     private static Guid CreateStableId(string key)
     {
         using var md5 = MD5.Create();
@@ -1471,5 +1552,87 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         }
 
         return path;
+    }
+
+    private async Task<ComplexityGraphData?> BuildComplexityDataAsync(
+        string rootPath,
+        CodeSolutionWorkspace solution,
+        CancellationToken cancellationToken)
+    {
+        if (_complexityStrategyFactory is null)
+        {
+            return null;
+        }
+
+        var methodMetrics = new ConcurrentBag<ComplexityMetricData>();
+        var typeMetrics = new ConcurrentBag<ComplexityMetricData>();
+
+        var strategies = new Dictionary<ComplexityMeasureType, IComplexityStrategy>
+        {
+            [ComplexityMeasureType.Cognitive] = _complexityStrategyFactory.GetStrategy(ComplexityMeasureType.Cognitive),
+            [ComplexityMeasureType.Cyclomatic] = _complexityStrategyFactory.GetStrategy(ComplexityMeasureType.Cyclomatic),
+            [ComplexityMeasureType.Indentation] = _complexityStrategyFactory.GetStrategy(ComplexityMeasureType.Indentation)
+        };
+
+        var treeToCompilation = new Dictionary<SyntaxTree, Compilation>();
+        foreach (var compilation in solution.Compilations.Values)
+        {
+            foreach (var tree in compilation.SyntaxTrees)
+            {
+                if (!treeToCompilation.ContainsKey(tree))
+                {
+                    treeToCompilation[tree] = compilation;
+                }
+            }
+        }
+
+        var syntaxTrees = treeToCompilation.Keys
+            .Where(tree => !string.IsNullOrWhiteSpace(tree.FilePath))
+            .ToList();
+
+        await Parallel.ForEachAsync(
+            syntaxTrees,
+            cancellationToken,
+            async (tree, ct) =>
+            {
+                if (!treeToCompilation.TryGetValue(tree, out var compilation))
+                {
+                    return;
+                }
+
+                var semanticModel = compilation.GetSemanticModel(tree);
+                var sourceText = await tree.GetTextAsync(ct);
+                var methodNodes = tree.GetRoot(ct)
+                    .DescendantNodes()
+                    .OfType<BaseMethodDeclarationSyntax>()
+                    .ToList();
+
+                foreach (var method in methodNodes)
+                {
+                    var methodSymbol = semanticModel.GetDeclaredSymbol(method, ct);
+                    var typeDocId = methodSymbol?.ContainingType is not null
+                        ? DocumentationIdUtility.GetDocumentationId(methodSymbol.ContainingType)
+                        : null;
+                    var methodDocId = methodSymbol is not null
+                        ? DocumentationIdUtility.GetDocumentationId(methodSymbol)
+                        : null;
+
+                    foreach (var (measure, strategy) in strategies)
+                    {
+                        var value = strategy.Compute(method, semanticModel, sourceText);
+                        if (!string.IsNullOrWhiteSpace(methodDocId))
+                        {
+                            methodMetrics.Add(new ComplexityMetricData(methodDocId!, measure, value));
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(typeDocId))
+                        {
+                            typeMetrics.Add(new ComplexityMetricData(typeDocId!, measure, value));
+                        }
+                    }
+                }
+            });
+
+        return new ComplexityGraphData(methodMetrics.ToList(), typeMetrics.ToList());
     }
 }
