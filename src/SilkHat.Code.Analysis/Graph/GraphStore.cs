@@ -11,7 +11,8 @@ public sealed class GraphStore
     private readonly AdjacencyGraph<Guid, TaggedEdge<Guid, EdgeType>> _graph = new();
     private readonly ConcurrentDictionary<Guid, GraphNodeDto> _nodes = new();
     private readonly ConcurrentDictionary<string, Guid> _nodeIdsByKey = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentBag<GraphEdgeDto> _edges = new();
+    private readonly ConcurrentDictionary<GraphNodeKind, ConcurrentDictionary<string, Guid>> _nodeIdsByTypeAndKey = new();
+    private readonly ConcurrentDictionary<(Guid SourceId, Guid TargetId, EdgeType Type), GraphEdgeDto> _edges = new();
 
     public bool AddNode(GraphNodeDto node)
     {
@@ -24,6 +25,8 @@ public sealed class GraphStore
         {
             _graph.AddVertex(node.Id);
             _nodeIdsByKey[node.Key] = node.Id;
+            var typed = _nodeIdsByTypeAndKey.GetOrAdd(node.Kind, _ => new ConcurrentDictionary<string, Guid>(StringComparer.OrdinalIgnoreCase));
+            typed[node.Key] = node.Id;
             return true;
         }
 
@@ -37,19 +40,30 @@ public sealed class GraphStore
             return false;
         }
 
-        var edge = new TaggedEdge<Guid, EdgeType>(sourceId, targetId, type);
-        if (_graph.AddEdge(edge))
+        var key = (sourceId, targetId, type);
+        if (_edges.ContainsKey(key))
         {
-            _edges.Add(new GraphEdgeDto(sourceId, targetId, type, attributes));
+            return false;
+        }
+
+        var edge = new TaggedEdge<Guid, EdgeType>(sourceId, targetId, type);
+        if (!_graph.AddEdge(edge))
+        {
+            return false;
+        }
+
+        if (_edges.TryAdd(key, new GraphEdgeDto(sourceId, targetId, type, attributes)))
+        {
             return true;
         }
 
+        _graph.RemoveEdge(edge);
         return false;
     }
 
     public IEnumerable<GraphNodeDto> Nodes => _nodes.Values;
 
-    public IEnumerable<GraphEdgeDto> Edges => _edges;
+    public IEnumerable<GraphEdgeDto> Edges => _edges.Values;
 
     public bool TryGetNode(Guid id, out GraphNodeDto? node)
     {
@@ -80,29 +94,37 @@ public sealed class GraphStore
         return false;
     }
 
-    public IEnumerable<GraphEdgeDto> GetOutEdges(Guid nodeId, EdgeType? type = null)
+    public bool TryGetNodeByTypeAndKey(GraphNodeKind type, string key, out GraphNodeDto? node)
     {
-        if (!_graph.TryGetOutEdges(nodeId, out var edges))
+        node = null;
+        if (string.IsNullOrWhiteSpace(key))
         {
-            return Array.Empty<GraphEdgeDto>();
+            return false;
         }
 
-        var filtered = edges.Where(e => !type.HasValue || e.Tag == type.Value)
-            .Select(e => _edges.First(ed => ed.SourceId == e.Source && ed.TargetId == e.Target && ed.EdgeType == e.Tag))
-            .ToList();
+        if (_nodeIdsByTypeAndKey.TryGetValue(type, out var byKey)
+            && byKey.TryGetValue(key, out var id)
+            && _nodes.TryGetValue(id, out var found))
+        {
+            node = found;
+            return true;
+        }
 
-        return filtered;
+        return false;
+    }
+
+    public IEnumerable<GraphEdgeDto> GetOutEdges(Guid nodeId, EdgeType? type = null)
+    {
+        return _edges.Values.Where(e =>
+            e.SourceId == nodeId &&
+            (!type.HasValue || e.EdgeType == type.Value));
     }
 
     public IEnumerable<GraphEdgeDto> GetInEdges(Guid nodeId, EdgeType? type = null)
     {
-        var filtered = _graph.Edges
-            .Where(e => e.Target == nodeId)
-            .Where(e => !type.HasValue || e.Tag == type.Value)
-            .Select(e => _edges.First(ed => ed.SourceId == e.Source && ed.TargetId == e.Target && ed.EdgeType == e.Tag))
-            .ToList();
-
-        return filtered;
+        return _edges.Values.Where(e =>
+            e.TargetId == nodeId &&
+            (!type.HasValue || e.EdgeType == type.Value));
     }
 
     public int GetInDegree(Guid nodeId, EdgeType? type = null)
@@ -117,6 +139,6 @@ public sealed class GraphStore
 
     public GraphSnapshot ToSnapshot()
     {
-        return new GraphSnapshot(_nodes.Values.ToList(), _edges.ToList());
+        return new GraphSnapshot(_nodes.Values.ToList(), _edges.Values.ToList());
     }
 }

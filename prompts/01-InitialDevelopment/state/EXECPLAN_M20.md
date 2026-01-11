@@ -32,6 +32,8 @@ Replace ad-hoc indexing with a rich in-memory graph (QuikGraph) built at solutio
 
 - Graph index is the single read surface for tree/symbol/annotation flows; outline fallback removed.
 - Index job status is exposed via API and surfaced in the IDE status dialog with auto-polling during solution load.
+- Tree queries are graph-backed with fast keyed lookups, de-duped edges, and project de-duplication in roots; member ordering is deterministic (fields → properties → methods).
+- UX polish: type/member clicks open the owning file, highlight full spans, and auto-scroll; auto-nav to IDE after group load; status dialog auto-opens during indexing.
 - Status plumbing is ready for upcoming jobs (packages/git/complexity) to plug into without contract changes.
 - Next milestone (M21) will swap placeholder job completions for real package/git/complexity indexing and broaden graph queries.
 
@@ -122,6 +124,7 @@ Plan Update Notes: 2026-01-10 15:13Z — Added typed edges, serialization-friend
 Plan Update Notes: 2026-01-17 15:58Z — Graph-backed tree/symbol lookup implemented; graph now includes members/parameters/locations/project metadata. Status/metrics/filter migration and job orchestration still pending.
 Plan Update Notes: 2026-01-17 17:10Z — Tree filtering/annotations now use graph metrics; CodeTreeService is graph-only (outline fallback removed); tests passing.
 Plan Update Notes: 2026-01-18 14:05Z — Index status store/API/UI added; docs refreshed; all suites passing.
+Plan Update Notes: 2026-01-18 18:45Z — Tree de-duplication + ordering tightened; type/member span highlighting/scrolling added; graph edges de-duped; tests passing.
 
 ## Graph Extensions (Edge Types + Method Parameters)
 

@@ -275,6 +275,16 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 
         foreach (var entry in treeEntries)
         {
+            if (entry.Type == CodeTreeEntryType.Project)
+            {
+                // Bind project display path to the existing project node; do not create duplicates.
+                if (displayPathToNodeId.TryGetValue(entry.Name, out var existingProjectId))
+                {
+                    displayPathToNodeId[entry.DisplayPath] = existingProjectId;
+                }
+                continue;
+            }
+
             var kind = entry.Type switch
             {
                 CodeTreeEntryType.Project => GraphNodeKind.Project,
@@ -643,15 +653,36 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 
     private static IReadOnlyDictionary<string, string>? BuildLocationAttributes(ISymbol symbol, string rootPath)
     {
-        var location = symbol.Locations.FirstOrDefault(loc => loc.IsInSource);
-        if (location?.SourceTree?.FilePath is null)
+        var syntaxRef = symbol.DeclaringSyntaxReferences.FirstOrDefault();
+        if (syntaxRef?.SyntaxTree?.FilePath is null)
         {
-            return null;
+            var location = symbol.Locations.FirstOrDefault(loc => loc.IsInSource);
+            if (location?.SourceTree?.FilePath is null)
+            {
+                return null;
+            }
+
+            var spanFallback = location.SourceSpan;
+            var lineSpanFallback = location.GetLineSpan();
+            var normalizedPathFallback = SolutionIdentity.NormalizeRelativePath(rootPath, location.SourceTree.FilePath);
+
+            return new Dictionary<string, string>
+            {
+                ["FilePath"] = normalizedPathFallback,
+                ["SpanStart"] = spanFallback.Start.ToString(),
+                ["SpanLength"] = spanFallback.Length.ToString(),
+                ["StartLine"] = (lineSpanFallback.StartLinePosition.Line + 1).ToString(),
+                ["StartColumn"] = (lineSpanFallback.StartLinePosition.Character + 1).ToString(),
+                ["EndLine"] = (lineSpanFallback.EndLinePosition.Line + 1).ToString(),
+                ["EndColumn"] = (lineSpanFallback.EndLinePosition.Character + 1).ToString()
+            };
         }
 
-        var span = location.SourceSpan;
-        var lineSpan = location.GetLineSpan();
-        var normalizedPath = SolutionIdentity.NormalizeRelativePath(rootPath, location.SourceTree.FilePath);
+        var syntax = syntaxRef.GetSyntax();
+        var tree = syntax.SyntaxTree;
+        var span = syntax.FullSpan; // include leading trivia to highlight full definition
+        var lineSpan = tree.GetLineSpan(span);
+        var normalizedPath = SolutionIdentity.NormalizeRelativePath(rootPath, tree.FilePath);
 
         return new Dictionary<string, string>
         {

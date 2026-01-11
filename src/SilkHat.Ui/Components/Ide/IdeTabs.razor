@@ -13,6 +13,7 @@
 @inject IState<IdeLayoutState> LayoutState
 @inject IDispatcher Dispatcher
 @inject IDialogService DialogService
+@inject IJSRuntime JS
 
 @if (TabsView?.OpenFiles.Count > 0)
 {
@@ -47,11 +48,12 @@
                     <div class="ide-tab-body" style="height: 100%;">
                         <div class="ide-file-tooling" style="height: 100%;">
                             <MudPaper Elevation="0" Class="pa-3 ide-file-panel">
-                                <div class="ide-file-scroll">
+                                <div class="ide-file-scroll @(TabsView.ActiveTabIndex == tabIndex ? "active" : string.Empty)">
                                     <div class="ide-file-content">
                                         @foreach (var line in file.RenderLines)
                                         {
-                                            <div style="@GetLineStyle(line)">
+                                            <div class="ide-file-line @(line.Decoration == IdeLineDecoration.Highlight ? "ide-line-highlight" : string.Empty)"
+                                                 style="@GetLineStyle(line)">
                                                 <span class="ide-file-line-number">@GetLineNumber(line)</span>
                                                 <span class="ide-file-line-text" style="white-space: pre;">@line.Text</span>
                                             </div>
@@ -112,6 +114,9 @@
             _symbolDialog.Close();
             _symbolDialog = null;
         }
+
+        _pendingScroll = true;
+        _ = ScrollToHighlightAsync();
     }
 
     private Task CloseTabAsync(int index)
@@ -200,6 +205,42 @@
             return LayoutState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
                 ? view.ToolboxView
                 : IdeLayoutViewState.Default.ToolboxView;
+        }
+    }
+
+    private bool _pendingScroll;
+    private string _lastScrollKey = string.Empty;
+
+    private async Task ScrollToHighlightAsync()
+    {
+        if (!_pendingScroll)
+        {
+            return;
+        }
+
+        _pendingScroll = false;
+
+        var activeFile = TabsView?.OpenFiles.ElementAtOrDefault(TabsView.ActiveTabIndex);
+        if (activeFile is null)
+        {
+            return;
+        }
+
+        var scrollKey = $"{SelectedSolutionId}:{TabsView.ActiveTabIndex}:{activeFile.HighlightStartLine}:{activeFile.HighlightEndLine}:{activeFile.HighlightLine}";
+        if (string.Equals(scrollKey, _lastScrollKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastScrollKey = scrollKey;
+
+        try
+        {
+            await JS.InvokeVoidAsync("silkhatScrollToHighlight");
+        }
+        catch
+        {
+            // ignore
         }
     }
 }

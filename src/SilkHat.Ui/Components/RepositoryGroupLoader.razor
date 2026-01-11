@@ -1,6 +1,7 @@
 @using SilkHat.Ui.Models
 @using System.Linq
 @inject RepositoryApiClient Api
+@inject NavigationManager Navigation
 
 <MudText Typo="Typo.h4" Class="mb-4">Repository Group Loader</MudText>
 <MudGrid>
@@ -534,6 +535,7 @@
         {
             var result = await Api.LoadRepositoryGroupAsync(_selectedGroup.Id);
             _groupLoadResults.AddRange(result.Repositories);
+            Navigation.NavigateTo("/ide", forceLoad: false);
         }
         catch (Exception ex)
         {

@@ -28,7 +28,19 @@ public sealed class CodeTreeService : ICodeTreeService
         var store = _graphStoreProvider.GetOrAdd(solution.SolutionId);
         var parentKey = string.IsNullOrWhiteSpace(parentId) ? solution.SolutionId : parentId.Trim().TrimEnd('/');
 
-        if (!store.TryGetNodeByKey(parentKey, out var parentNode) || parentNode is null)
+        GraphNodeDto? parentNode = null;
+        if (string.IsNullOrWhiteSpace(parentId))
+        {
+            // Root should be the solution node by key.
+            store.TryGetNodeByKey(parentKey, out parentNode);
+        }
+        else
+        {
+            // Prefer typed lookup when we can infer node type from the ID shape.
+            parentNode = LookupNode(store, parentKey);
+        }
+
+        if (parentNode is null)
         {
             return Task.FromResult<IReadOnlyList<CodeTreeEntryDto>>(Array.Empty<CodeTreeEntryDto>());
         }
@@ -53,11 +65,24 @@ public sealed class CodeTreeService : ICodeTreeService
             .Select(node => MapNodeToEntry(node!, solution))
             .Where(dto => dto is not null)
             .Select(dto => dto!)
-            .OrderBy(entry => GetNodeSortOrder(entry.Type))
+            .GroupBy(dto => dto.DisplayPath ?? dto.RepositoryPath ?? dto.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First()) // de-duplicate by key
+            .OrderBy(entry => GetNodeSortOrder(entry))
             .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         return Task.FromResult<IReadOnlyList<CodeTreeEntryDto>>(children);
+    }
+
+    private static GraphNodeDto? LookupNode(GraphStore store, string key)
+    {
+        // Try fast typed lookups based on key shape.
+        if (store.TryGetNodeByKey(key, out var node) && node is not null)
+        {
+            return node;
+        }
+
+        return null;
     }
 
     private static CodeTreeEntryDto? MapNodeToEntry(GraphNodeDto node, CodeSolutionWorkspace solution)
@@ -163,16 +188,21 @@ public sealed class CodeTreeService : ICodeTreeService
         };
     }
 
-    private static int GetNodeSortOrder(CodeTreeEntryType type)
+    private static int GetNodeSortOrder(CodeTreeEntryDto entry)
     {
-        return type switch
+        return entry.Type switch
         {
             CodeTreeEntryType.Project => 0,
             CodeTreeEntryType.Directory => 1,
             CodeTreeEntryType.File => 2,
             CodeTreeEntryType.Type => 3,
-            CodeTreeEntryType.Member => 4,
-            _ => 5
+            CodeTreeEntryType.Member => entry.RealType?.ToLowerInvariant() switch
+            {
+                "field" => 4,
+                "property" => 5,
+                _ => 6 // methods/others
+            },
+            _ => 10
         };
     }
 
