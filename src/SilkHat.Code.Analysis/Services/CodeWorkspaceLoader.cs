@@ -20,6 +20,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
     private readonly SolutionParser _solutionParser = new();
     private readonly ProjectParser _projectParser = new();
     private readonly SolutionIdentityResolver _identityResolver = new();
+    private const string UnspecifiedPackageVersion = "unspecified";
 
     public CodeWorkspaceLoader(
         ILogger<CodeWorkspaceLoader> logger,
@@ -97,6 +98,12 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 
             var projectKeyMap = workspaceProjects.ToDictionary(p => p.Id, p => p.Id.Id.ToString("N"));
             var projectKeyToName = workspaceProjects.ToDictionary(p => projectKeyMap[p.Id], p => p.Name);
+            var projectPathToKey = workspaceProjects
+                .Where(p => !string.IsNullOrWhiteSpace(p.FilePath))
+                .ToDictionary(
+                    p => Path.GetFullPath(p.FilePath!),
+                    p => projectKeyMap[p.Id],
+                    StringComparer.OrdinalIgnoreCase);
 
             var compilations = new Dictionary<string, Compilation>();
             foreach (var project in workspaceProjects)
@@ -169,6 +176,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             var namedTypeByDocId = new Dictionary<string, NamedTypeDto>(StringComparer.Ordinal);
             var memberNodes = new List<MemberNodeInfo>();
             var typeLocationAttributes = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+            IReadOnlyList<ProjectPackageReference> packageReferences = Array.Empty<ProjectPackageReference>();
 
             _statusStore?.SetJobRunning(solutionId, IndexJobType.TypesAndMembers, "Indexing types and members.");
             foreach (var compilationEntry in compilations)
@@ -210,6 +218,17 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             }
             _statusStore?.SetJobCompleted(solutionId, IndexJobType.TypesAndMembers, "Types and members indexed.");
 
+            try
+            {
+                _statusStore?.SetJobRunning(solutionId, IndexJobType.Packages, "Indexing packages.");
+                packageReferences = BuildPackageReferences(solutionProjects, projectPathToKey, projectIndex);
+            }
+            catch (Exception ex)
+            {
+                _statusStore?.SetJobFailed(solutionId, IndexJobType.Packages, $"Package indexing failed: {ex.Message}");
+                throw;
+            }
+
             var treeEntries = BuildCodeTreeEntries(workspace, rootPath, projectKeyMap);
             var treeChildrenMap = await Task.Run(() => BuildTreeChildrenMap(treeEntries), cancellationToken);
             var relativeSolutionPath = SolutionIdentity.NormalizeRelativePath(rootPath, parsedSolution.SolutionPath);
@@ -236,9 +255,10 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 treeChildrenMap,
                 namedTypes,
                 typeLocationAttributes,
-                memberNodes);
+                memberNodes,
+                packageReferences);
 
-            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Packages, "Package indexing not yet implemented (marked complete).");
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Packages, "Packages indexed.");
             _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git indexing not yet implemented (marked complete).");
             _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity indexing not yet implemented (marked complete).");
         }
@@ -254,7 +274,8 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         IReadOnlyDictionary<string, IReadOnlyList<CodeTreeEntryDto>> treeChildrenByParent,
         IReadOnlyList<NamedTypeDto> namedTypes,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> typeLocationAttributes,
-        IReadOnlyList<MemberNodeInfo> memberNodes)
+        IReadOnlyList<MemberNodeInfo> memberNodes,
+        IReadOnlyList<ProjectPackageReference> packageReferences)
     {
         var graph = _graphStoreProvider.GetOrAdd(solutionId);
 
@@ -264,6 +285,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         var displayPathToNodeId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         var repositoryPathToNodeId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         var typeNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var projectNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var project in projects.Values)
         {
@@ -271,6 +293,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             graph.AddNode(new GraphNodeDto(projectNodeId, GraphNodeKind.Project, project.ProjectKey, project.Name));
             graph.AddEdge(solutionNodeId, projectNodeId, EdgeType.Contains);
             displayPathToNodeId[project.Name] = projectNodeId;
+            projectNodeIds[project.ProjectKey] = projectNodeId;
         }
 
         foreach (var entry in treeEntries)
@@ -331,6 +354,49 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 }
 
                 graph.AddEdge(rootParentId, childNodeId, EdgeType.Contains);
+            }
+        }
+
+        var packageNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var packageVersionNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var reference in packageReferences)
+        {
+            var packageKey = reference.PackageId.Trim();
+            if (!packageNodeIds.TryGetValue(packageKey, out var packageNodeId))
+            {
+                packageNodeId = CreateStableId($"package:{packageKey}");
+                var packageAttributes = new Dictionary<string, string>
+                {
+                    ["PackageId"] = packageKey
+                };
+                graph.AddNode(new GraphNodeDto(packageNodeId, GraphNodeKind.Package, packageKey, packageKey, packageAttributes));
+                packageNodeIds[packageKey] = packageNodeId;
+            }
+
+            var versionKey = $"{packageKey}@{reference.Version}";
+            if (!packageVersionNodeIds.TryGetValue(versionKey, out var packageVersionNodeId))
+            {
+                packageVersionNodeId = CreateStableId($"package-version:{versionKey}");
+                var versionAttributes = new Dictionary<string, string>
+                {
+                    ["PackageId"] = packageKey,
+                    ["Version"] = reference.Version
+                };
+                graph.AddNode(new GraphNodeDto(
+                    packageVersionNodeId,
+                    GraphNodeKind.PackageVersion,
+                    versionKey,
+                    reference.Version,
+                    versionAttributes));
+                packageVersionNodeIds[versionKey] = packageVersionNodeId;
+
+                graph.AddEdge(packageVersionNodeId, packageNodeId, EdgeType.PackageVersion);
+            }
+
+            if (projectNodeIds.TryGetValue(reference.ProjectKey, out var projectNodeId))
+            {
+                graph.AddEdge(projectNodeId, packageVersionNodeId, EdgeType.DependsOnPackage);
             }
         }
 
@@ -563,6 +629,41 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             if (paths.Add(location))
             {
                 references.Add(MetadataReference.CreateFromFile(location));
+            }
+        }
+
+        return references;
+    }
+
+    private static IReadOnlyList<ProjectPackageReference> BuildPackageReferences(
+        IReadOnlyDictionary<string, ParsedProject> parsedProjects,
+        IReadOnlyDictionary<string, string> projectPathToKey,
+        IReadOnlyDictionary<string, ProjectIndex> projectIndex)
+    {
+        var references = new List<ProjectPackageReference>();
+
+        foreach (var (projectPath, parsedProject) in parsedProjects)
+        {
+            if (!projectPathToKey.TryGetValue(projectPath, out var projectKey))
+            {
+                continue;
+            }
+
+            var projectName = projectIndex.TryGetValue(projectKey, out var index)
+                ? index.Name
+                : projectKey;
+
+            foreach (var package in parsedProject.PackageReferences)
+            {
+                var version = string.IsNullOrWhiteSpace(package.Version)
+                    ? UnspecifiedPackageVersion
+                    : package.Version!;
+
+                references.Add(new ProjectPackageReference(
+                    projectKey,
+                    projectName,
+                    package.Id.Trim(),
+                    version.Trim()));
             }
         }
 
@@ -1140,6 +1241,12 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         string? ReturnOrValueTypeDocumentationId,
         IReadOnlyList<ParameterNodeInfo> Parameters,
         IReadOnlyDictionary<string, string> Attributes);
+
+    private sealed record ProjectPackageReference(
+        string ProjectKey,
+        string ProjectName,
+        string PackageId,
+        string Version);
 
     private static Guid CreateStableId(string key)
     {
