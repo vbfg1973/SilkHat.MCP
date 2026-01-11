@@ -12,6 +12,7 @@
 @inject IState<IdeSymbolsState> SymbolsState
 @inject IDispatcher Dispatcher
 @inject IDialogService DialogService
+@inject RepositoryApiClient Api
 
 <MudPaper Elevation="1" Class="pa-2">
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
@@ -177,11 +178,30 @@
         Dispatcher.Dispatch(new SetIdeMainViewAction(SelectedSolutionId, IdeMainView.Tabs));
     }
 
-    private Task SelectSolutionAsync(string solutionId)
+    private async Task SelectSolutionAsync(string solutionId)
     {
         Dispatcher.Dispatch(new SelectSolutionAction(solutionId));
         Dispatcher.Dispatch(new SetIdeMainViewAction(solutionId, IdeMainView.Tabs));
-        return Task.CompletedTask;
+
+        // Auto-show status dialog if indexing is still running for this solution.
+        try
+        {
+            var entry = SolutionsState.Value.Solutions.FirstOrDefault(s =>
+                string.Equals(s.SolutionId, solutionId, StringComparison.OrdinalIgnoreCase));
+            if (entry is not null)
+            {
+                var status = await Api.GetIndexStatusAsync(entry.ConfigId, solutionId);
+                if (status.Any(s => string.Equals(s.State, "Running", StringComparison.OrdinalIgnoreCase)
+                                 || string.Equals(s.State, "Pending", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await OpenStatusDialogInternal(entry.ConfigId, solutionId);
+                }
+            }
+        }
+        catch
+        {
+            // best-effort; ignore
+        }
     }
 
     private Task SwitchToTabAsync(int index)
@@ -231,6 +251,11 @@
             return;
         }
 
+        await OpenStatusDialogInternal(SelectedRepositoryId.Value, SelectedSolutionId);
+    }
+
+    private async Task OpenStatusDialogInternal(Guid repositoryId, string solutionId)
+    {
         if (_statusDialog is not null)
         {
             return;
@@ -238,8 +263,8 @@
 
         var parameters = new DialogParameters
         {
-            { "RepositoryId", SelectedRepositoryId.Value },
-            { "SolutionId", SelectedSolutionId }
+            { "RepositoryId", repositoryId },
+            { "SolutionId", solutionId }
         };
 
         _statusDialog = await DialogService.ShowAsync<IndexStatusDialog>(

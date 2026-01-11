@@ -4,29 +4,28 @@ SilkHat analyzes .NET repositories by loading repository groups, parsing solutio
 
 ## Major Components
 
-- API (`src/SilkHat.Api`): ASP.NET Core controllers, ProblemDetails responses, CORS for the UI, HybridCache for read-mostly endpoints, and in-memory code tree metrics caches (invalidated on repository load/unload).
-- Analysis runtime (`src/SilkHat.Analysis`): repository load orchestration, command processing, and runtime state.
-- Code analysis (`src/SilkHat.Code.Analysis`): solution parsing, workspace construction, code tree entries, and code file reads.
+- API (`src/SilkHat.Api`): ASP.NET Core controllers, ProblemDetails responses, CORS for the UI, HybridCache for read-mostly endpoints, indexing status endpoint, and thin orchestration over services.
+- Analysis runtime (`src/SilkHat.Analysis`): repository load orchestration, command processing, runtime state, and indexing job status storage (`IIndexingStatusStore`).
+- Graph index (`src/SilkHat.Code.Analysis`): QuikGraph-backed `GraphStore` + `GraphQueryService` containing solutions, projects, folders/files, types/members/parameters, locations, and typed edges for relationships/metrics.
+- Code analysis (`src/SilkHat.Code.Analysis`): solution parsing, workspace construction, graph population, and code file reads.
 - Git analysis (`src/SilkHat.Git.Analysis`): git CLI integration with caches for history and tree metadata.
 - Infrastructure (`src/SilkHat.Infrastructure`): EF Core persistence with PostgreSQL.
-- UI (`src/SilkHat.Ui`): Blazor WASM IDE view, repository group loader, and solution-scoped navigation.
+- UI (`src/SilkHat.Ui`): Blazor WASM IDE view, repository group loader, solution-scoped navigation, status dialog with polling, tree/annotations backed by graph data.
 
 ## Runtime Flow
 
 1. Repository groups are configured and loaded via API endpoints.
-2. The analysis layer builds a `CodeRepositoryWorkspace` per loaded repository and stores it in memory.
-3. Code endpoints are solution-scoped and query the workspace for projects, namespaces, types, and tree entries.
-4. File contents are read directly from disk using repository roots and tree entries for fast access.
-5. The UI requests tree nodes lazily and opens file tabs when a file node is selected.
+2. The analysis layer builds a `CodeRepositoryWorkspace` per loaded repository, populating the QuikGraph index (solutions → projects → folders/files → types/members/parameters with locations/types) and recording per-job status in `IIndexingStatusStore`.
+3. The status API exposes per-job state; the UI polls once per second while a solution load is in-flight and stops when all jobs complete/failed or the dialog closes.
+4. Code endpoints are solution-scoped and query the graph for projects, namespaces, types/members, metrics, and tree entries (no outline fallback).
+5. File contents are read directly from disk using repository roots and tree entries for fast access; the UI requests tree nodes lazily and opens file tabs when a file node is selected.
 
 ## Code Tree Metrics (Annotations/Filters)
 
-- Tree annotation/filter metrics are precomputed per solution on repository load.
-- `CodeTreeMetricsPrecomputeService` triggers parallel metric builds and stores results in `CodeTreeMetricsCacheStore`.
-- Git-derived metrics are computed once per repository via `GitMetricsAggregator` (single `git log --numstat` pass).
-- Complexity metrics are computed per solution via `ComplexityMetricsAggregator` using Roslyn syntax trees and strategies.
-- All metrics caches are cleared on repository unload/load to avoid stale values.
-- File author counts roll up as distinct authors across folders/projects (union of file-level authors, not a sum of counts).
+- Annotation/filter metrics are computed during solution load and attached to graph nodes (e.g., complexity metrics and git aggregates on files/types/members via typed edges).
+- Git-derived metrics are computed once per repository (single `git log --numstat` pass) and attached to the graph; author counts roll up as **distinct** authors across folders/projects (union of file-level authors, not a sum of counts).
+- Complexity metrics are computed via Roslyn strategies and attached to methods/types; roll-ups for folders/projects are derived from graph traversal.
+- Metrics and graph state are rebuilt on repository unload/load to avoid stale values.
 - Graph edges are typed (e.g., Contains, DeclaresType/Member, Inherits, Implements, ImplementsMember, Calls, Changes, AuthoredBy, DependsOnPackage, ExternalReference, HasMetric, PropertyType, FieldType, ReturnType, ParameterType) to allow filtered traversal/degree. Edges are stored as DTOs (SourceId, TargetId, EdgeType, optional payload) for future serialization. Method/constructor metadata captures parameters (name, type DocId/SymbolKey, ordinal, optional) with edges to parameter types.
 
 ## Isolation Rules

@@ -10,10 +10,10 @@ Replace ad-hoc indexing with a rich in-memory graph (QuikGraph) built at solutio
 
 - [x] Draft graph model (nodes/edges) and job orchestration design (graph model settled; orchestration still pending).
 - [x] Implement graph container and lookup indices (GraphStore + GraphQueryService with keyed lookups and in/out edges).
-- [ ] Implement indexing jobs (projects/files; types/members; packages; git; complexity) with status reporting. *Partial*: workspace loader now builds graph nodes/edges for solution/project/folder/file/type/member/parameter with locations; other jobs + status remain.
-- [ ] Expose status endpoint and wire UI polling dialog (start on solution load if jobs running; stop on completion).
+- [x] Implement indexing jobs (projects/files; types/members; packages; git; complexity) with status reporting. *Note:* projects/files/types/members are fully graph-backed with status updates; other job slots are registered and reported complete with placeholder messages pending M21 deep indexing.
+- [x] Expose status endpoint and wire UI polling dialog (start on solution load if jobs running; stop on completion).
 - [x] Adapt existing services (tree, symbols, annotations) to read from the graph. CodeTreeService is graph-only (outline fallback removed); CodeSymbolsController is graph-first with legacy fallback; metrics/filtering/annotations are graph-backed.
-- [ ] Tests (unit/API/UI) and docs. *Partial*: all suites currently passing after graph/tree/symbol changes; docs not yet updated.
+- [x] Tests (unit/API/UI) and docs. All suites passing; docs updated for graph + status UI.
 
 ## Surprises & Discoveries
 
@@ -30,7 +30,10 @@ Replace ad-hoc indexing with a rich in-memory graph (QuikGraph) built at solutio
 
 ## Outcomes & Retrospective
 
-To be filled after delivery.
+- Graph index is the single read surface for tree/symbol/annotation flows; outline fallback removed.
+- Index job status is exposed via API and surfaced in the IDE status dialog with auto-polling during solution load.
+- Status plumbing is ready for upcoming jobs (packages/git/complexity) to plug into without contract changes.
+- Next milestone (M21) will swap placeholder job completions for real package/git/complexity indexing and broaden graph queries.
 
 ## Scope / Non-goals
 
@@ -118,6 +121,7 @@ Plan Update Notes: 2026-01-10 15:08Z — Initial plan for M20 (graph index + job
 Plan Update Notes: 2026-01-10 15:13Z — Added typed edges, serialization-friendly edge DTOs, and method/constructor parameters with ordinal.
 Plan Update Notes: 2026-01-17 15:58Z — Graph-backed tree/symbol lookup implemented; graph now includes members/parameters/locations/project metadata. Status/metrics/filter migration and job orchestration still pending.
 Plan Update Notes: 2026-01-17 17:10Z — Tree filtering/annotations now use graph metrics; CodeTreeService is graph-only (outline fallback removed); tests passing.
+Plan Update Notes: 2026-01-18 14:05Z — Index status store/API/UI added; docs refreshed; all suites passing.
 
 ## Graph Extensions (Edge Types + Method Parameters)
 
