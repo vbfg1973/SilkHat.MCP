@@ -6,8 +6,10 @@ using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Graph;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
+using SilkHat.Git.Analysis.Abstractions;
 using System.Security.Cryptography;
 using System.Text;
+using System.Globalization;
 
 namespace SilkHat.Code.Analysis.Services;
 
@@ -17,6 +19,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
     private readonly ILogger<CodeWorkspaceLoader> _logger;
     private readonly IGraphStoreProvider _graphStoreProvider;
     private readonly IIndexingStatusStore? _statusStore;
+    private readonly IGitCommandRunner? _gitCommandRunner;
     private readonly SolutionParser _solutionParser = new();
     private readonly ProjectParser _projectParser = new();
     private readonly SolutionIdentityResolver _identityResolver = new();
@@ -25,11 +28,13 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
     public CodeWorkspaceLoader(
         ILogger<CodeWorkspaceLoader> logger,
         IGraphStoreProvider? graphStoreProvider = null,
-        IIndexingStatusStore? statusStore = null)
+        IIndexingStatusStore? statusStore = null,
+        IGitCommandRunner? gitCommandRunner = null)
     {
         _logger = logger;
         _graphStoreProvider = graphStoreProvider ?? new GraphStoreProvider();
         _statusStore = statusStore;
+        _gitCommandRunner = gitCommandRunner;
     }
 
     public async Task<CodeRepositoryWorkspace> LoadAsync(
@@ -247,6 +252,25 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 namedTypeByDocId,
                 compilations);
 
+            GitLogData? gitData = null;
+            if (_gitCommandRunner is null)
+            {
+                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git runner not configured (skipped).");
+            }
+            else
+            {
+                try
+                {
+                    _statusStore?.SetJobRunning(solutionId, IndexJobType.Git, "Indexing git.");
+                    gitData = await BuildGitDataAsync(rootPath, cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    _statusStore?.SetJobFailed(solutionId, IndexJobType.Git, $"Git indexing failed: {ex.Message}");
+                    _logger.LogWarning(ex, "Git indexing failed for solution {SolutionPath}.", parsedSolution.SolutionPath);
+                }
+            }
+
             PopulateGraph(
                 solutionId,
                 parsedSolution.SolutionName,
@@ -256,10 +280,14 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 namedTypes,
                 typeLocationAttributes,
                 memberNodes,
-                packageReferences);
+                packageReferences,
+                gitData);
 
             _statusStore?.SetJobCompleted(solutionId, IndexJobType.Packages, "Packages indexed.");
-            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git indexing not yet implemented (marked complete).");
+            if (gitData is not null)
+            {
+                _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git indexed.");
+            }
             _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity indexing not yet implemented (marked complete).");
         }
 
@@ -275,7 +303,8 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         IReadOnlyList<NamedTypeDto> namedTypes,
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> typeLocationAttributes,
         IReadOnlyList<MemberNodeInfo> memberNodes,
-        IReadOnlyList<ProjectPackageReference> packageReferences)
+        IReadOnlyList<ProjectPackageReference> packageReferences,
+        GitLogData? gitData)
     {
         var graph = _graphStoreProvider.GetOrAdd(solutionId);
 
@@ -488,11 +517,67 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 
                 if (!string.IsNullOrWhiteSpace(parameter.TypeDocumentationId)
                     && typeNodeIds.TryGetValue(parameter.TypeDocumentationId, out var parameterTypeId))
+            {
+                graph.AddEdge(parameterNodeId, parameterTypeId, EdgeType.ParameterType);
+            }
+        }
+
+        if (gitData is not null)
+        {
+            var authorNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var commit in gitData.Commits)
+            {
+                var commitNodeId = CreateStableId($"git-commit:{commit.Sha}");
+                var commitAttributes = new Dictionary<string, string>
                 {
-                    graph.AddEdge(parameterNodeId, parameterTypeId, EdgeType.ParameterType);
+                    ["Sha"] = commit.Sha,
+                    ["AuthorName"] = commit.AuthorName,
+                    ["AuthorEmail"] = commit.AuthorEmail ?? string.Empty
+                };
+                if (commit.Date.HasValue)
+                {
+                    commitAttributes["Date"] = commit.Date.Value.ToString("O");
+                }
+
+                graph.AddNode(new GraphNodeDto(commitNodeId, GraphNodeKind.GitCommit, commit.Sha, commit.Sha, commitAttributes));
+                graph.AddEdge(solutionNodeId, commitNodeId, EdgeType.Contains);
+
+                var authorKey = string.IsNullOrWhiteSpace(commit.AuthorEmail) ? commit.AuthorName : commit.AuthorEmail!;
+                if (!authorNodeIds.TryGetValue(authorKey, out var authorNodeId))
+                {
+                    authorNodeId = CreateStableId($"git-author:{authorKey}");
+                    var authorAttributes = new Dictionary<string, string>
+                    {
+                        ["Name"] = commit.AuthorName,
+                        ["Email"] = commit.AuthorEmail ?? string.Empty
+                    };
+                    graph.AddNode(new GraphNodeDto(authorNodeId, GraphNodeKind.GitAuthor, authorKey, commit.AuthorName, authorAttributes));
+                    authorNodeIds[authorKey] = authorNodeId;
+                }
+
+                graph.AddEdge(commitNodeId, authorNodeId, EdgeType.AuthoredBy);
+
+                foreach (var change in commit.Changes)
+                {
+                    var normalizedPath = NormalizePathKey(change.Path);
+                    if (!repositoryPathToNodeId.TryGetValue(normalizedPath, out var fileNodeId))
+                    {
+                        continue;
+                    }
+
+                    var changeAttributes = new Dictionary<string, string>
+                    {
+                        ["Added"] = change.Added.ToString(CultureInfo.InvariantCulture),
+                        ["Deleted"] = change.Deleted.ToString(CultureInfo.InvariantCulture),
+                        ["RepositoryPath"] = normalizedPath
+                    };
+
+                    graph.AddEdge(commitNodeId, fileNodeId, EdgeType.Changes, changeAttributes);
                 }
             }
         }
+    }
     }
 
     private Dictionary<string, ParsedProject> LoadProjectsForSolution(ParsedSolution solution)
@@ -1248,11 +1333,143 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         string PackageId,
         string Version);
 
+    private sealed record GitChangeData(string Path, int Added, int Deleted);
+
+    private sealed record GitCommitData(
+        string Sha,
+        string AuthorName,
+        string? AuthorEmail,
+        DateTimeOffset? Date,
+        IReadOnlyList<GitChangeData> Changes);
+
+    private sealed record GitLogData(
+        IReadOnlyList<GitCommitData> Commits);
+
     private static Guid CreateStableId(string key)
     {
         using var md5 = MD5.Create();
         var bytes = Encoding.UTF8.GetBytes(key);
         var hash = md5.ComputeHash(bytes);
         return new Guid(hash);
+    }
+
+    private async Task<GitLogData?> BuildGitDataAsync(string repoRoot, CancellationToken cancellationToken)
+    {
+        if (_gitCommandRunner is null)
+        {
+            return null;
+        }
+
+        var result = await _gitCommandRunner.ExecuteAsync(
+            repoRoot,
+            new[] { "log", "--numstat", "--pretty=format:COMMIT|%H|%an|%ae|%ad", "--" },
+            cancellationToken);
+
+        if (result.ExitCode != 0)
+        {
+            var message = string.IsNullOrWhiteSpace(result.StandardError)
+                ? "Git log failed while indexing."
+                : result.StandardError.Trim();
+            throw new InvalidOperationException(message);
+        }
+
+        var commits = new List<GitCommitData>();
+        string? currentSha = null;
+        string? currentAuthor = null;
+        string? currentEmail = null;
+        DateTimeOffset? currentDate = null;
+        var currentChanges = new List<GitChangeData>();
+
+        var lines = result.StandardOutput.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        foreach (var line in lines)
+        {
+            if (line.StartsWith("COMMIT|", StringComparison.Ordinal))
+            {
+                if (!string.IsNullOrWhiteSpace(currentSha))
+                {
+                    commits.Add(new GitCommitData(
+                        currentSha!,
+                        currentAuthor ?? string.Empty,
+                        currentEmail,
+                        currentDate,
+                        currentChanges.ToList()));
+                }
+
+                currentChanges.Clear();
+                var parts = line.Split('|');
+                currentSha = parts.ElementAtOrDefault(1)?.Trim();
+                currentAuthor = parts.ElementAtOrDefault(2)?.Trim();
+                currentEmail = parts.ElementAtOrDefault(3)?.Trim();
+                currentDate = null;
+                if (DateTimeOffset.TryParse(parts.ElementAtOrDefault(4), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsedDate))
+                {
+                    currentDate = parsedDate;
+                }
+
+                continue;
+            }
+
+            var segments = line.Split('\t');
+            if (segments.Length < 3)
+            {
+                continue;
+            }
+
+            var path = NormalizePathKey(ResolveRenamePath(segments[2].Trim()));
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            var added = segments[0] == "-" ? 0 : int.TryParse(segments[0], out var a) ? a : 0;
+            var deleted = segments[1] == "-" ? 0 : int.TryParse(segments[1], out var d) ? d : 0;
+            currentChanges.Add(new GitChangeData(path, added, deleted));
+        }
+
+        if (!string.IsNullOrWhiteSpace(currentSha))
+        {
+            commits.Add(new GitCommitData(
+                currentSha!,
+                currentAuthor ?? string.Empty,
+                currentEmail,
+                currentDate,
+                currentChanges.ToList()));
+        }
+
+        return new GitLogData(commits);
+    }
+
+    private static string ResolveRenamePath(string path)
+    {
+        if (!path.Contains("=>", StringComparison.Ordinal))
+        {
+            return path;
+        }
+
+        if (path.Contains('{') && path.Contains('}'))
+        {
+            var open = path.IndexOf('{');
+            var close = path.IndexOf('}');
+            if (open >= 0 && close > open)
+            {
+                var prefix = path[..open];
+                var suffix = path[(close + 1)..];
+                var segment = path[(open + 1)..close];
+                var parts = segment.Split("=>", 2, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length == 2)
+                {
+                    var newSegment = parts[1].Trim();
+                    return $"{prefix}{newSegment}{suffix}";
+                }
+            }
+        }
+
+        var arrowIndex = path.LastIndexOf("=>", StringComparison.Ordinal);
+        if (arrowIndex >= 0)
+        {
+            return path[(arrowIndex + 2)..].Trim();
+        }
+
+        return path;
     }
 }
