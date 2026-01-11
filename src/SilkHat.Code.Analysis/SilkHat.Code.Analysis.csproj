@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SilkHat.Core\SilkHat.Core.csproj" />
     <ProjectReference Include="..\SilkHat.Code.Core\SilkHat.Code.Core.csproj" />
+    <ProjectReference Include="..\SilkHat.Git.Analysis\SilkHat.Git.Analysis.csproj" />
   </ItemGroup>
 
 </Project>

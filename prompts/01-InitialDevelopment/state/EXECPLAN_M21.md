@@ -34,13 +34,14 @@ Replace placeholder status updates with real indexing work during solution load:
 
 ## Progress
 
-- [ ] Phase 1: Packages
-- [ ] Phase 2: Git
-- [ ] Phase 3: Complexity
-- [ ] Phase 4: Stabilization (docs/tests/smoke)
+- [x] Phase 1: Packages
+- [x] Phase 2: Git
+- [x] Phase 3: Complexity
+- [x] Phase 4: Stabilization (docs/tests/smoke)
 
 ## Surprises & Discoveries
-- To be filled during implementation.
+- `git log --numstat` parsing is fast enough when run once per repo; everything else hangs off the graph without extra queries.
+- Complexity calculation needed a factory injection to avoid nulls during load.
 
 ## Decision Log
 - Use semantic triples as edge contracts; edge types must be recorded and documented.
@@ -48,5 +49,7 @@ Replace placeholder status updates with real indexing work during solution load:
 - Aggregate file-level metrics (changes/authors) into File node attributes for speed; still retain commit/author edges for traversal.
 
 ## Outcomes & Retrospective
-To be filled after delivery.
-
+- Graph now owns packages, git authors/commits/changes, and complexity metrics; tree/annotations use graph data only.
+- Status store reflects real work for packages/git/complexity jobs.
+- All unit tests pass (`dotnet test -m:1` per suite); one existing nullable warning remains in `IdeTabs.razor`.
+- Base load stops after projects/files/types; expensive package/git/complexity indexing runs in deferred background jobs with status updates so the IDE can appear quickly.
