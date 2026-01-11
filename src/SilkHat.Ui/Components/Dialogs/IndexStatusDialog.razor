@@ -1,0 +1,108 @@
+@using SilkHat.Ui.Models
+@using MudBlazor
+@inject RepositoryApiClient Api
+@inject ILogger<IndexStatusDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex justify-space-between align-center mb-2">
+            <MudText Typo="Typo.h6">Indexing Status</MudText>
+            <MudProgressCircular Class="ms-2" Size="Size.Small" Indeterminate="@_isPolling" />
+        </div>
+        @if (_statuses.Count == 0)
+        {
+            <MudText Typo="Typo.body2">No status available.</MudText>
+        }
+        else
+        {
+            <MudTable Items="_statuses" Dense="true">
+                <HeaderContent>
+                    <MudTh>Job</MudTh>
+                    <MudTh>State</MudTh>
+                    <MudTh>Percent</MudTh>
+                    <MudTh>Message</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Job">@context.JobType</MudTd>
+                    <MudTd DataLabel="State">@context.State</MudTd>
+                    <MudTd DataLabel="Percent">@context.Percent</MudTd>
+                    <MudTd DataLabel="Message">@context.Message</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Close">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public Guid RepositoryId { get; set; }
+    [Parameter] public string SolutionId { get; set; } = string.Empty;
+    [CascadingParameter] public IMudDialogInstance Dialog { get; set; } = default!;
+
+    private readonly List<IndexStatusViewModel> _statuses = new();
+    private bool _isPolling;
+    private CancellationTokenSource? _cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await StartPollingAsync();
+    }
+
+    private async Task StartPollingAsync()
+    {
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+        _isPolling = true;
+
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await RefreshAsync(token);
+                if (IsComplete())
+                {
+                    break;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(1), token);
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // ignore
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to poll index status.");
+        }
+        finally
+        {
+            _isPolling = false;
+        }
+    }
+
+    private async Task RefreshAsync(CancellationToken cancellationToken)
+    {
+        var result = await Api.GetIndexStatusAsync(RepositoryId, SolutionId, cancellationToken);
+        _statuses.Clear();
+        _statuses.AddRange(result.Select(status =>
+            new IndexStatusViewModel(status.JobType, status.State, status.Percent, status.Message)));
+        StateHasChanged();
+    }
+
+    private bool IsComplete()
+    {
+        if (_statuses.Count == 0)
+        {
+            return false;
+        }
+
+        return _statuses.All(s => string.Equals(s.State, "Completed", StringComparison.OrdinalIgnoreCase)
+                                 || string.Equals(s.State, "Failed", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void Close() => Dialog?.Close();
+}

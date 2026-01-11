@@ -9,3 +9,6 @@ What’s implemented so far
 Still to do in M20
 - Job orchestration + status endpoints + UI polling.
 - Update docs once the above lands.
+
+Notes for next milestone (M21)
+- Implement real indexing jobs for packages, git, complexity (phased).
