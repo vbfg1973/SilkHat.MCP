@@ -15,3 +15,9 @@ public sealed record RepoEventModel(
     object? Payload,
     RepoEventErrorModel? Error,
     RepoEventSummaryModel? Summary);
+
+public sealed record IndexJobStatusModel(
+    string JobType,
+    string State,
+    int Percent,
+    string? Message);

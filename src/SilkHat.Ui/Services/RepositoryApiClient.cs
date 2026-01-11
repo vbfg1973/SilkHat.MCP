@@ -191,6 +191,16 @@ public sealed class RepositoryApiClient
                ?? Array.Empty<CodeSymbolOutlineNodeModel>();
     }
 
+    public async Task<IReadOnlyList<IndexJobStatusModel>> GetIndexStatusAsync(
+        Guid repositoryId,
+        string solutionId,
+        CancellationToken cancellationToken = default)
+    {
+        var url = $"api/repositories/{repositoryId}/code/solutions/{solutionId}/index/status";
+        return await GetFromJsonAsync<IReadOnlyList<IndexJobStatusModel>>(url, cancellationToken)
+               ?? Array.Empty<IndexJobStatusModel>();
+    }
+
     public async Task<MethodCallStackResponseModel> GetMethodCallStackAsync(
         Guid repositoryId,
         string solutionId,

@@ -4,6 +4,7 @@
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
 @using SilkHat.Ui.State.Ide.Models
+@using SilkHat.Ui.Components.Dialogs
 @inherits Fluxor.Blazor.Web.Components.FluxorComponent
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeTabsState> TabsState
@@ -11,6 +12,7 @@
 @inject IState<IdeSymbolsState> SymbolsState
 @inject IDispatcher Dispatcher
 @inject IDialogService DialogService
+@inject RepositoryApiClient Api
 
 <MudPaper Elevation="1" Class="pa-2">
     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
@@ -64,6 +66,12 @@
             <MudMenuItem Disabled="true">Structs</MudMenuItem>
             <MudMenuItem Disabled="true">Other</MudMenuItem>
         </MudMenu>
+        <MudMenu Dense="true" Label="Status" ActivationEvent="MouseEvent.LeftClick">
+            <MudMenuItem OnClick="OpenStatusDialog" Disabled="@IsTabsDisabled">Indexing Status</MudMenuItem>
+        </MudMenu>
+        <MudMenu Dense="true" Label="Status" ActivationEvent="MouseEvent.LeftClick">
+            <MudMenuItem OnClick="OpenStatusDialog" Disabled="@IsTabsDisabled">Indexing Status</MudMenuItem>
+        </MudMenu>
         <MudMenu Dense="true" Label="Syntax" ActivationEvent="MouseEvent.LeftClick">
             <MudMenuItem Disabled="true">Syntax Tree</MudMenuItem>
         </MudMenu>
@@ -90,8 +98,15 @@
 
 @code {
     private IDialogReference? _symbolDialog;
+    private IDialogReference? _statusDialog;
 
     private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+    private Guid? SelectedRepositoryId =>
+        SolutionsState.Value.SelectedSolutionId is null
+            ? null
+            : SolutionsState.Value.Solutions
+                .FirstOrDefault(s => string.Equals(s.SolutionId, SelectedSolutionId, StringComparison.OrdinalIgnoreCase))
+                ?.ConfigId;
 
     private bool IsTabsDisabled => SelectedSolutionId is null;
 
@@ -163,11 +178,30 @@
         Dispatcher.Dispatch(new SetIdeMainViewAction(SelectedSolutionId, IdeMainView.Tabs));
     }
 
-    private Task SelectSolutionAsync(string solutionId)
+    private async Task SelectSolutionAsync(string solutionId)
     {
         Dispatcher.Dispatch(new SelectSolutionAction(solutionId));
         Dispatcher.Dispatch(new SetIdeMainViewAction(solutionId, IdeMainView.Tabs));
-        return Task.CompletedTask;
+
+        // Auto-show status dialog if indexing is still running for this solution.
+        try
+        {
+            var entry = SolutionsState.Value.Solutions.FirstOrDefault(s =>
+                string.Equals(s.SolutionId, solutionId, StringComparison.OrdinalIgnoreCase));
+            if (entry is not null)
+            {
+                var status = await Api.GetIndexStatusAsync(entry.ConfigId, solutionId);
+                if (status.Any(s => string.Equals(s.State, "Running", StringComparison.OrdinalIgnoreCase)
+                                 || string.Equals(s.State, "Pending", StringComparison.OrdinalIgnoreCase)))
+                {
+                    await OpenStatusDialogInternal(entry.ConfigId, solutionId);
+                }
+            }
+        }
+        catch
+        {
+            // best-effort; ignore
+        }
     }
 
     private Task SwitchToTabAsync(int index)
@@ -207,6 +241,41 @@
             {
                 Dispatcher.Dispatch(new CloseSymbolPopupAction(SelectedSolutionId));
             }
+        }));
+    }
+
+    private async Task OpenStatusDialog()
+    {
+        if (SelectedSolutionId is null || SelectedRepositoryId is null)
+        {
+            return;
+        }
+
+        await OpenStatusDialogInternal(SelectedRepositoryId.Value, SelectedSolutionId);
+    }
+
+    private async Task OpenStatusDialogInternal(Guid repositoryId, string solutionId)
+    {
+        if (_statusDialog is not null)
+        {
+            return;
+        }
+
+        var parameters = new DialogParameters
+        {
+            { "RepositoryId", repositoryId },
+            { "SolutionId", solutionId }
+        };
+
+        _statusDialog = await DialogService.ShowAsync<IndexStatusDialog>(
+            "Indexing Status",
+            parameters,
+            new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true });
+
+        var dialogRef = _statusDialog;
+        _ = dialogRef.Result.ContinueWith(_ => InvokeAsync(() =>
+        {
+            _statusDialog = null;
         }));
     }
 

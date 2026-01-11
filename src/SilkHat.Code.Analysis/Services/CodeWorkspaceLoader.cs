@@ -3,8 +3,11 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Graph;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace SilkHat.Code.Analysis.Services;
 
@@ -12,13 +15,20 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 {
     private static readonly IReadOnlyList<MetadataReference> DefaultReferences = BuildDefaultReferences();
     private readonly ILogger<CodeWorkspaceLoader> _logger;
+    private readonly IGraphStoreProvider _graphStoreProvider;
+    private readonly IIndexingStatusStore? _statusStore;
     private readonly SolutionParser _solutionParser = new();
     private readonly ProjectParser _projectParser = new();
     private readonly SolutionIdentityResolver _identityResolver = new();
 
-    public CodeWorkspaceLoader(ILogger<CodeWorkspaceLoader> logger)
+    public CodeWorkspaceLoader(
+        ILogger<CodeWorkspaceLoader> logger,
+        IGraphStoreProvider? graphStoreProvider = null,
+        IIndexingStatusStore? statusStore = null)
     {
         _logger = logger;
+        _graphStoreProvider = graphStoreProvider ?? new GraphStoreProvider();
+        _statusStore = statusStore;
     }
 
     public async Task<CodeRepositoryWorkspace> LoadAsync(
@@ -78,6 +88,8 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 throw new InvalidOperationException($"No C# projects were found in solution '{parsedSolution.SolutionPath}'.");
             }
 
+            _statusStore?.InitializeSolution(solutionId);
+
             var workspace = BuildWorkspace(solutionProjects);
             var workspaceProjects = workspace.CurrentSolution.Projects
                 .Where(project => !string.IsNullOrWhiteSpace(project.FilePath))
@@ -90,6 +102,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             foreach (var project in workspaceProjects)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                _statusStore?.SetJobRunning(solutionId, IndexJobType.ProjectsAndFiles, "Building project compilations.");
                 var compilation = await project.GetCompilationAsync(cancellationToken);
                 if (compilation is null)
                 {
@@ -99,6 +112,7 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
 
                 compilations[projectKeyMap[project.Id]] = compilation;
             }
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.ProjectsAndFiles, "Projects loaded.");
 
             var referenceMap = new Dictionary<string, HashSet<string>>();
             var referencedByMap = new Dictionary<string, HashSet<string>>();
@@ -153,7 +167,10 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             var namespaces = new HashSet<string>(StringComparer.Ordinal);
             var namedTypeByKey = new Dictionary<string, NamedTypeDto>(StringComparer.Ordinal);
             var namedTypeByDocId = new Dictionary<string, NamedTypeDto>(StringComparer.Ordinal);
+            var memberNodes = new List<MemberNodeInfo>();
+            var typeLocationAttributes = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
 
+            _statusStore?.SetJobRunning(solutionId, IndexJobType.TypesAndMembers, "Indexing types and members.");
             foreach (var compilationEntry in compilations)
             {
                 var projectKey = compilationEntry.Key;
@@ -177,8 +194,21 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                     {
                         namedTypeByDocId[dto.DocumentationId] = dto;
                     }
+
+                    var typeKey = !string.IsNullOrWhiteSpace(dto.DocumentationId)
+                        ? dto.DocumentationId
+                        : dto.SymbolKey;
+
+                    var locationAttributes = BuildLocationAttributes(symbol, rootPath);
+                    if (locationAttributes is not null)
+                    {
+                        typeLocationAttributes[typeKey] = locationAttributes;
+                    }
+
+                    memberNodes.AddRange(CollectMemberNodes(symbol, compilation, dto, projectIndex[projectKey].Name, rootPath));
                 }
             }
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.TypesAndMembers, "Types and members indexed.");
 
             var treeEntries = BuildCodeTreeEntries(workspace, rootPath, projectKeyMap);
             var treeChildrenMap = await Task.Run(() => BuildTreeChildrenMap(treeEntries), cancellationToken);
@@ -197,9 +227,206 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
                 namedTypeByKey,
                 namedTypeByDocId,
                 compilations);
+
+            PopulateGraph(
+                solutionId,
+                parsedSolution.SolutionName,
+                projectIndex,
+                treeEntries,
+                treeChildrenMap,
+                namedTypes,
+                typeLocationAttributes,
+                memberNodes);
+
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Packages, "Package indexing not yet implemented (marked complete).");
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Git, "Git indexing not yet implemented (marked complete).");
+            _statusStore?.SetJobCompleted(solutionId, IndexJobType.Complexity, "Complexity indexing not yet implemented (marked complete).");
         }
 
         return new CodeRepositoryWorkspace(rootPath, solutionWorkspaces);
+    }
+
+    private void PopulateGraph(
+        string solutionId,
+        string solutionName,
+        IReadOnlyDictionary<string, ProjectIndex> projects,
+        IReadOnlyList<CodeTreeEntryDto> treeEntries,
+        IReadOnlyDictionary<string, IReadOnlyList<CodeTreeEntryDto>> treeChildrenByParent,
+        IReadOnlyList<NamedTypeDto> namedTypes,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> typeLocationAttributes,
+        IReadOnlyList<MemberNodeInfo> memberNodes)
+    {
+        var graph = _graphStoreProvider.GetOrAdd(solutionId);
+
+        var solutionNodeId = CreateStableId($"solution:{solutionId}");
+        graph.AddNode(new GraphNodeDto(solutionNodeId, GraphNodeKind.Solution, solutionId, solutionName));
+
+        var displayPathToNodeId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var repositoryPathToNodeId = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+        var typeNodeIds = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var project in projects.Values)
+        {
+            var projectNodeId = CreateStableId($"project:{project.ProjectKey}");
+            graph.AddNode(new GraphNodeDto(projectNodeId, GraphNodeKind.Project, project.ProjectKey, project.Name));
+            graph.AddEdge(solutionNodeId, projectNodeId, EdgeType.Contains);
+            displayPathToNodeId[project.Name] = projectNodeId;
+        }
+
+        foreach (var entry in treeEntries)
+        {
+            if (entry.Type == CodeTreeEntryType.Project)
+            {
+                // Bind project display path to the existing project node; do not create duplicates.
+                if (displayPathToNodeId.TryGetValue(entry.Name, out var existingProjectId))
+                {
+                    displayPathToNodeId[entry.DisplayPath] = existingProjectId;
+                }
+                continue;
+            }
+
+            var kind = entry.Type switch
+            {
+                CodeTreeEntryType.Project => GraphNodeKind.Project,
+                CodeTreeEntryType.Directory => GraphNodeKind.Folder,
+                CodeTreeEntryType.File => GraphNodeKind.File,
+                _ => GraphNodeKind.File
+            };
+
+            var nodeId = CreateStableId($"{entry.Type}:{entry.DisplayPath}:{entry.ProjectKey}");
+            var attributes = new Dictionary<string, string>
+            {
+                ["DisplayPath"] = entry.DisplayPath,
+                ["ProjectKey"] = entry.ProjectKey,
+                ["ProjectName"] = entry.ProjectName
+            };
+            if (entry.Type == CodeTreeEntryType.File)
+            {
+                attributes["RepositoryPath"] = entry.RepositoryPath;
+            }
+            else if (entry.Type == CodeTreeEntryType.Directory)
+            {
+                attributes["RepositoryPath"] = entry.RepositoryPath;
+            }
+
+            graph.AddNode(new GraphNodeDto(nodeId, kind, entry.DisplayPath, entry.Name, attributes));
+            displayPathToNodeId[entry.DisplayPath] = nodeId;
+            if (entry.Type == CodeTreeEntryType.File)
+            {
+                repositoryPathToNodeId[entry.RepositoryPath] = nodeId;
+            }
+        }
+
+        foreach (var (parent, children) in treeChildrenByParent)
+        {
+            var hasParent = displayPathToNodeId.TryGetValue(parent, out var parentNodeId);
+            // root-level entries hang directly off the solution
+            var rootParentId = hasParent ? parentNodeId : solutionNodeId;
+
+            foreach (var child in children)
+            {
+                if (!displayPathToNodeId.TryGetValue(child.DisplayPath, out var childNodeId))
+                {
+                    continue;
+                }
+
+                graph.AddEdge(rootParentId, childNodeId, EdgeType.Contains);
+            }
+        }
+
+        foreach (var type in namedTypes)
+        {
+            var typeKey = !string.IsNullOrWhiteSpace(type.DocumentationId)
+                ? type.DocumentationId
+                : type.SymbolKey;
+            var typeNodeId = CreateStableId($"type:{typeKey}");
+            var attributes = new Dictionary<string, string>
+            {
+                ["DocumentationId"] = type.DocumentationId ?? string.Empty,
+                ["SymbolKey"] = type.SymbolKey,
+                ["RealType"] = type.Kind.ToString(),
+                ["Name"] = type.Name,
+                ["Namespace"] = type.Namespace,
+                ["AssemblyName"] = type.AssemblyName,
+                ["ProjectKey"] = type.ProjectKey,
+                ["ProjectName"] = projects.TryGetValue(type.ProjectKey, out var projectIndex) ? projectIndex.Name : type.ProjectKey
+            };
+            if (!string.IsNullOrWhiteSpace(type.FilePath))
+            {
+                attributes["RepositoryPath"] = type.FilePath;
+            }
+
+            if (typeLocationAttributes.TryGetValue(typeKey, out var locationAttrs))
+            {
+                foreach (var pair in locationAttrs)
+                {
+                    attributes[pair.Key] = pair.Value;
+                }
+            }
+
+            graph.AddNode(new GraphNodeDto(typeNodeId, GraphNodeKind.NamedType, typeKey, type.Name, attributes));
+            typeNodeIds[typeKey] = typeNodeId;
+
+            if (!string.IsNullOrWhiteSpace(type.FilePath) &&
+                repositoryPathToNodeId.TryGetValue(type.FilePath, out var fileNodeId))
+            {
+                graph.AddEdge(fileNodeId, typeNodeId, EdgeType.DeclaresType);
+            }
+        }
+
+        foreach (var member in memberNodes)
+        {
+            if (!typeNodeIds.TryGetValue(member.ParentKey, out var parentTypeId))
+            {
+                continue;
+            }
+
+            var memberNodeId = CreateStableId($"member:{member.Key}");
+            var attributes = new Dictionary<string, string>(member.Attributes)
+            {
+                ["ProjectKey"] = member.ProjectKey,
+                ["ProjectName"] = member.ProjectName
+            };
+
+            if (!string.IsNullOrWhiteSpace(member.FilePath))
+            {
+                attributes["RepositoryPath"] = member.FilePath!;
+            }
+
+            graph.AddNode(new GraphNodeDto(memberNodeId, member.Kind, member.Key, member.Name, attributes));
+            graph.AddEdge(parentTypeId, memberNodeId, EdgeType.DeclaresMember);
+
+            if (!string.IsNullOrWhiteSpace(member.ReturnOrValueTypeDocumentationId)
+                && typeNodeIds.TryGetValue(member.ReturnOrValueTypeDocumentationId, out var returnTypeId))
+            {
+                var edgeType = member.Kind switch
+                {
+                    GraphNodeKind.Property => EdgeType.PropertyType,
+                    GraphNodeKind.Field => EdgeType.FieldType,
+                    _ => EdgeType.ReturnType
+                };
+                graph.AddEdge(memberNodeId, returnTypeId, edgeType);
+            }
+
+            foreach (var parameter in member.Parameters)
+            {
+                var parameterNodeId = CreateStableId($"parameter:{parameter.Key}");
+                var parameterAttributes = new Dictionary<string, string>(parameter.Attributes)
+                {
+                    ["ProjectKey"] = member.ProjectKey,
+                    ["ProjectName"] = member.ProjectName
+                };
+
+                graph.AddNode(new GraphNodeDto(parameterNodeId, GraphNodeKind.Parameter, parameter.Key, parameter.Name, parameterAttributes));
+                graph.AddEdge(memberNodeId, parameterNodeId, EdgeType.DeclaresParameter);
+
+                if (!string.IsNullOrWhiteSpace(parameter.TypeDocumentationId)
+                    && typeNodeIds.TryGetValue(parameter.TypeDocumentationId, out var parameterTypeId))
+                {
+                    graph.AddEdge(parameterNodeId, parameterTypeId, EdgeType.ParameterType);
+                }
+            }
+        }
     }
 
     private Dictionary<string, ParsedProject> LoadProjectsForSolution(ParsedSolution solution)
@@ -424,6 +651,271 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
             filePath);
     }
 
+    private static IReadOnlyDictionary<string, string>? BuildLocationAttributes(ISymbol symbol, string rootPath)
+    {
+        var syntaxRef = symbol.DeclaringSyntaxReferences.FirstOrDefault();
+        if (syntaxRef?.SyntaxTree?.FilePath is null)
+        {
+            var location = symbol.Locations.FirstOrDefault(loc => loc.IsInSource);
+            if (location?.SourceTree?.FilePath is null)
+            {
+                return null;
+            }
+
+            var spanFallback = location.SourceSpan;
+            var lineSpanFallback = location.GetLineSpan();
+            var normalizedPathFallback = SolutionIdentity.NormalizeRelativePath(rootPath, location.SourceTree.FilePath);
+
+            return new Dictionary<string, string>
+            {
+                ["FilePath"] = normalizedPathFallback,
+                ["SpanStart"] = spanFallback.Start.ToString(),
+                ["SpanLength"] = spanFallback.Length.ToString(),
+                ["StartLine"] = (lineSpanFallback.StartLinePosition.Line + 1).ToString(),
+                ["StartColumn"] = (lineSpanFallback.StartLinePosition.Character + 1).ToString(),
+                ["EndLine"] = (lineSpanFallback.EndLinePosition.Line + 1).ToString(),
+                ["EndColumn"] = (lineSpanFallback.EndLinePosition.Character + 1).ToString()
+            };
+        }
+
+        var syntax = syntaxRef.GetSyntax();
+        var tree = syntax.SyntaxTree;
+        var span = syntax.FullSpan; // include leading trivia to highlight full definition
+        var lineSpan = tree.GetLineSpan(span);
+        var normalizedPath = SolutionIdentity.NormalizeRelativePath(rootPath, tree.FilePath);
+
+        return new Dictionary<string, string>
+        {
+            ["FilePath"] = normalizedPath,
+            ["SpanStart"] = span.Start.ToString(),
+            ["SpanLength"] = span.Length.ToString(),
+            ["StartLine"] = (lineSpan.StartLinePosition.Line + 1).ToString(),
+            ["StartColumn"] = (lineSpan.StartLinePosition.Character + 1).ToString(),
+            ["EndLine"] = (lineSpan.EndLinePosition.Line + 1).ToString(),
+            ["EndColumn"] = (lineSpan.EndLinePosition.Character + 1).ToString()
+        };
+    }
+
+    private static IReadOnlyList<MemberNodeInfo> CollectMemberNodes(
+        INamedTypeSymbol type,
+        Compilation compilation,
+        NamedTypeDto typeDto,
+        string projectName,
+        string rootPath)
+    {
+        var results = new List<MemberNodeInfo>();
+        var parentKey = !string.IsNullOrWhiteSpace(typeDto.DocumentationId) ? typeDto.DocumentationId : typeDto.SymbolKey;
+
+        foreach (var member in type.GetMembers())
+        {
+            switch (member)
+            {
+                case IFieldSymbol field:
+                    {
+                        var docId = DocumentationIdUtility.GetDocumentationId(field);
+                        var symbolKey = SymbolKeyUtility.GetSymbolKeyString(field, compilation);
+                        var key = !string.IsNullOrWhiteSpace(docId) ? docId : symbolKey;
+                        if (string.IsNullOrWhiteSpace(key))
+                        {
+                            continue;
+                        }
+
+                        var attributes = new Dictionary<string, string>
+                        {
+                            ["DocumentationId"] = docId ?? string.Empty,
+                            ["SymbolKey"] = symbolKey,
+                            ["RealType"] = "Field",
+                            ["Name"] = field.Name
+                        };
+
+                        var location = BuildLocationAttributes(field, rootPath);
+                        if (location is not null)
+                        {
+                            foreach (var pair in location)
+                            {
+                                attributes[pair.Key] = pair.Value;
+                            }
+                        }
+
+                        results.Add(new MemberNodeInfo(
+                            key,
+                            field.Name,
+                            GraphNodeKind.Field,
+                            parentKey,
+                            typeDto.ProjectKey,
+                            projectName,
+                            attributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
+                            DocumentationIdUtility.GetDocumentationId(field.Type),
+                            new List<ParameterNodeInfo>(),
+                            attributes));
+                        break;
+                    }
+                case IPropertySymbol property:
+                    {
+                        var docId = DocumentationIdUtility.GetDocumentationId(property);
+                        var symbolKey = SymbolKeyUtility.GetSymbolKeyString(property, compilation);
+                        var key = !string.IsNullOrWhiteSpace(docId) ? docId : symbolKey;
+                        if (string.IsNullOrWhiteSpace(key))
+                        {
+                            continue;
+                        }
+
+                        var attributes = new Dictionary<string, string>
+                        {
+                            ["DocumentationId"] = docId ?? string.Empty,
+                            ["SymbolKey"] = symbolKey,
+                            ["RealType"] = "Property",
+                            ["Name"] = property.Name
+                        };
+
+                        var location = BuildLocationAttributes(property, rootPath);
+                        if (location is not null)
+                        {
+                            foreach (var pair in location)
+                            {
+                                attributes[pair.Key] = pair.Value;
+                            }
+                        }
+
+                        results.Add(new MemberNodeInfo(
+                            key,
+                            property.Name,
+                            GraphNodeKind.Property,
+                            parentKey,
+                            typeDto.ProjectKey,
+                            projectName,
+                            attributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
+                            DocumentationIdUtility.GetDocumentationId(property.Type),
+                            new List<ParameterNodeInfo>(),
+                            attributes));
+                        break;
+                    }
+                case IEventSymbol @event:
+                    {
+                        var docId = DocumentationIdUtility.GetDocumentationId(@event);
+                        var symbolKey = SymbolKeyUtility.GetSymbolKeyString(@event, compilation);
+                        var key = !string.IsNullOrWhiteSpace(docId) ? docId : symbolKey;
+                        if (string.IsNullOrWhiteSpace(key))
+                        {
+                            continue;
+                        }
+
+                        var attributes = new Dictionary<string, string>
+                        {
+                            ["DocumentationId"] = docId ?? string.Empty,
+                            ["SymbolKey"] = symbolKey,
+                            ["RealType"] = "Event",
+                            ["Name"] = @event.Name
+                        };
+
+                        var location = BuildLocationAttributes(@event, rootPath);
+                        if (location is not null)
+                        {
+                            foreach (var pair in location)
+                            {
+                                attributes[pair.Key] = pair.Value;
+                            }
+                        }
+
+                        results.Add(new MemberNodeInfo(
+                            key,
+                            @event.Name,
+                            GraphNodeKind.Field,
+                            parentKey,
+                            typeDto.ProjectKey,
+                            projectName,
+                            attributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
+                            DocumentationIdUtility.GetDocumentationId(@event.Type),
+                            new List<ParameterNodeInfo>(),
+                            attributes));
+                        break;
+                    }
+                case IMethodSymbol method:
+                    {
+                        if (method.MethodKind is MethodKind.PropertyGet or MethodKind.PropertySet or MethodKind.EventAdd or MethodKind.EventRemove)
+                        {
+                            continue;
+                        }
+
+                        var docId = DocumentationIdUtility.GetDocumentationId(method);
+                        var symbolKey = SymbolKeyUtility.GetSymbolKeyString(method, compilation);
+                        var key = !string.IsNullOrWhiteSpace(docId) ? docId : symbolKey;
+                        if (string.IsNullOrWhiteSpace(key))
+                        {
+                            continue;
+                        }
+
+                        var realType = method.MethodKind switch
+                        {
+                            MethodKind.Constructor => "Constructor",
+                            MethodKind.StaticConstructor => "StaticConstructor",
+                            _ => "Method"
+                        };
+
+                        var attributes = new Dictionary<string, string>
+                        {
+                            ["DocumentationId"] = docId ?? string.Empty,
+                            ["SymbolKey"] = symbolKey,
+                            ["RealType"] = realType,
+                            ["Name"] = method.Name
+                        };
+
+                        var location = BuildLocationAttributes(method, rootPath);
+                        if (location is not null)
+                        {
+                            foreach (var pair in location)
+                            {
+                                attributes[pair.Key] = pair.Value;
+                            }
+                        }
+
+                        var parameters = new List<ParameterNodeInfo>();
+                        for (var i = 0; i < method.Parameters.Length; i++)
+                        {
+                            var parameter = method.Parameters[i];
+                            var parameterKey = $"{key}:param:{i}:{parameter.Name}";
+                            var parameterAttributes = new Dictionary<string, string>
+                            {
+                                ["RealType"] = "Parameter",
+                                ["Name"] = parameter.Name,
+                                ["Ordinal"] = i.ToString()
+                            };
+                            var parameterLocation = BuildLocationAttributes(parameter, rootPath);
+                            if (parameterLocation is not null)
+                            {
+                                foreach (var pair in parameterLocation)
+                                {
+                                    parameterAttributes[pair.Key] = pair.Value;
+                                }
+                            }
+
+                            parameters.Add(new ParameterNodeInfo(
+                                parameterKey,
+                                parameter.Name,
+                                i,
+                                DocumentationIdUtility.GetDocumentationId(parameter.Type),
+                                parameterAttributes));
+                        }
+
+                        results.Add(new MemberNodeInfo(
+                            key,
+                            method.Name,
+                            GraphNodeKind.Method,
+                            parentKey,
+                            typeDto.ProjectKey,
+                            projectName,
+                            attributes.TryGetValue("FilePath", out var fp) ? fp : typeDto.FilePath,
+                            DocumentationIdUtility.GetDocumentationId(method.ReturnType),
+                            parameters,
+                            attributes));
+                        break;
+                    }
+            }
+        }
+
+        return results;
+    }
+
     private static IReadOnlyList<CodeTreeEntryDto> BuildCodeTreeEntries(
         Workspace workspace,
         string rootPath,
@@ -628,5 +1120,32 @@ public sealed class CodeWorkspaceLoader : ICodeWorkspaceLoader
         }
 
         return normalized;
+    }
+
+    private sealed record ParameterNodeInfo(
+        string Key,
+        string Name,
+        int Ordinal,
+        string? TypeDocumentationId,
+        IReadOnlyDictionary<string, string> Attributes);
+
+    private sealed record MemberNodeInfo(
+        string Key,
+        string Name,
+        GraphNodeKind Kind,
+        string ParentKey,
+        string ProjectKey,
+        string ProjectName,
+        string? FilePath,
+        string? ReturnOrValueTypeDocumentationId,
+        IReadOnlyList<ParameterNodeInfo> Parameters,
+        IReadOnlyDictionary<string, string> Attributes);
+
+    private static Guid CreateStableId(string key)
+    {
+        using var md5 = MD5.Create();
+        var bytes = Encoding.UTF8.GetBytes(key);
+        var hash = md5.ComputeHash(bytes);
+        return new Guid(hash);
     }
 }

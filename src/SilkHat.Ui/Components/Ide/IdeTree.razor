@@ -126,35 +126,27 @@
             return Task.CompletedTask;
         }
 
-        if (entry.Type == CodeTreeEntryType.Member && IsMethodEntry(entry))
+        var lineSpan = entry.Location?.LineSpan;
+        var highlightStart = lineSpan?.StartLine;
+        var highlightEnd = lineSpan?.EndLine;
+        var highlightLine = lineSpan?.StartLine;
+
+        if (entry.Type == CodeTreeEntryType.File)
         {
-            Dispatcher.Dispatch(new OpenFileTabByPathAction(
-                SelectedSolutionId,
-                CurrentConfigId.Value,
-                entry.RepositoryPath,
-                entry.Location?.LineSpan.StartLine,
-                entry.Location?.LineSpan.StartLine,
-                entry.Location?.LineSpan.EndLine));
+            Dispatcher.Dispatch(new OpenFileTabAction(SelectedSolutionId, CurrentConfigId.Value, entry));
             return Task.CompletedTask;
         }
 
-        if (entry.Type != CodeTreeEntryType.File)
-        {
-            return Task.CompletedTask;
-        }
+        // For types and members, open the owning file and highlight the full span.
+        Dispatcher.Dispatch(new OpenFileTabByPathAction(
+            SelectedSolutionId,
+            CurrentConfigId.Value,
+            entry.RepositoryPath,
+            highlightLine,
+            highlightStart,
+            highlightEnd));
 
-        Dispatcher.Dispatch(new OpenFileTabAction(SelectedSolutionId, CurrentConfigId.Value, entry));
         return Task.CompletedTask;
-    }
-
-    private static bool IsMethodEntry(CodeTreeEntryModel entry)
-    {
-        return entry.RealType?.ToLowerInvariant() switch
-        {
-            "method" => true,
-            "constructor" => true,
-            _ => false
-        };
     }
 
     private static void OnItemsLoaded(

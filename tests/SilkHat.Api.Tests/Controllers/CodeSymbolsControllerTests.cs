@@ -4,6 +4,7 @@ using Moq;
 using SilkHat.Api.Controllers;
 using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Graph;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
 
@@ -16,7 +17,8 @@ public sealed class CodeSymbolsControllerTests
     {
         var store = new Mock<ICodeWorkspaceStore>();
         store.Setup(s => s.Get(It.IsAny<Guid>())).Returns((CodeRepositoryWorkspace?)null);
-        var controller = new CodeSymbolsController(store.Object)
+        var graph = new Mock<IGraphQueryService>();
+        var controller = new CodeSymbolsController(store.Object, graph.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };
@@ -37,7 +39,11 @@ public sealed class CodeSymbolsControllerTests
         var workspace = CodeWorkspaceFactory.CreateWorkspace();
         var store = new Mock<ICodeWorkspaceStore>();
         store.Setup(s => s.Get(It.IsAny<Guid>())).Returns(workspace);
-        var controller = new CodeSymbolsController(store.Object)
+        var graph = new Mock<IGraphQueryService>();
+        GraphNodeDto? unused = null;
+        graph.Setup(g => g.TryGetNodeByKey(It.IsAny<string>(), It.IsAny<string>(), out unused))
+            .Returns(false);
+        var controller = new CodeSymbolsController(store.Object, graph.Object)
         {
             ControllerContext = ControllerTestFactory.CreateContext()
         };

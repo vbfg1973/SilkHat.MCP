@@ -1,5 +1,6 @@
 using Moq;
 using SilkHat.Code.Analysis.Abstractions;
+using SilkHat.Code.Analysis.Graph;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Analysis.Services;
 using SilkHat.Code.Core.Dtos;
@@ -11,8 +12,9 @@ public sealed class CodeTreeServiceTests
     [Fact]
     public async Task GetTree_ReturnsProjects_WhenParentIdIsNull()
     {
-        var service = new CodeTreeService(Mock.Of<ICodeSymbolOutlineService>());
-        var solution = BuildSolutionWorkspace();
+        var provider = BuildGraphProvider();
+        var service = new CodeTreeService(provider);
+        var solution = BuildSolutionWorkspace(provider);
         var workspace = new CodeRepositoryWorkspace("/repo", new Dictionary<string, CodeSolutionWorkspace>
         {
             [solution.SolutionId] = solution
@@ -28,8 +30,9 @@ public sealed class CodeTreeServiceTests
     [Fact]
     public async Task GetTree_ReturnsDirectChildren_WhenParentIdProvided()
     {
-        var service = new CodeTreeService(Mock.Of<ICodeSymbolOutlineService>());
-        var solution = BuildSolutionWorkspace();
+        var provider = BuildGraphProvider();
+        var service = new CodeTreeService(provider);
+        var solution = BuildSolutionWorkspace(provider);
         var workspace = new CodeRepositoryWorkspace("/repo", new Dictionary<string, CodeSolutionWorkspace>
         {
             [solution.SolutionId] = solution
@@ -44,19 +47,25 @@ public sealed class CodeTreeServiceTests
         Assert.Contains(results, entry => entry.Name == "Program.cs" && entry.Type == CodeTreeEntryType.File);
     }
 
-    private static CodeSolutionWorkspace BuildSolutionWorkspace()
+    private static IGraphStoreProvider BuildGraphProvider()
+    {
+        return new GraphStoreProvider();
+    }
+
+    private static CodeSolutionWorkspace BuildSolutionWorkspace(IGraphStoreProvider provider)
     {
         var entries = new List<CodeTreeEntryDto>
         {
             new("./Repo", "Repo", "Repo", CodeTreeEntryType.Project, "repo", "Repo", null, null, null, null, null, null),
             new("./Repo/src", "Repo/src", "src", CodeTreeEntryType.Directory, "repo", "Repo", null, null, null, null, null, null),
+            new("./Repo/src/Nested", "Repo/src/Nested", "Nested", CodeTreeEntryType.Directory, "repo", "Repo", null, null, null, null, null, null),
             new("./Repo/src/Program.cs", "Repo/src/Program.cs", "Program.cs", CodeTreeEntryType.File, "repo", "Repo", null, null, null, null, null, null),
             new("./Repo/Program.cs", "Repo/Program.cs", "Program.cs", CodeTreeEntryType.File, "repo", "Repo", null, null, null, null, null, null),
             new("./Repo/src/Nested/Thing.cs", "Repo/src/Nested/Thing.cs", "Thing.cs", CodeTreeEntryType.File, "repo", "Repo", null, null, null, null, null, null)
         };
         var treeMap = BuildTreeChildrenMap(entries);
 
-        return new CodeSolutionWorkspace(
+        var solution = new CodeSolutionWorkspace(
             "solution-1",
             "Repo",
             "/repo/Repo.sln",
@@ -69,6 +78,9 @@ public sealed class CodeTreeServiceTests
             new Dictionary<string, NamedTypeDto>(),
             new Dictionary<string, NamedTypeDto>(),
             new Dictionary<string, Microsoft.CodeAnalysis.Compilation>());
+
+        SeedGraph(provider, solution, entries, treeMap);
+        return solution;
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyList<CodeTreeEntryDto>> BuildTreeChildrenMap(
@@ -99,5 +111,55 @@ public sealed class CodeTreeServiceTests
                 .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList(),
             StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static void SeedGraph(
+        IGraphStoreProvider provider,
+        CodeSolutionWorkspace solution,
+        IReadOnlyList<CodeTreeEntryDto> entries,
+        IReadOnlyDictionary<string, IReadOnlyList<CodeTreeEntryDto>> children)
+    {
+        var store = provider.GetOrAdd(solution.SolutionId);
+        var solutionNode = new GraphNodeDto(Guid.NewGuid(), GraphNodeKind.Solution, solution.SolutionId, solution.SolutionName);
+        store.AddNode(solutionNode);
+
+        var nodeByPath = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase)
+        {
+            [solution.SolutionId] = solutionNode.Id
+        };
+
+        foreach (var entry in entries)
+        {
+            var kind = entry.Type switch
+            {
+                CodeTreeEntryType.Project => GraphNodeKind.Project,
+                CodeTreeEntryType.Directory => GraphNodeKind.Folder,
+                CodeTreeEntryType.File => GraphNodeKind.File,
+                _ => GraphNodeKind.File
+            };
+            var attrs = new Dictionary<string, string>
+            {
+                ["DisplayPath"] = entry.DisplayPath
+            };
+            if (entry.Type is CodeTreeEntryType.File or CodeTreeEntryType.Directory)
+            {
+                attrs["RepositoryPath"] = entry.RepositoryPath;
+            }
+            var nodeId = Guid.NewGuid();
+            store.AddNode(new GraphNodeDto(nodeId, kind, entry.DisplayPath, entry.Name, attrs));
+            nodeByPath[entry.DisplayPath] = nodeId;
+        }
+
+        foreach (var (parent, kids) in children)
+        {
+            var parentId = nodeByPath.TryGetValue(parent, out var id) ? id : solutionNode.Id;
+            foreach (var child in kids)
+            {
+                if (nodeByPath.TryGetValue(child.DisplayPath, out var childId))
+                {
+                    store.AddEdge(parentId, childId, EdgeType.Contains);
+                }
+            }
+        }
     }
 }
