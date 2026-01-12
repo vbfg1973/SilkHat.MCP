@@ -4,69 +4,67 @@ using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
 
-namespace SilkHat.Api.Controllers;
-
-[Route("api/repositories/{id:guid}/code/solutions/{solutionId}/files/symbols")]
-public sealed class CodeFileSymbolsController : ApiControllerBase
+namespace SilkHat.Api.Controllers
 {
-    private readonly ICodeWorkspaceStore _store;
-    private readonly ICodeSymbolOutlineService _symbols;
-
-    public CodeFileSymbolsController(ICodeWorkspaceStore store, ICodeSymbolOutlineService symbols)
+    [Route("api/repositories/{id:guid}/code/solutions/{solutionId}/files/symbols")]
+    public sealed class CodeFileSymbolsController : ApiControllerBase
     {
-        _store = store;
-        _symbols = symbols;
-    }
+        private readonly ICodeWorkspaceStore _store;
+        private readonly ICodeSymbolOutlineService _symbols;
 
-    [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<SymbolOutlineNodeDto>>> GetFileSymbols(
-        Guid id,
-        string solutionId,
-        [FromQuery] CodeFileQuery query,
-        CancellationToken cancellationToken)
-    {
-        if (!ModelState.IsValid)
+        public CodeFileSymbolsController(ICodeWorkspaceStore store, ICodeSymbolOutlineService symbols)
         {
-            var errors = ModelState.Values
-                .SelectMany(value => value.Errors)
-                .Select(error => error.ErrorMessage)
-                .Where(message => !string.IsNullOrWhiteSpace(message))
-                .ToList();
-            var message = errors.Count > 0 ? string.Join(" ", errors) : "Validation failed.";
-            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", message, "Validation");
+            _store = store;
+            _symbols = symbols;
         }
 
-        var workspace = _store.Get(id);
-        if (workspace is null)
+        [HttpGet]
+        public async Task<ActionResult<IReadOnlyList<SymbolOutlineNodeDto>>> GetFileSymbols(
+            Guid id,
+            string solutionId,
+            [FromQuery] CodeFileQuery query,
+            CancellationToken cancellationToken)
         {
-            return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository is not loaded.", "Code");
-        }
+            if (!ModelState.IsValid)
+            {
+                var errors = ModelState.Values
+                    .SelectMany(value => value.Errors)
+                    .Select(error => error.ErrorMessage)
+                    .Where(message => !string.IsNullOrWhiteSpace(message))
+                    .ToList();
+                var message = errors.Count > 0 ? string.Join(" ", errors) : "Validation failed.";
+                return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", message, "Validation");
+            }
 
-        var solution = workspace.TryGetSolution(solutionId);
-        if (solution is null)
-        {
-            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
-        }
+            var workspace = _store.Get(id);
+            if (workspace is null)
+                return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded",
+                    "Repository is not loaded.", "Code");
 
-        var result = await _symbols.GetFileSymbolsAsync(workspace, solution, query.Path!, cancellationToken);
-        return result.Status switch
-        {
-            CodeFileSymbolsStatus.Success => Ok(result.Symbols ?? Array.Empty<SymbolOutlineNodeDto>()),
-            CodeFileSymbolsStatus.NotFound => ProblemWithCategory(
-                StatusCodes.Status404NotFound,
-                "Not Found",
-                result.Message ?? "File not found.",
-                "Code"),
-            CodeFileSymbolsStatus.InvalidPath => ProblemWithCategory(
-                StatusCodes.Status400BadRequest,
-                "Validation Failed",
-                result.Message ?? "Invalid file path.",
-                "Validation"),
-            _ => ProblemWithCategory(
-                StatusCodes.Status500InternalServerError,
-                "Internal Error",
-                "Unable to read symbols.",
-                "Code")
-        };
+            var solution = workspace.TryGetSolution(solutionId);
+            if (solution is null)
+                return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+
+            var result = await _symbols.GetFileSymbolsAsync(workspace, solution, query.Path!, cancellationToken);
+            return result.Status switch
+            {
+                CodeFileSymbolsStatus.Success => Ok(result.Symbols ?? Array.Empty<SymbolOutlineNodeDto>()),
+                CodeFileSymbolsStatus.NotFound => ProblemWithCategory(
+                    StatusCodes.Status404NotFound,
+                    "Not Found",
+                    result.Message ?? "File not found.",
+                    "Code"),
+                CodeFileSymbolsStatus.InvalidPath => ProblemWithCategory(
+                    StatusCodes.Status400BadRequest,
+                    "Validation Failed",
+                    result.Message ?? "Invalid file path.",
+                    "Validation"),
+                _ => ProblemWithCategory(
+                    StatusCodes.Status500InternalServerError,
+                    "Internal Error",
+                    "Unable to read symbols.",
+                    "Code")
+            };
+        }
     }
 }

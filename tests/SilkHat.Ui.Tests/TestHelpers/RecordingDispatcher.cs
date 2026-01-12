@@ -1,18 +1,19 @@
 using Fluxor;
 
-namespace SilkHat.Ui.Tests.TestHelpers;
-
-public sealed class RecordingDispatcher : IDispatcher
+namespace SilkHat.Ui.Tests.TestHelpers
 {
-    private readonly List<object> _actions = new();
-
-    public IReadOnlyList<object> Actions => _actions;
-
-    public event EventHandler<ActionDispatchedEventArgs>? ActionDispatched;
-
-    public void Dispatch(object action)
+    public sealed class RecordingDispatcher : IDispatcher
     {
-        _actions.Add(action);
-        ActionDispatched?.Invoke(this, new ActionDispatchedEventArgs(action));
+        private readonly List<object> _actions = new();
+
+        public IReadOnlyList<object> Actions => _actions;
+
+        public event EventHandler<ActionDispatchedEventArgs>? ActionDispatched;
+
+        public void Dispatch(object action)
+        {
+            _actions.Add(action);
+            ActionDispatched?.Invoke(this, new ActionDispatchedEventArgs(action));
+        }
     }
 }

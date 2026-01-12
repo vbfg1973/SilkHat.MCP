@@ -1,6 +1,6 @@
-﻿namespace SilkHat.Infrastructure;
-
-public class Class1
+﻿namespace SilkHat.Infrastructure
 {
-
+    public class Class1
+    {
+    }
 }

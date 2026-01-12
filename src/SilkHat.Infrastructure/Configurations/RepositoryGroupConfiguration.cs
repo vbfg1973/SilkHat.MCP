@@ -2,13 +2,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SilkHat.Infrastructure.Entities;
 
-namespace SilkHat.Infrastructure.Configurations;
-
-public sealed class RepositoryGroupConfiguration : IEntityTypeConfiguration<RepositoryGroup>
+namespace SilkHat.Infrastructure.Configurations
 {
-    public void Configure(EntityTypeBuilder<RepositoryGroup> builder)
+    public sealed class RepositoryGroupConfiguration : IEntityTypeConfiguration<RepositoryGroup>
     {
-        builder.HasKey(group => group.Id);
-        builder.Property(group => group.Name).IsRequired();
+        public void Configure(EntityTypeBuilder<RepositoryGroup> builder)
+        {
+            builder.HasKey(group => group.Id);
+            builder.Property(group => group.Name).IsRequired();
+        }
     }
 }

@@ -1,62 +1,63 @@
 using SilkHat.Analysis.Services;
 
-namespace SilkHat.Tests.Services;
-
-public sealed class LoadedRepositoryStoreTests
+namespace SilkHat.Tests.Services
 {
-    [Fact]
-    public void SetLoaded_ThenGet_ReturnsRepository()
+    public sealed class LoadedRepositoryStoreTests
     {
-        var store = new LoadedRepositoryStore();
-        var id = Guid.NewGuid();
+        [Fact]
+        public void SetLoaded_ThenGet_ReturnsRepository()
+        {
+            var store = new LoadedRepositoryStore();
+            var id = Guid.NewGuid();
 
-        store.SetLoaded(id, "/repo");
+            store.SetLoaded(id, "/repo");
 
-        var loaded = store.Get(id);
-        Assert.NotNull(loaded);
-        Assert.Equal(id, loaded!.ConfigId);
-    }
+            var loaded = store.Get(id);
+            Assert.NotNull(loaded);
+            Assert.Equal(id, loaded!.ConfigId);
+        }
 
-    [Fact]
-    public void Unload_RemovesRepository()
-    {
-        var store = new LoadedRepositoryStore();
-        var id = Guid.NewGuid();
+        [Fact]
+        public void Unload_RemovesRepository()
+        {
+            var store = new LoadedRepositoryStore();
+            var id = Guid.NewGuid();
 
-        store.SetLoaded(id, "/repo");
+            store.SetLoaded(id, "/repo");
 
-        var removed = store.Unload(id);
+            var removed = store.Unload(id);
 
-        Assert.True(removed);
-        Assert.Null(store.Get(id));
-    }
+            Assert.True(removed);
+            Assert.Null(store.Get(id));
+        }
 
-    [Fact]
-    public void GetLock_ReturnsSameSemaphorePerConfig()
-    {
-        var store = new LoadedRepositoryStore();
-        var id = Guid.NewGuid();
+        [Fact]
+        public void GetLock_ReturnsSameSemaphorePerConfig()
+        {
+            var store = new LoadedRepositoryStore();
+            var id = Guid.NewGuid();
 
-        var first = store.GetLock(id);
-        var second = store.GetLock(id);
+            var first = store.GetLock(id);
+            var second = store.GetLock(id);
 
-        Assert.Same(first, second);
-    }
+            Assert.Same(first, second);
+        }
 
-    [Fact]
-    public void GetAll_ReturnsLoadedRepositories()
-    {
-        var store = new LoadedRepositoryStore();
-        var first = Guid.NewGuid();
-        var second = Guid.NewGuid();
+        [Fact]
+        public void GetAll_ReturnsLoadedRepositories()
+        {
+            var store = new LoadedRepositoryStore();
+            var first = Guid.NewGuid();
+            var second = Guid.NewGuid();
 
-        store.SetLoaded(first, "/repo/one");
-        store.SetLoaded(second, "/repo/two");
+            store.SetLoaded(first, "/repo/one");
+            store.SetLoaded(second, "/repo/two");
 
-        var loaded = store.GetAll();
+            var loaded = store.GetAll();
 
-        Assert.Equal(2, loaded.Count);
-        Assert.Contains(loaded, repo => repo.ConfigId == first);
-        Assert.Contains(loaded, repo => repo.ConfigId == second);
+            Assert.Equal(2, loaded.Count);
+            Assert.Contains(loaded, repo => repo.ConfigId == first);
+            Assert.Contains(loaded, repo => repo.ConfigId == second);
+        }
     }
 }

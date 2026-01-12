@@ -1,220 +1,239 @@
 using Fluxor;
 using SilkHat.Ui.State.Ide.Actions;
 
-namespace SilkHat.Ui.State.Ide.Reducers;
-
-public static class IdeCallStackReducers
+namespace SilkHat.Ui.State.Ide.Reducers
 {
-    [ReducerMethod]
-    public static IdeCallStackState ReduceOpen(IdeCallStackState state, OpenCallStackPopupAction action)
+    public static class IdeCallStackReducers
     {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
-
-        views[action.SolutionId] = view with
+        [ReducerMethod]
+        public static IdeCallStackState ReduceOpen(IdeCallStackState state, OpenCallStackPopupAction action)
         {
-            IsOpen = true,
-            Error = null,
-            MermaidError = null,
-            DocumentationId = action.DocumentationId,
-            SymbolKey = action.SymbolKey
-        };
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-        return state with { Views = views };
-    }
+            views[action.SolutionId] = view with
+            {
+                IsOpen = true,
+                Error = null,
+                MermaidError = null,
+                DocumentationId = action.DocumentationId,
+                SymbolKey = action.SymbolKey
+            };
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceClose(IdeCallStackState state, CloseCallStackPopupAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with
+        [ReducerMethod]
+        public static IdeCallStackState ReduceClose(IdeCallStackState state, CloseCallStackPopupAction action)
         {
-            IsOpen = false,
-            IsLoading = false,
-            IsMermaidLoading = false,
-            Error = null,
-            MermaidError = null
-        };
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-        return state with { Views = views };
-    }
+            views[action.SolutionId] = view with
+            {
+                IsOpen = false,
+                IsLoading = false,
+                IsMermaidLoading = false,
+                Error = null,
+                MermaidError = null
+            };
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceLoad(IdeCallStackState state, LoadCallStackAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with
+        [ReducerMethod]
+        public static IdeCallStackState ReduceLoad(IdeCallStackState state, LoadCallStackAction action)
         {
-            IsLoading = true,
-            Error = null,
-            DocumentationId = action.DocumentationId,
-            SymbolKey = action.SymbolKey,
-            IncludeExternalCalls = action.IncludeExternalCalls
-        };
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-        return state with { Views = views };
-    }
+            views[action.SolutionId] = view with
+            {
+                IsLoading = true,
+                Error = null,
+                DocumentationId = action.DocumentationId,
+                SymbolKey = action.SymbolKey,
+                IncludeExternalCalls = action.IncludeExternalCalls
+            };
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceLoadSuccess(IdeCallStackState state, LoadCallStackSuccessAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with
+        [ReducerMethod]
+        public static IdeCallStackState ReduceLoadSuccess(IdeCallStackState state, LoadCallStackSuccessAction action)
         {
-            IsLoading = false,
-            Error = null,
-            DocumentationId = action.DocumentationId,
-            SymbolKey = action.SymbolKey,
-            Nodes = action.Nodes
-        };
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-        return state with { Views = views };
-    }
+            views[action.SolutionId] = view with
+            {
+                IsLoading = false,
+                Error = null,
+                DocumentationId = action.DocumentationId,
+                SymbolKey = action.SymbolKey,
+                Nodes = action.Nodes
+            };
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceLoadFailure(IdeCallStackState state, LoadCallStackFailureAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with
+        [ReducerMethod]
+        public static IdeCallStackState ReduceLoadFailure(IdeCallStackState state, LoadCallStackFailureAction action)
         {
-            IsLoading = false,
-            Error = action.Error
-        };
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-        return state with { Views = views };
-    }
+            views[action.SolutionId] = view with
+            {
+                IsLoading = false,
+                Error = action.Error
+            };
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceMermaidLoad(IdeCallStackState state, LoadCallStackMermaidAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with
+        [ReducerMethod]
+        public static IdeCallStackState ReduceMermaidLoad(IdeCallStackState state, LoadCallStackMermaidAction action)
         {
-            IsMermaidLoading = true,
-            MermaidError = null,
-            DocumentationId = action.DocumentationId,
-            SymbolKey = action.SymbolKey,
-            IncludeExternalCalls = action.IncludeExternalCalls
-        };
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-        return state with { Views = views };
-    }
+            views[action.SolutionId] = view with
+            {
+                IsMermaidLoading = true,
+                MermaidError = null,
+                DocumentationId = action.DocumentationId,
+                SymbolKey = action.SymbolKey,
+                IncludeExternalCalls = action.IncludeExternalCalls
+            };
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceMermaidSuccess(IdeCallStackState state, LoadCallStackMermaidSuccessAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with
+        [ReducerMethod]
+        public static IdeCallStackState ReduceMermaidSuccess(IdeCallStackState state,
+            LoadCallStackMermaidSuccessAction action)
         {
-            IsMermaidLoading = false,
-            MermaidError = null,
-            DocumentationId = action.DocumentationId,
-            MermaidDiagram = action.Diagram
-        };
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-        return state with { Views = views };
-    }
+            views[action.SolutionId] = view with
+            {
+                IsMermaidLoading = false,
+                MermaidError = null,
+                DocumentationId = action.DocumentationId,
+                MermaidDiagram = action.Diagram
+            };
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceMermaidFailure(IdeCallStackState state, LoadCallStackMermaidFailureAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with
+        [ReducerMethod]
+        public static IdeCallStackState ReduceMermaidFailure(IdeCallStackState state,
+            LoadCallStackMermaidFailureAction action)
         {
-            IsMermaidLoading = false,
-            MermaidError = action.Error
-        };
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-        return state with { Views = views };
-    }
+            views[action.SolutionId] = view with
+            {
+                IsMermaidLoading = false,
+                MermaidError = action.Error
+            };
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceSaveDecisionSuccess(IdeCallStackState state, SaveCallStackDecisionSuccessAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with { Error = null };
-        return state with { Views = views };
-    }
+        [ReducerMethod]
+        public static IdeCallStackState ReduceSaveDecisionSuccess(IdeCallStackState state,
+            SaveCallStackDecisionSuccessAction action)
+        {
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceSaveDecisionFailure(IdeCallStackState state, SaveCallStackDecisionFailureAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            views[action.SolutionId] = view with { Error = null };
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with { Error = action.Error };
-        return state with { Views = views };
-    }
+        [ReducerMethod]
+        public static IdeCallStackState ReduceSaveDecisionFailure(IdeCallStackState state,
+            SaveCallStackDecisionFailureAction action)
+        {
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceSelectNode(IdeCallStackState state, SelectCallStackNodeAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            views[action.SolutionId] = view with { Error = action.Error };
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with { SelectedNodeId = action.NodeId };
-        return state with { Views = views };
-    }
+        [ReducerMethod]
+        public static IdeCallStackState ReduceSelectNode(IdeCallStackState state, SelectCallStackNodeAction action)
+        {
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceShading(IdeCallStackState state, SetCallStackShadingModeAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            views[action.SolutionId] = view with { SelectedNodeId = action.NodeId };
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with { ShadingMode = action.Mode };
-        return state with { Views = views };
-    }
+        [ReducerMethod]
+        public static IdeCallStackState ReduceShading(IdeCallStackState state, SetCallStackShadingModeAction action)
+        {
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
 
-    [ReducerMethod]
-    public static IdeCallStackState ReduceIncludeExternal(IdeCallStackState state, SetCallStackIncludeExternalAction action)
-    {
-        var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.OrdinalIgnoreCase);
-        var view = views.TryGetValue(action.SolutionId, out var existing)
-            ? existing
-            : IdeCallStackViewState.Empty;
+            views[action.SolutionId] = view with { ShadingMode = action.Mode };
+            return state with { Views = views };
+        }
 
-        views[action.SolutionId] = view with { IncludeExternalCalls = action.IncludeExternalCalls };
-        return state with { Views = views };
+        [ReducerMethod]
+        public static IdeCallStackState ReduceIncludeExternal(IdeCallStackState state,
+            SetCallStackIncludeExternalAction action)
+        {
+            var views = state.Views.ToDictionary(entry => entry.Key, entry => entry.Value,
+                StringComparer.OrdinalIgnoreCase);
+            var view = views.TryGetValue(action.SolutionId, out var existing)
+                ? existing
+                : IdeCallStackViewState.Empty;
+
+            views[action.SolutionId] = view with { IncludeExternalCalls = action.IncludeExternalCalls };
+            return state with { Views = views };
+        }
     }
 }

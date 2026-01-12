@@ -1,29 +1,19 @@
-using System;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Emit;
 
-namespace Microsoft.CodeAnalysis;
-
-public static class CompilationExtensions
+namespace Microsoft.CodeAnalysis
 {
-    public static Task<EmitResult> EmitAsync(
-        this Compilation compilation,
-        Stream peStream,
-        CancellationToken cancellationToken = default)
+    public static class CompilationExtensions
     {
-        if (compilation is null)
+        public static Task<EmitResult> EmitAsync(
+            this Compilation compilation,
+            Stream peStream,
+            CancellationToken cancellationToken = default)
         {
-            throw new ArgumentNullException(nameof(compilation));
-        }
+            if (compilation is null) throw new ArgumentNullException(nameof(compilation));
 
-        if (peStream is null)
-        {
-            throw new ArgumentNullException(nameof(peStream));
-        }
+            if (peStream is null) throw new ArgumentNullException(nameof(peStream));
 
-        return Task.FromResult(compilation.Emit(peStream, cancellationToken: cancellationToken));
+            return Task.FromResult(compilation.Emit(peStream, cancellationToken: cancellationToken));
+        }
     }
 }

@@ -1,6 +1,6 @@
-﻿namespace SilkHat.Code.Core;
-
-public class Class1
+﻿namespace SilkHat.Code.Core
 {
-
+    public class Class1
+    {
+    }
 }

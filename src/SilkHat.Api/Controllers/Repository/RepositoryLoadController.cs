@@ -4,147 +4,141 @@ using Microsoft.EntityFrameworkCore;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Commands;
 using SilkHat.Analysis.Models;
+using SilkHat.Api.Services;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Analysis.Services;
-using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Core.Dtos;
+using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Infrastructure;
 using SilkHat.Infrastructure.Entities;
-using System.Linq;
-using SilkHat.Api.Services;
 
-namespace SilkHat.Api.Controllers;
-
-[Route("api/repositories")]
-public sealed class RepositoryLoadController : ApiControllerBase
+namespace SilkHat.Api.Controllers
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    private readonly SilkHatDbContext _dbContext;
-    private readonly ILoadedRepositoryStore _store;
-    private readonly ICodeWorkspaceStore _codeStore;
-    private readonly IGitRepositoryCacheStore _gitCacheStore;
-    private readonly ICodeTreeMetricsPrecomputeService _metricsPrecomputeService;
-    private readonly IRepoCommandProcessor _processor;
-    private readonly ICodeWorkspaceLoader _workspaceLoader;
-    private readonly IApiCache _cache;
-
-    public RepositoryLoadController(
-        SilkHatDbContext dbContext,
-        ILoadedRepositoryStore store,
-        ICodeWorkspaceStore codeStore,
-        IGitRepositoryCacheStore gitCacheStore,
-        ICodeTreeMetricsPrecomputeService metricsPrecomputeService,
-        IRepoCommandProcessor processor,
-        ICodeWorkspaceLoader workspaceLoader,
-        IApiCache cache)
+    [Route("api/repositories")]
+    public sealed class RepositoryLoadController : ApiControllerBase
     {
-        _dbContext = dbContext;
-        _store = store;
-        _codeStore = codeStore;
-        _gitCacheStore = gitCacheStore;
-        _metricsPrecomputeService = metricsPrecomputeService;
-        _processor = processor;
-        _workspaceLoader = workspaceLoader;
-        _cache = cache;
-    }
+        private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+        private readonly IApiCache _cache;
+        private readonly ICodeWorkspaceStore _codeStore;
 
-    [HttpPost("{id:guid}/load")]
-    [Produces("application/x-ndjson")]
-    public async Task<IActionResult> Load(Guid id, CancellationToken cancellationToken)
-    {
-        _cache.InvalidateAll();
-        _metricsPrecomputeService.Clear(id);
-        var config = await _dbContext.RepositoryConfigs
-            .Include(item => item.Solutions)
-            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        private readonly SilkHatDbContext _dbContext;
+        private readonly IGitRepositoryCacheStore _gitCacheStore;
+        private readonly ICodeTreeMetricsPrecomputeService _metricsPrecomputeService;
+        private readonly IRepoCommandProcessor _processor;
+        private readonly ILoadedRepositoryStore _store;
+        private readonly ICodeWorkspaceLoader _workspaceLoader;
 
-        if (config is null)
+        public RepositoryLoadController(
+            SilkHatDbContext dbContext,
+            ILoadedRepositoryStore store,
+            ICodeWorkspaceStore codeStore,
+            IGitRepositoryCacheStore gitCacheStore,
+            ICodeTreeMetricsPrecomputeService metricsPrecomputeService,
+            IRepoCommandProcessor processor,
+            ICodeWorkspaceLoader workspaceLoader,
+            IApiCache cache)
         {
-            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Repository config not found.", "NotFound");
+            _dbContext = dbContext;
+            _store = store;
+            _codeStore = codeStore;
+            _gitCacheStore = gitCacheStore;
+            _metricsPrecomputeService = metricsPrecomputeService;
+            _processor = processor;
+            _workspaceLoader = workspaceLoader;
+            _cache = cache;
         }
 
-        var resolver = new SolutionIdentityResolver();
-        var solutionReferences = BuildSolutionReferences(config, resolver, out var updatedSolutions);
-        if (solutionReferences.Count == 0)
+        [HttpPost("{id:guid}/load")]
+        [Produces("application/x-ndjson")]
+        public async Task<IActionResult> Load(Guid id, CancellationToken cancellationToken)
         {
-            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed",
-                "No enabled solution files configured for this repository.", "Validation");
-        }
+            _cache.InvalidateAll();
+            _metricsPrecomputeService.Clear(id);
+            var config = await _dbContext.RepositoryConfigs
+                .Include(item => item.Solutions)
+                .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
 
-        if (updatedSolutions)
-        {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
+            if (config is null)
+                return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Repository config not found.",
+                    "NotFound");
 
-        Response.StatusCode = StatusCodes.Status200OK;
-        Response.ContentType = "application/x-ndjson";
+            var resolver = new SolutionIdentityResolver();
+            var solutionReferences = BuildSolutionReferences(config, resolver, out var updatedSolutions);
+            if (solutionReferences.Count == 0)
+                return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed",
+                    "No enabled solution files configured for this repository.", "Validation");
 
-        var context = new RepoCommandContext(config.Id, config.RootPath, solutionReferences, _store, _codeStore, _workspaceLoader);
-        var command = new LoadRepositoryCommand();
+            if (updatedSolutions) await _dbContext.SaveChangesAsync(cancellationToken);
 
-        await foreach (var evt in _processor.ExecuteAsync(command, context, cancellationToken))
-        {
-            var json = JsonSerializer.Serialize(evt, JsonOptions);
-            await Response.WriteAsync(json + "\n", cancellationToken);
-            await Response.Body.FlushAsync(cancellationToken);
-        }
+            Response.StatusCode = StatusCodes.Status200OK;
+            Response.ContentType = "application/x-ndjson";
 
-        _ = _metricsPrecomputeService.StartPrecomputeAsync(id, CancellationToken.None);
+            var context = new RepoCommandContext(config.Id, config.RootPath, solutionReferences, _store, _codeStore,
+                _workspaceLoader);
+            var command = new LoadRepositoryCommand();
 
-        return new EmptyResult();
-    }
-
-    [HttpPost("{id:guid}/unload")]
-    public async Task<ActionResult<RepoEventDto>> Unload(Guid id, CancellationToken cancellationToken)
-    {
-        var exists = await _dbContext.RepositoryConfigs
-            .AsNoTracking()
-            .AnyAsync(item => item.Id == id, cancellationToken);
-
-        if (!exists)
-        {
-            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Repository config not found.", "NotFound");
-        }
-
-        var unloaded = _store.Unload(id);
-        _codeStore.Remove(id);
-        _gitCacheStore.Remove(id);
-        _metricsPrecomputeService.Clear(id);
-        var message = unloaded ? "Repository unloaded." : "Repository was not loaded.";
-
-        return Ok(new RepoEventDto(
-            RepoEventKind.Completed,
-            "unload",
-            message,
-            100,
-            null,
-            null,
-            new RepoEventSummaryDto(message)));
-    }
-
-    private static List<SolutionReference> BuildSolutionReferences(
-        RepositoryConfig config,
-        SolutionIdentityResolver resolver,
-        out bool updatedSolutions)
-    {
-        updatedSolutions = false;
-        var results = new List<SolutionReference>();
-
-        foreach (var solution in config.Solutions.Where(item => item.IsEnabled))
-        {
-            var solutionId = solution.SolutionId;
-            if (string.IsNullOrWhiteSpace(solutionId))
+            await foreach (var evt in _processor.ExecuteAsync(command, context, cancellationToken))
             {
-                solutionId = resolver.ResolveFromRelativePath(config.RootPath, solution.RelativePath);
-                solution.SolutionId = solutionId;
-                updatedSolutions = true;
+                var json = JsonSerializer.Serialize(evt, JsonOptions);
+                await Response.WriteAsync(json + "\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
             }
 
-            results.Add(new SolutionReference(solution.RelativePath, solutionId));
+            _ = _metricsPrecomputeService.StartPrecomputeAsync(id, CancellationToken.None);
+
+            return new EmptyResult();
         }
 
-        return results;
+        [HttpPost("{id:guid}/unload")]
+        public async Task<ActionResult<RepoEventDto>> Unload(Guid id, CancellationToken cancellationToken)
+        {
+            var exists = await _dbContext.RepositoryConfigs
+                .AsNoTracking()
+                .AnyAsync(item => item.Id == id, cancellationToken);
+
+            if (!exists)
+                return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Repository config not found.",
+                    "NotFound");
+
+            var unloaded = _store.Unload(id);
+            _codeStore.Remove(id);
+            _gitCacheStore.Remove(id);
+            _metricsPrecomputeService.Clear(id);
+            var message = unloaded ? "Repository unloaded." : "Repository was not loaded.";
+
+            return Ok(new RepoEventDto(
+                RepoEventKind.Completed,
+                "unload",
+                message,
+                100,
+                null,
+                null,
+                new RepoEventSummaryDto(message)));
+        }
+
+        private static List<SolutionReference> BuildSolutionReferences(
+            RepositoryConfig config,
+            SolutionIdentityResolver resolver,
+            out bool updatedSolutions)
+        {
+            updatedSolutions = false;
+            var results = new List<SolutionReference>();
+
+            foreach (var solution in config.Solutions.Where(item => item.IsEnabled))
+            {
+                var solutionId = solution.SolutionId;
+                if (string.IsNullOrWhiteSpace(solutionId))
+                {
+                    solutionId = resolver.ResolveFromRelativePath(config.RootPath, solution.RelativePath);
+                    solution.SolutionId = solutionId;
+                    updatedSolutions = true;
+                }
+
+                results.Add(new SolutionReference(solution.RelativePath, solutionId));
+            }
+
+            return results;
+        }
     }
 }

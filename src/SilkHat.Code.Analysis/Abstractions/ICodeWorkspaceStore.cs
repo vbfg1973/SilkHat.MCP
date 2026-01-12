@@ -1,10 +1,11 @@
 using SilkHat.Code.Analysis.Models;
 
-namespace SilkHat.Code.Analysis.Abstractions;
-
-public interface ICodeWorkspaceStore
+namespace SilkHat.Code.Analysis.Abstractions
 {
-    CodeRepositoryWorkspace? Get(Guid configId);
-    void Set(Guid configId, CodeRepositoryWorkspace workspace);
-    bool Remove(Guid configId);
+    public interface ICodeWorkspaceStore
+    {
+        CodeRepositoryWorkspace? Get(Guid configId);
+        void Set(Guid configId, CodeRepositoryWorkspace workspace);
+        bool Remove(Guid configId);
+    }
 }

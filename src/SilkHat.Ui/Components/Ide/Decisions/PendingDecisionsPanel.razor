@@ -1,9 +1,5 @@
 @using System.Text.Json
-@using MudBlazor
-@using SilkHat.Ui.Models
 @using SilkHat.Ui.State.Ide
-@using SilkHat.Ui.State.Ide.Actions
-
 @inject IDispatcher Dispatcher
 
 <div class="d-flex flex-row justify-space-between align-center mb-2">
@@ -13,7 +9,7 @@
 
 @if (ViewState.IsLoadingPending)
 {
-    <MudProgressLinear Indeterminate="true" />
+    <MudProgressLinear Indeterminate="true"/>
 }
 else if (ViewState.Pending.Count == 0)
 {
@@ -39,8 +35,8 @@ else
                         if (payload is not null)
                         {
                             <ResolveInterfaceDecisionControl Decision="decision"
-                                                              Payload="payload"
-                                                              SolutionId="@SolutionId" />
+                                                             Payload="payload"
+                                                             SolutionId="@SolutionId"/>
                         }
                     }
                 </div>
@@ -72,4 +68,5 @@ else
             return null;
         }
     }
+
 }

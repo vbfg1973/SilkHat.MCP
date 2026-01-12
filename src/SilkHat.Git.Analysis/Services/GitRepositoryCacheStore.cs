@@ -2,19 +2,20 @@ using System.Collections.Concurrent;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Git.Analysis.Models;
 
-namespace SilkHat.Git.Analysis.Services;
-
-public sealed class GitRepositoryCacheStore : IGitRepositoryCacheStore
+namespace SilkHat.Git.Analysis.Services
 {
-    private readonly ConcurrentDictionary<Guid, GitRepositoryCache> _cache = new();
-
-    public GitRepositoryCache GetOrCreate(Guid configId)
+    public sealed class GitRepositoryCacheStore : IGitRepositoryCacheStore
     {
-        return _cache.GetOrAdd(configId, _ => new GitRepositoryCache());
-    }
+        private readonly ConcurrentDictionary<Guid, GitRepositoryCache> _cache = new();
 
-    public bool Remove(Guid configId)
-    {
-        return _cache.TryRemove(configId, out _);
+        public GitRepositoryCache GetOrCreate(Guid configId)
+        {
+            return _cache.GetOrAdd(configId, _ => new GitRepositoryCache());
+        }
+
+        public bool Remove(Guid configId)
+        {
+            return _cache.TryRemove(configId, out _);
+        }
     }
 }

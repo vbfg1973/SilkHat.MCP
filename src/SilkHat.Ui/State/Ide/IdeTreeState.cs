@@ -1,28 +1,29 @@
 using MudBlazor;
 using SilkHat.Ui.Models;
 
-namespace SilkHat.Ui.State.Ide;
-
-public sealed record IdeTreeState
+namespace SilkHat.Ui.State.Ide
 {
-    public IdeTreeState()
+    public sealed record IdeTreeState
     {
-        Trees = new Dictionary<string, IdeTreeViewState>(StringComparer.OrdinalIgnoreCase);
+        public IdeTreeState()
+        {
+            Trees = new Dictionary<string, IdeTreeViewState>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        public IdeTreeState(IDictionary<string, IdeTreeViewState> trees)
+        {
+            Trees = new Dictionary<string, IdeTreeViewState>(trees, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public IReadOnlyDictionary<string, IdeTreeViewState> Trees { get; init; }
     }
 
-    public IdeTreeState(IDictionary<string, IdeTreeViewState> trees)
+    public sealed record IdeTreeViewState(
+        bool IsLoading,
+        bool RootLoaded,
+        string? Error,
+        List<TreeItemData<CodeTreeEntryModel>> Items)
     {
-        Trees = new Dictionary<string, IdeTreeViewState>(trees, StringComparer.OrdinalIgnoreCase);
+        public static IdeTreeViewState Empty => new(false, false, null, new List<TreeItemData<CodeTreeEntryModel>>());
     }
-
-    public IReadOnlyDictionary<string, IdeTreeViewState> Trees { get; init; }
-}
-
-public sealed record IdeTreeViewState(
-    bool IsLoading,
-    bool RootLoaded,
-    string? Error,
-    List<TreeItemData<CodeTreeEntryModel>> Items)
-{
-    public static IdeTreeViewState Empty => new(false, false, null, new List<TreeItemData<CodeTreeEntryModel>>());
 }

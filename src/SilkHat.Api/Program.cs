@@ -1,18 +1,18 @@
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Context;
 using SilkHat.Analysis.Abstractions;
-using SilkHat.Analysis.Services;
 using SilkHat.Analysis.Models;
+using SilkHat.Analysis.Services;
+using SilkHat.Api.Services;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Services;
-using SilkHat.Api.Services;
-using Microsoft.Extensions.Caching.Hybrid;
+using SilkHat.Code.Analysis.Services.Complexity;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Git.Analysis.Services;
 using SilkHat.Infrastructure;
-using FluentValidation;
-using FluentValidation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,7 +30,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:10080" };
+                  ?? new[] { "http://localhost:10080" };
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("UiCors", policy =>
@@ -42,8 +42,8 @@ builder.Services.AddCors(options =>
 });
 
 var connectionString = builder.Configuration.GetConnectionString("SilkHat")
-                      ?? builder.Configuration["DATABASE_URL"]
-                      ?? "Host=localhost;Port=5432;Database=silkhat;Username=silkhat;Password=silkhat";
+                       ?? builder.Configuration["DATABASE_URL"]
+                       ?? "Host=localhost;Port=5432;Database=silkhat;Username=silkhat;Password=silkhat";
 builder.Services.AddDbContext<SilkHatDbContext>(options =>
     options.UseNpgsql(connectionString, npgsql => npgsql.SetPostgresVersion(18, 0)));
 builder.Services.AddSingleton<ILoadedRepositoryStore, LoadedRepositoryStore>();
@@ -61,13 +61,13 @@ builder.Services.AddSingleton<IIndexingStatusStore, IndexingStatusStore>();
 builder.Services.AddSingleton<ICodeFileService, CodeFileService>();
 builder.Services.AddSingleton<ICodeSymbolOutlineService, CodeSymbolOutlineService>();
 builder.Services.AddSingleton<ISymbolDescriptionService, SymbolDescriptionService>();
-builder.Services.AddSingleton<IComplexityStrategy, SilkHat.Code.Analysis.Services.Complexity.CognitiveComplexityStrategy>();
-builder.Services.AddSingleton<IComplexityStrategy, SilkHat.Code.Analysis.Services.Complexity.CyclomaticComplexityStrategy>();
-builder.Services.AddSingleton<IComplexityStrategy, SilkHat.Code.Analysis.Services.Complexity.IndentationComplexityStrategy>();
-builder.Services.AddSingleton<IComplexityStrategyFactory, SilkHat.Code.Analysis.Services.Complexity.ComplexityStrategyFactory>();
+builder.Services.AddSingleton<IComplexityStrategy, CognitiveComplexityStrategy>();
+builder.Services.AddSingleton<IComplexityStrategy, CyclomaticComplexityStrategy>();
+builder.Services.AddSingleton<IComplexityStrategy, IndentationComplexityStrategy>();
+builder.Services.AddSingleton<IComplexityStrategyFactory, ComplexityStrategyFactory>();
 builder.Services.AddSingleton<IMethodComplexityService, MethodComplexityService>();
 builder.Services.AddSingleton<ITypeComplexityService, TypeComplexityService>();
-builder.Services.AddSingleton<IComplexityMetricsAggregator, SilkHat.Code.Analysis.Services.Complexity.ComplexityMetricsAggregator>();
+builder.Services.AddSingleton<IComplexityMetricsAggregator, ComplexityMetricsAggregator>();
 builder.Services.AddScoped<IMethodImplementationDecisionService, MethodImplementationDecisionService>();
 builder.Services.AddScoped<IDecisionService, DecisionService>();
 builder.Services.AddScoped<IMethodCallStackService, MethodCallStackService>();
@@ -94,10 +94,7 @@ app.UseSerilogRequestLogging();
 app.Use(async (context, next) =>
 {
     var correlationId = context.Request.Headers["X-Correlation-Id"].FirstOrDefault();
-    if (string.IsNullOrWhiteSpace(correlationId))
-    {
-        correlationId = Guid.NewGuid().ToString("N");
-    }
+    if (string.IsNullOrWhiteSpace(correlationId)) correlationId = Guid.NewGuid().ToString("N");
 
     context.Items["CorrelationId"] = correlationId;
     context.Response.Headers["X-Correlation-Id"] = correlationId;

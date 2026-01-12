@@ -1,39 +1,35 @@
 using Microsoft.AspNetCore.Mvc;
-using SilkHat.Api.Extensions;
-using SilkHat.Api.Models;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
 
-namespace SilkHat.Api.Controllers;
-
-[Route("api/repositories/{id:guid}/code/solutions/{solutionId}/index/status")]
-public sealed class CodeIndexStatusController : ApiControllerBase
+namespace SilkHat.Api.Controllers
 {
-    private readonly ICodeWorkspaceStore _store;
-    private readonly IIndexingStatusStore _statusStore;
-
-    public CodeIndexStatusController(ICodeWorkspaceStore store, IIndexingStatusStore statusStore)
+    [Route("api/repositories/{id:guid}/code/solutions/{solutionId}/index/status")]
+    public sealed class CodeIndexStatusController : ApiControllerBase
     {
-        _store = store;
-        _statusStore = statusStore;
-    }
+        private readonly IIndexingStatusStore _statusStore;
+        private readonly ICodeWorkspaceStore _store;
 
-    [HttpGet]
-    public ActionResult<IReadOnlyCollection<IndexJobStatus>> GetStatus(Guid id, string solutionId)
-    {
-        var workspace = _store.Get(id);
-        if (workspace is null)
+        public CodeIndexStatusController(ICodeWorkspaceStore store, IIndexingStatusStore statusStore)
         {
-            return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository is not loaded.", "Code");
+            _store = store;
+            _statusStore = statusStore;
         }
 
-        var solution = workspace.TryGetSolution(solutionId);
-        if (solution is null)
+        [HttpGet]
+        public ActionResult<IReadOnlyCollection<IndexJobStatus>> GetStatus(Guid id, string solutionId)
         {
-            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
-        }
+            var workspace = _store.Get(id);
+            if (workspace is null)
+                return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded",
+                    "Repository is not loaded.", "Code");
 
-        var status = _statusStore.GetStatus(solution.SolutionId);
-        return Ok(status);
+            var solution = workspace.TryGetSolution(solutionId);
+            if (solution is null)
+                return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+
+            var status = _statusStore.GetStatus(solution.SolutionId);
+            return Ok(status);
+        }
     }
 }

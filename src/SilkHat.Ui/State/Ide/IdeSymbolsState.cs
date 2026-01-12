@@ -1,37 +1,38 @@
 using SilkHat.Ui.Models;
 
-namespace SilkHat.Ui.State.Ide;
-
-public sealed record IdeSymbolsState
+namespace SilkHat.Ui.State.Ide
 {
-    public IdeSymbolsState()
+    public sealed record IdeSymbolsState
     {
-        Views = new Dictionary<string, IdeSymbolsViewState>(StringComparer.OrdinalIgnoreCase);
+        public IdeSymbolsState()
+        {
+            Views = new Dictionary<string, IdeSymbolsViewState>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        public IdeSymbolsState(IDictionary<string, IdeSymbolsViewState> views)
+        {
+            Views = new Dictionary<string, IdeSymbolsViewState>(views, StringComparer.OrdinalIgnoreCase);
+        }
+
+        public IReadOnlyDictionary<string, IdeSymbolsViewState> Views { get; init; }
     }
 
-    public IdeSymbolsState(IDictionary<string, IdeSymbolsViewState> views)
+    public sealed record IdeSymbolsViewState(
+        bool IsOpen,
+        bool IsLoading,
+        string? Error,
+        string? RepositoryPath,
+        IReadOnlyList<CodeSymbolOutlineNodeModel> Nodes,
+        string? SelectedDocumentationId,
+        string? SelectedSymbolKey)
     {
-        Views = new Dictionary<string, IdeSymbolsViewState>(views, StringComparer.OrdinalIgnoreCase);
+        public static IdeSymbolsViewState Empty => new(
+            false,
+            false,
+            null,
+            null,
+            Array.Empty<CodeSymbolOutlineNodeModel>(),
+            null,
+            null);
     }
-
-    public IReadOnlyDictionary<string, IdeSymbolsViewState> Views { get; init; }
-}
-
-public sealed record IdeSymbolsViewState(
-    bool IsOpen,
-    bool IsLoading,
-    string? Error,
-    string? RepositoryPath,
-    IReadOnlyList<CodeSymbolOutlineNodeModel> Nodes,
-    string? SelectedDocumentationId,
-    string? SelectedSymbolKey)
-{
-    public static IdeSymbolsViewState Empty => new(
-        false,
-        false,
-        null,
-        null,
-        Array.Empty<CodeSymbolOutlineNodeModel>(),
-        null,
-        null);
 }

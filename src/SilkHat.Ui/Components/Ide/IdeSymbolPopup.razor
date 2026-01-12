@@ -1,10 +1,6 @@
-@using Fluxor
-@using Fluxor.Blazor.Web.Components
-@using MudBlazor
-@using SilkHat.Ui.Models
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
-@inherits FluxorComponent
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeSymbolsState> SymbolsState
 @inject IDispatcher Dispatcher
@@ -20,7 +16,7 @@
             }
             else if (CurrentView?.IsLoading == true)
             {
-                <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium"/>
             }
             else if (CurrentView is null || CurrentView.Nodes.Count == 0)
             {
@@ -62,8 +58,7 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter]
-    private IMudDialogInstance? Dialog { get; set; }
+    [CascadingParameter] private IMudDialogInstance? Dialog { get; set; }
 
     private IDialogReference? _callStackDialog;
 
@@ -228,4 +223,5 @@
         return string.Equals(node.RealType, "Method", StringComparison.OrdinalIgnoreCase)
                || string.Equals(node.RealType, "Constructor", StringComparison.OrdinalIgnoreCase);
     }
+
 }

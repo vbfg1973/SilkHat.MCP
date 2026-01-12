@@ -1,6 +1,3 @@
-@using MudBlazor
-@using SilkHat.Ui.Components.Ide.Decisions
-
 @inject IDialogService DialogService
 
 <MudPaper Elevation="0" Class="pa-3 ide-toolbox-panel d-flex flex-column gap-2">
@@ -10,15 +7,17 @@
                        Size="Size.Small"
                        Color="Color.Default"
                        aria-label="Open decisions in dialog"
-                       OnClick="OpenDialog" />
+                       OnClick="OpenDialog"/>
     </div>
-    <DecisionToolboxContent />
+    <DecisionToolboxContent/>
 </MudPaper>
 
 @code {
+
     private async Task OpenDialog()
     {
         var options = new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true };
         await DialogService.ShowAsync<DecisionToolboxDialog>("Decisions", options);
     }
+
 }

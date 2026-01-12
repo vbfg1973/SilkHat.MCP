@@ -1,10 +1,11 @@
-namespace SilkHat.Infrastructure.Entities;
-
-public sealed class RepositorySolutionConfig : BaseEntity
+namespace SilkHat.Infrastructure.Entities
 {
-    public Guid RepositoryConfigId { get; set; }
-    public RepositoryConfig? RepositoryConfig { get; set; }
-    public string RelativePath { get; set; } = string.Empty;
-    public string SolutionId { get; set; } = string.Empty;
-    public bool IsEnabled { get; set; }
+    public sealed class RepositorySolutionConfig : BaseEntity
+    {
+        public Guid RepositoryConfigId { get; set; }
+        public RepositoryConfig? RepositoryConfig { get; set; }
+        public string RelativePath { get; set; } = string.Empty;
+        public string SolutionId { get; set; } = string.Empty;
+        public bool IsEnabled { get; set; }
+    }
 }

@@ -1,56 +1,51 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Text;
-using SilkHat.Code.Analysis.Abstractions;
-using SilkHat.Code.Analysis.Models;
-using SilkHat.Code.Analysis.Services.Complexity;
-
-namespace SilkHat.Tests.Services;
-
+using SilkHat.Code.Core.Dtos;
 using SilkHat.Tests.Fixtures;
 
-[CollectionDefinition("SampleCodeCollection")]
-public sealed class SampleCodeCollection : ICollectionFixture<SampleCodeFixture>
+namespace SilkHat.Tests.Services
 {
-}
-
-[Collection("SampleCodeCollection")]
-public sealed class ComplexityMetricsAggregatorTests
-{
-    private readonly SampleCodeFixture _fixture;
-
-    public ComplexityMetricsAggregatorTests(SampleCodeFixture fixture)
+    [CollectionDefinition("SampleCodeCollection")]
+    public sealed class SampleCodeCollection : ICollectionFixture<SampleCodeFixture>
     {
-        _fixture = fixture;
     }
 
-    [Fact]
-    public async Task GetMetricsAsync_ComputesFileComplexity()
+    [Collection("SampleCodeCollection")]
+    public sealed class ComplexityMetricsAggregatorTests
     {
-        var metrics = await _fixture.GetCachedMetricsAsync();
+        private readonly SampleCodeFixture _fixture;
 
-        Assert.True(metrics.Cognitive["./Sample.cs"] > 0);
-        Assert.True(metrics.Cyclomatic["./Sample.cs"] > 0);
-        Assert.True(metrics.Indentation["./Sample.cs"] > 0);
-        Assert.NotEmpty(metrics.GetMethods(SilkHat.Code.Core.Dtos.ComplexityMeasureType.Cognitive));
-    }
+        public ComplexityMetricsAggregatorTests(SampleCodeFixture fixture)
+        {
+            _fixture = fixture;
+        }
 
-    [Fact]
-    public async Task GetMetricsAsync_DoesNotMixMeasuresAcrossBuckets()
-    {
-        var metrics = await _fixture.GetCachedMetricsAsync();
+        [Fact]
+        public async Task GetMetricsAsync_ComputesFileComplexity()
+        {
+            var metrics = await _fixture.GetCachedMetricsAsync();
 
-        // For the type, cognitive/cyclomatic/indentation buckets should all be present and independent
-        var typeDocId = metrics.GetTypes(SilkHat.Code.Core.Dtos.ComplexityMeasureType.Cognitive).Keys.First();
+            Assert.True(metrics.Cognitive["./Sample.cs"] > 0);
+            Assert.True(metrics.Cyclomatic["./Sample.cs"] > 0);
+            Assert.True(metrics.Indentation["./Sample.cs"] > 0);
+            Assert.NotEmpty(metrics.GetMethods(ComplexityMeasureType.Cognitive));
+        }
 
-        var cognitiveForType = metrics.GetTypes(SilkHat.Code.Core.Dtos.ComplexityMeasureType.Cognitive)[typeDocId];
-        var cyclomaticForType = metrics.GetTypes(SilkHat.Code.Core.Dtos.ComplexityMeasureType.Cyclomatic)[typeDocId];
-        var indentationForType = metrics.GetTypes(SilkHat.Code.Core.Dtos.ComplexityMeasureType.Indentation)[typeDocId];
+        [Fact]
+        public async Task GetMetricsAsync_DoesNotMixMeasuresAcrossBuckets()
+        {
+            var metrics = await _fixture.GetCachedMetricsAsync();
 
-        Assert.True(cognitiveForType >= 0);
-        Assert.True(cyclomaticForType >= 0);
-        Assert.True(indentationForType >= 0);
+            // For the type, cognitive/cyclomatic/indentation buckets should all be present and independent
+            var typeDocId = metrics.GetTypes(ComplexityMeasureType.Cognitive).Keys.First();
 
-        Assert.NotEqual(cognitiveForType, cyclomaticForType); // branchy method should bump cyclomatic differently
+            var cognitiveForType = metrics.GetTypes(ComplexityMeasureType.Cognitive)[typeDocId];
+            var cyclomaticForType = metrics.GetTypes(ComplexityMeasureType.Cyclomatic)[typeDocId];
+            var indentationForType = metrics.GetTypes(ComplexityMeasureType.Indentation)[typeDocId];
+
+            Assert.True(cognitiveForType >= 0);
+            Assert.True(cyclomaticForType >= 0);
+            Assert.True(indentationForType >= 0);
+
+            Assert.NotEqual(cognitiveForType, cyclomaticForType); // branchy method should bump cyclomatic differently
+        }
     }
 }

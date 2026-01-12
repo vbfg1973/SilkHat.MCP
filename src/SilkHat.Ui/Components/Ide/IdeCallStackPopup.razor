@@ -1,11 +1,7 @@
-@using Fluxor
-@using Fluxor.Blazor.Web.Components
-@using MudBlazor
-@using SilkHat.Ui.Models
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
 @using SilkHat.Ui.State.Ide.Models
-@inherits FluxorComponent
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeCallStackState> CallStackState
 @inject IDispatcher Dispatcher
@@ -19,15 +15,17 @@
                     <MudCheckBox T="bool"
                                  @bind-Value="IncludeExternalCalls"
                                  Color="Color.Default"
-                                 Label="Include external calls" />
+                                 Label="Include external calls"/>
                     <MudSelect T="IdeCallStackShadingMode"
                                Dense="true"
                                Value="CurrentView?.ShadingMode ?? IdeCallStackShadingMode.None"
                                ValueChanged="OnShadingChanged"
                                Label="Shading">
                         <MudSelectItem Value="IdeCallStackShadingMode.None">Default</MudSelectItem>
-                        <MudSelectItem Value="IdeCallStackShadingMode.CognitiveComplexity">Cognitive Complexity</MudSelectItem>
-                        <MudSelectItem Value="IdeCallStackShadingMode.CyclomaticComplexity">Cyclomatic Complexity</MudSelectItem>
+                        <MudSelectItem Value="IdeCallStackShadingMode.CognitiveComplexity">Cognitive Complexity
+                        </MudSelectItem>
+                        <MudSelectItem Value="IdeCallStackShadingMode.CyclomaticComplexity">Cyclomatic Complexity
+                        </MudSelectItem>
                     </MudSelect>
                 </MudStack>
             </MudStack>
@@ -40,7 +38,7 @@
                     <ChildContent>
                         @if (CurrentView?.IsLoading == true)
                         {
-                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
+                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium"/>
                         }
                         else if (CurrentView is null || CurrentView.Nodes.Count == 0)
                         {
@@ -62,20 +60,25 @@
                                             {
                                                 var node = item.Value;
                                                 <MudCard Elevation="0" Class="pa-2">
-                                                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                                    <MudStack Row="true" AlignItems="AlignItems.Center"
+                                                              Justify="Justify.SpaceBetween">
                                                         <MudStack Spacing="0">
-                                                            <MudText Typo="Typo.subtitle2">@($"{node.TypeName}.{node.MethodName}")</MudText>
+                                                            <MudText
+                                                                Typo="Typo.subtitle2">@($"{node.TypeName}.{node.MethodName}")</MudText>
                                                             <MudText Typo="Typo.caption">@node.Namespace</MudText>
-                                                            <MudText Typo="Typo.caption">Line @node.CallSite.LineSpan.StartLine</MudText>
+                                                            <MudText Typo="Typo.caption">
+                                                                Line @node.CallSite.LineSpan.StartLine</MudText>
                                                             @if (node.DecisionRequired)
                                                             {
-                                                                <MudText Typo="Typo.caption" Color="Color.Warning">Decision required</MudText>
+                                                                <MudText Typo="Typo.caption" Color="Color.Warning">
+                                                                    Decision required
+                                                                </MudText>
                                                             }
                                                         </MudStack>
                                                         <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
                                                                        Size="Size.Small"
                                                                        Color="Color.Primary"
-                                                                       OnClick="@(() => JumpToCallSite(node))" />
+                                                                       OnClick="@(() => JumpToCallSite(node))"/>
                                                     </MudStack>
                                                     @if (node.DecisionRequired && node.CandidateTypeNames.Count > 0)
                                                     {
@@ -87,7 +90,8 @@
                                                                        Label="Implementation">
                                                                 @foreach (var candidate in node.CandidateTypeNames)
                                                                 {
-                                                                    <MudSelectItem Value="@candidate">@candidate</MudSelectItem>
+                                                                    <MudSelectItem
+                                                                        Value="@candidate">@candidate</MudSelectItem>
                                                                 }
                                                             </MudSelect>
                                                             <MudButton Variant="Variant.Outlined"
@@ -111,7 +115,7 @@
                     <ChildContent>
                         @if (CurrentView?.IsMermaidLoading == true)
                         {
-                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium" />
+                            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Medium"/>
                         }
                         else if (!string.IsNullOrWhiteSpace(CurrentView?.MermaidError))
                         {
@@ -124,7 +128,7 @@
                         else
                         {
                             <MudPaper Elevation="0" Class="pa-3">
-                                <IdeMermaidViewer Diagram="@CurrentView!.MermaidDiagram" />
+                                <IdeMermaidViewer Diagram="@CurrentView!.MermaidDiagram"/>
                             </MudPaper>
                         }
                     </ChildContent>
@@ -141,8 +145,7 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter]
-    private IMudDialogInstance? Dialog { get; set; }
+    [CascadingParameter] private IMudDialogInstance? Dialog { get; set; }
 
     private bool _isFullScreen;
     private readonly Dictionary<string, string> _decisionSelections = new(StringComparer.OrdinalIgnoreCase);
@@ -376,4 +379,5 @@
 
         Dialog?.Close();
     }
+
 }

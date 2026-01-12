@@ -5,35 +5,36 @@ using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Core.Dtos;
 using SilkHat.Core.Dtos;
 
-namespace SilkHat.Api.Controllers;
-
-[Route("api/repositories/{id:guid}/code/solutions")]
-public sealed class CodeSolutionsController : ApiControllerBase
+namespace SilkHat.Api.Controllers
 {
-    private readonly ICodeWorkspaceStore _store;
-
-    public CodeSolutionsController(ICodeWorkspaceStore store)
+    [Route("api/repositories/{id:guid}/code/solutions")]
+    public sealed class CodeSolutionsController : ApiControllerBase
     {
-        _store = store;
-    }
+        private readonly ICodeWorkspaceStore _store;
 
-    [HttpGet]
-    public ActionResult<PagedResult<CodeSolutionDto>> GetSolutions(
-        Guid id,
-        [FromQuery] PagingQuery pagingQuery)
-    {
-        var workspace = _store.Get(id);
-        if (workspace is null)
+        public CodeSolutionsController(ICodeWorkspaceStore store)
         {
-            return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
+            _store = store;
         }
 
-        var paging = pagingQuery.ResolvePaging();
-        var results = workspace.Solutions.Values
-            .OrderBy(solution => solution.SolutionName, StringComparer.OrdinalIgnoreCase)
-            .Select(solution => new CodeSolutionDto(solution.SolutionId, solution.SolutionName, solution.RelativePath))
-            .ToPagedResult(paging);
+        [HttpGet]
+        public ActionResult<PagedResult<CodeSolutionDto>> GetSolutions(
+            Guid id,
+            [FromQuery] PagingQuery pagingQuery)
+        {
+            var workspace = _store.Get(id);
+            if (workspace is null)
+                return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded",
+                    "Repository code workspace is not loaded.", "Code");
 
-        return Ok(results);
+            var paging = pagingQuery.ResolvePaging();
+            var results = workspace.Solutions.Values
+                .OrderBy(solution => solution.SolutionName, StringComparer.OrdinalIgnoreCase)
+                .Select(solution =>
+                    new CodeSolutionDto(solution.SolutionId, solution.SolutionName, solution.RelativePath))
+                .ToPagedResult(paging);
+
+            return Ok(results);
+        }
     }
 }

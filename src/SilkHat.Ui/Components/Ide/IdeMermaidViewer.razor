@@ -1,14 +1,10 @@
-@using SilkHat.Ui.Components
-@using SilkHat.Ui.Models
-@using SilkHat.Ui.Services
 @inherits VisualizationComponentBase
 @inject VisualizationThemeService VisualizationThemeService
 
 <div class="ide-mermaid-viewer" id="@ContainerId"></div>
 
 @code {
-    [Parameter]
-    public string? Diagram { get; set; }
+    [Parameter] public string? Diagram { get; set; }
 
     private string? _lastDiagram;
     private string? _lastPaletteKey;
@@ -38,4 +34,5 @@
         _lastPaletteKey = null;
         return JSRuntime.InvokeVoidAsync("silkhatMermaid.clear", ContainerId).AsTask();
     }
+
 }

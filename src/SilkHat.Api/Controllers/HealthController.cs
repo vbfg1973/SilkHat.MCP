@@ -1,13 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace SilkHat.Api.Controllers;
-
-[Route("api/health")]
-public sealed class HealthController : ApiControllerBase
+namespace SilkHat.Api.Controllers
 {
-    [HttpGet]
-    public IActionResult Get()
+    [Route("api/health")]
+    public sealed class HealthController : ApiControllerBase
     {
-        return Ok("OK");
+        [HttpGet]
+        public IActionResult Get()
+        {
+            return Ok("OK");
+        }
     }
 }

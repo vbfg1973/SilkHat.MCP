@@ -1,17 +1,17 @@
 @page "/ide"
-@using Fluxor
-@using SilkHat.Ui.Components.Ide
 @using SilkHat.Ui.State.Ide.Actions
 @inject IDispatcher Dispatcher
 
 <PageTitle>IDE</PageTitle>
 
-<IdeHeader />
-<IdeWorkspaceLayout />
+<IdeHeader/>
+<IdeWorkspaceLayout/>
 
 @code {
+
     protected override void OnInitialized()
     {
         Dispatcher.Dispatch(new LoadSolutionsAction());
     }
+
 }

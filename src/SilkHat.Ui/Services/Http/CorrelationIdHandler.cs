@@ -1,55 +1,50 @@
-using Microsoft.Extensions.Logging;
-
-namespace SilkHat.Ui.Services.Http;
-
-public sealed class CorrelationIdHandler : DelegatingHandler
+namespace SilkHat.Ui.Services.Http
 {
-    private const string CorrelationHeader = "X-Correlation-Id";
-    private readonly ILogger<CorrelationIdHandler> _logger;
-
-    public CorrelationIdHandler(ILogger<CorrelationIdHandler> logger)
+    public sealed class CorrelationIdHandler : DelegatingHandler
     {
-        _logger = logger;
-    }
+        private const string CorrelationHeader = "X-Correlation-Id";
+        private readonly ILogger<CorrelationIdHandler> _logger;
 
-    protected override async Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage request,
-        CancellationToken cancellationToken)
-    {
-        var localCorrelationId = Guid.NewGuid().ToString("N");
-        if (!request.Headers.Contains(CorrelationHeader))
+        public CorrelationIdHandler(ILogger<CorrelationIdHandler> logger)
         {
-            request.Headers.Add(CorrelationHeader, localCorrelationId);
+            _logger = logger;
         }
 
-        _logger.LogDebug("HTTP {Method} {Url} correlation {CorrelationId}",
-            request.Method.Method,
-            request.RequestUri,
-            localCorrelationId);
-
-        var response = await base.SendAsync(request, cancellationToken);
-        response.Headers.TryGetValues(CorrelationHeader, out var responseValues);
-        var responseCorrelationId = responseValues?.FirstOrDefault();
-
-        if (response.IsSuccessStatusCode)
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
         {
-            _logger.LogDebug("HTTP {Method} {Url} -> {StatusCode} correlation {CorrelationId} response {ResponseCorrelationId}",
+            var localCorrelationId = Guid.NewGuid().ToString("N");
+            if (!request.Headers.Contains(CorrelationHeader))
+                request.Headers.Add(CorrelationHeader, localCorrelationId);
+
+            _logger.LogDebug("HTTP {Method} {Url} correlation {CorrelationId}",
                 request.Method.Method,
                 request.RequestUri,
-                (int)response.StatusCode,
-                localCorrelationId,
-                responseCorrelationId);
-        }
-        else
-        {
-            _logger.LogWarning("HTTP {Method} {Url} -> {StatusCode} correlation {CorrelationId} response {ResponseCorrelationId}",
-                request.Method.Method,
-                request.RequestUri,
-                (int)response.StatusCode,
-                localCorrelationId,
-                responseCorrelationId);
-        }
+                localCorrelationId);
 
-        return response;
+            var response = await base.SendAsync(request, cancellationToken);
+            response.Headers.TryGetValues(CorrelationHeader, out var responseValues);
+            var responseCorrelationId = responseValues?.FirstOrDefault();
+
+            if (response.IsSuccessStatusCode)
+                _logger.LogDebug(
+                    "HTTP {Method} {Url} -> {StatusCode} correlation {CorrelationId} response {ResponseCorrelationId}",
+                    request.Method.Method,
+                    request.RequestUri,
+                    (int)response.StatusCode,
+                    localCorrelationId,
+                    responseCorrelationId);
+            else
+                _logger.LogWarning(
+                    "HTTP {Method} {Url} -> {StatusCode} correlation {CorrelationId} response {ResponseCorrelationId}",
+                    request.Method.Method,
+                    request.RequestUri,
+                    (int)response.StatusCode,
+                    localCorrelationId,
+                    responseCorrelationId);
+
+            return response;
+        }
     }
 }

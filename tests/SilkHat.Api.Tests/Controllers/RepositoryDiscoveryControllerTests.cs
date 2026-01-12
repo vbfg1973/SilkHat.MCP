@@ -6,71 +6,72 @@ using SilkHat.Api.Models;
 using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Core.Dtos;
 
-namespace SilkHat.Api.Tests.Controllers;
-
-public sealed class RepositoryDiscoveryControllerTests
+namespace SilkHat.Api.Tests.Controllers
 {
-    [Fact]
-    public void GetAvailable_ReturnsRepositories()
+    public sealed class RepositoryDiscoveryControllerTests
     {
-        var discovery = new Mock<IRepositoryDiscoveryService>();
-        discovery.Setup(d => d.ListAvailableRepositories()).Returns(new List<AvailableRepositoryDto>
+        [Fact]
+        public void GetAvailable_ReturnsRepositories()
         {
-            new("Repo", "Repo", "/repos/Repo", true)
-        });
-        discovery.Setup(d => d.ListSolutions("/repos/Repo"))
-            .Returns(new List<AvailableRepositorySolutionDto> { new("./Repo.sln", "solution-1") });
+            var discovery = new Mock<IRepositoryDiscoveryService>();
+            discovery.Setup(d => d.ListAvailableRepositories()).Returns(new List<AvailableRepositoryDto>
+            {
+                new("Repo", "Repo", "/repos/Repo", true)
+            });
+            discovery.Setup(d => d.ListSolutions("/repos/Repo"))
+                .Returns(new List<AvailableRepositorySolutionDto> { new("./Repo.sln", "solution-1") });
 
-        var controller = new RepositoryDiscoveryController(discovery.Object)
+            var controller = new RepositoryDiscoveryController(discovery.Object)
+            {
+                ControllerContext = ControllerTestFactory.CreateContext()
+            };
+
+            var result = controller.GetAvailable(new PagingQuery());
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var repos = Assert.IsType<PagedResult<AvailableRepositoryDto>>(ok.Value);
+            Assert.Single(repos.Items);
+            discovery.Verify(d => d.ListAvailableRepositories(), Times.Once);
+        }
+
+        [Fact]
+        public void GetAvailable_ReturnsProblem_WhenMissingConfig()
         {
-            ControllerContext = ControllerTestFactory.CreateContext()
-        };
+            var discovery = new Mock<IRepositoryDiscoveryService>();
+            discovery.Setup(d => d.ListAvailableRepositories()).Throws(new InvalidOperationException("Missing"));
 
-        var result = controller.GetAvailable(new PagingQuery());
+            var controller = new RepositoryDiscoveryController(discovery.Object)
+            {
+                ControllerContext = ControllerTestFactory.CreateContext()
+            };
 
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var repos = Assert.IsType<PagedResult<AvailableRepositoryDto>>(ok.Value);
-        Assert.Single(repos.Items);
-        discovery.Verify(d => d.ListAvailableRepositories(), Times.Once);
-    }
+            var result = controller.GetAvailable(new PagingQuery());
 
-    [Fact]
-    public void GetAvailable_ReturnsProblem_WhenMissingConfig()
-    {
-        var discovery = new Mock<IRepositoryDiscoveryService>();
-        discovery.Setup(d => d.ListAvailableRepositories()).Throws(new InvalidOperationException("Missing"));
+            var problem = Assert.IsType<ObjectResult>(result.Result);
+            Assert.Equal(500, problem.StatusCode);
+        }
 
-        var controller = new RepositoryDiscoveryController(discovery.Object)
+        [Fact]
+        public void GetSolutions_ReturnsSolutionPaths()
         {
-            ControllerContext = ControllerTestFactory.CreateContext()
-        };
+            var discovery = new Mock<IRepositoryDiscoveryService>();
+            discovery.Setup(d => d.ListSolutions("/repos/Repo")).Returns(new List<AvailableRepositorySolutionDto>
+            {
+                new("./Repo.sln", "solution-1")
+            });
 
-        var result = controller.GetAvailable(new PagingQuery());
+            var controller = new RepositoryDiscoveryController(discovery.Object)
+            {
+                ControllerContext = ControllerTestFactory.CreateContext()
+            };
 
-        var problem = Assert.IsType<ObjectResult>(result.Result);
-        Assert.Equal(500, problem.StatusCode);
-    }
+            var result = controller.GetSolutions("/repos/Repo", new PagingQuery());
 
-    [Fact]
-    public void GetSolutions_ReturnsSolutionPaths()
-    {
-        var discovery = new Mock<IRepositoryDiscoveryService>();
-        discovery.Setup(d => d.ListSolutions("/repos/Repo")).Returns(new List<AvailableRepositorySolutionDto>
-        {
-            new("./Repo.sln", "solution-1")
-        });
-
-        var controller = new RepositoryDiscoveryController(discovery.Object)
-        {
-            ControllerContext = ControllerTestFactory.CreateContext()
-        };
-
-        var result = controller.GetSolutions("/repos/Repo", new PagingQuery());
-
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var solutions = Assert.IsType<PagedResult<AvailableRepositorySolutionDto>>(ok.Value);
-        Assert.Single(solutions.Items);
-        Assert.Equal("solution-1", solutions.Items[0].SolutionId);
-        discovery.Verify(d => d.ListSolutions("/repos/Repo"), Times.Once);
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var solutions = Assert.IsType<PagedResult<AvailableRepositorySolutionDto>>(ok.Value);
+            Assert.Single(solutions.Items);
+            Assert.Equal("solution-1", solutions.Items[0].SolutionId);
+            discovery.Verify(d => d.ListSolutions("/repos/Repo"), Times.Once);
+        }
     }
 }

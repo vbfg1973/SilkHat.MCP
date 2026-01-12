@@ -1,69 +1,69 @@
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using SilkHat.Code.Analysis.Services.Complexity;
-using Xunit;
 
-namespace SilkHat.Tests.Services;
-
-public sealed class ComplexityMathTests
+namespace SilkHat.Tests.Services
 {
-    [Theory]
-    [InlineData("int Foo(){ return 0; }", 0, 1)]
-    [InlineData("int Foo(int x){ if (x > 0) return 1; return 0; }", 1, 2)]
-    [InlineData("int Foo(int x, int y){ if (x > 0 && y > 0) return 1; return 0; }", 2, 3)]
-    [InlineData("int Foo(int x, int y){ if (x > 0){ if (y > 0) return 1; } return 0; }", 3, 3)]
-    [InlineData("int Foo(int x){ switch (x){ case 1: return 1; case 2: return 2; default: return 0; } }", 1, 3)]
-    public async Task Computes_Cognitive_And_Cyclomatic_As_Expected(string methodBody, int expectedCognitive, int expectedCyclomatic)
+    public sealed class ComplexityMathTests
     {
-        var (methodSyntax, semanticModel) = await CompileMethodAsync(methodBody);
-        var sourceText = methodSyntax.SyntaxTree.GetText();
-
-        var cognitive = new CognitiveComplexityStrategy().Compute(methodSyntax, semanticModel, sourceText);
-        var cyclomatic = new CyclomaticComplexityStrategy().Compute(methodSyntax, semanticModel, sourceText);
-
-        Assert.Equal(expectedCognitive, cognitive);
-        Assert.Equal(expectedCyclomatic, cyclomatic);
-    }
-
-    private static async Task<(BaseMethodDeclarationSyntax MethodSyntax, SemanticModel SemanticModel)> CompileMethodAsync(string methodText)
-    {
-        await Task.Yield();
-        var code = $$"""
-        namespace TestHarness
+        [Theory]
+        [InlineData("int Foo(){ return 0; }", 0, 1)]
+        [InlineData("int Foo(int x){ if (x > 0) return 1; return 0; }", 1, 2)]
+        [InlineData("int Foo(int x, int y){ if (x > 0 && y > 0) return 1; return 0; }", 2, 3)]
+        [InlineData("int Foo(int x, int y){ if (x > 0){ if (y > 0) return 1; } return 0; }", 3, 3)]
+        [InlineData("int Foo(int x){ switch (x){ case 1: return 1; case 2: return 2; default: return 0; } }", 1, 3)]
+        public async Task Computes_Cognitive_And_Cyclomatic_As_Expected(string methodBody, int expectedCognitive,
+            int expectedCyclomatic)
         {
-            public class Sample
-            {
-                {{methodText}}
-            }
+            var (methodSyntax, semanticModel) = await CompileMethodAsync(methodBody);
+            var sourceText = methodSyntax.SyntaxTree.GetText();
+
+            var cognitive = new CognitiveComplexityStrategy().Compute(methodSyntax, semanticModel, sourceText);
+            var cyclomatic = new CyclomaticComplexityStrategy().Compute(methodSyntax, semanticModel, sourceText);
+
+            Assert.Equal(expectedCognitive, cognitive);
+            Assert.Equal(expectedCyclomatic, cyclomatic);
         }
-        """;
 
-        var syntaxTree = CSharpSyntaxTree.ParseText(SourceText.From(code));
-        var references = new[]
+        private static async Task<(BaseMethodDeclarationSyntax MethodSyntax, SemanticModel SemanticModel)>
+            CompileMethodAsync(string methodText)
         {
-            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-            MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location)
-        };
+            await Task.Yield();
+            var code = $$"""
+                         namespace TestHarness
+                         {
+                             public class Sample
+                             {
+                                 {{methodText}}
+                             }
+                         }
+                         """;
 
-        var compilation = CSharpCompilation.Create(
-            "TestHarness",
-            new[] { syntaxTree },
-            references,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            var syntaxTree = CSharpSyntaxTree.ParseText(SourceText.From(code));
+            var references = new[]
+            {
+                MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+                MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location)
+            };
 
-        var semanticModel = compilation.GetSemanticModel(syntaxTree, ignoreAccessibility: true);
-        var methodSyntax = syntaxTree.GetRoot()
-            .DescendantNodes()
-            .OfType<BaseMethodDeclarationSyntax>()
-            .First();
+            var compilation = CSharpCompilation.Create(
+                "TestHarness",
+                new[] { syntaxTree },
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
-        // Force semantic model to be ready for the method
-        _ = semanticModel.GetDeclaredSymbol(methodSyntax);
+            var semanticModel = compilation.GetSemanticModel(syntaxTree, true);
+            var methodSyntax = syntaxTree.GetRoot()
+                .DescendantNodes()
+                .OfType<BaseMethodDeclarationSyntax>()
+                .First();
 
-        return (methodSyntax, semanticModel);
+            // Force semantic model to be ready for the method
+            _ = semanticModel.GetDeclaredSymbol(methodSyntax);
+
+            return (methodSyntax, semanticModel);
+        }
     }
 }

@@ -2,14 +2,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SilkHat.Infrastructure.Entities;
 
-namespace SilkHat.Infrastructure.Configurations;
-
-public sealed class RepositorySolutionConfigConfiguration : IEntityTypeConfiguration<RepositorySolutionConfig>
+namespace SilkHat.Infrastructure.Configurations
 {
-    public void Configure(EntityTypeBuilder<RepositorySolutionConfig> builder)
+    public sealed class RepositorySolutionConfigConfiguration : IEntityTypeConfiguration<RepositorySolutionConfig>
     {
-        builder.HasKey(solution => solution.Id);
-        builder.Property(solution => solution.RelativePath).IsRequired();
-        builder.Property(solution => solution.SolutionId).IsRequired();
+        public void Configure(EntityTypeBuilder<RepositorySolutionConfig> builder)
+        {
+            builder.HasKey(solution => solution.Id);
+            builder.Property(solution => solution.RelativePath).IsRequired();
+            builder.Property(solution => solution.SolutionId).IsRequired();
+        }
     }
 }

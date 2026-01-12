@@ -1,59 +1,59 @@
 using Microsoft.Extensions.Logging.Abstractions;
-using SilkHat.Code.Analysis.Services;
 using SilkHat.Code.Analysis.Models;
+using SilkHat.Code.Analysis.Services;
 
-namespace SilkHat.Tests.Services;
-
-public sealed class CodeWorkspaceLoaderTests
+namespace SilkHat.Tests.Services
 {
-    [Fact]
-    public async Task LoadAsync_Throws_WhenNoSolutionFiles()
+    public sealed class CodeWorkspaceLoaderTests
     {
-        var loader = new CodeWorkspaceLoader(NullLogger<CodeWorkspaceLoader>.Instance);
-        var tempRoot = Path.Combine(Path.GetTempPath(), $"silkhat-empty-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempRoot);
-
-        try
+        [Fact]
+        public async Task LoadAsync_Throws_WhenNoSolutionFiles()
         {
-            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-                loader.LoadAsync(tempRoot, Array.Empty<SolutionReference>(), CancellationToken.None));
-            Assert.Contains("No solution files selected", ex.Message, StringComparison.OrdinalIgnoreCase);
+            var loader = new CodeWorkspaceLoader(NullLogger<CodeWorkspaceLoader>.Instance);
+            var tempRoot = Path.Combine(Path.GetTempPath(), $"silkhat-empty-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempRoot);
+
+            try
+            {
+                var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                    loader.LoadAsync(tempRoot, Array.Empty<SolutionReference>(), CancellationToken.None));
+                Assert.Contains("No solution files selected", ex.Message, StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                Directory.Delete(tempRoot, true);
+            }
         }
-        finally
+
+        [Fact]
+        public async Task LoadAsync_LoadsMinimalSolution()
         {
-            Directory.Delete(tempRoot, true);
-        }
-    }
+            var loader = new CodeWorkspaceLoader(NullLogger<CodeWorkspaceLoader>.Instance);
+            var tempRoot = Path.Combine(Path.GetTempPath(), $"silkhat-sln-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(tempRoot);
 
-    [Fact]
-    public async Task LoadAsync_LoadsMinimalSolution()
-    {
-        var loader = new CodeWorkspaceLoader(NullLogger<CodeWorkspaceLoader>.Instance);
-        var tempRoot = Path.Combine(Path.GetTempPath(), $"silkhat-sln-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(tempRoot);
+            var projectId = Guid.NewGuid().ToString("B").ToUpperInvariant();
+            var slnPath = Path.Combine(tempRoot, "Sample.sln");
+            var csprojPath = Path.Combine(tempRoot, "Sample.csproj");
+            var codePath = Path.Combine(tempRoot, "Sample.cs");
 
-        var projectId = Guid.NewGuid().ToString("B").ToUpperInvariant();
-        var slnPath = Path.Combine(tempRoot, "Sample.sln");
-        var csprojPath = Path.Combine(tempRoot, "Sample.csproj");
-        var codePath = Path.Combine(tempRoot, "Sample.cs");
+            File.WriteAllText(csprojPath, """
+                                          <Project Sdk="Microsoft.NET.Sdk">
+                                            <PropertyGroup>
+                                              <TargetFramework>net9.0</TargetFramework>
+                                            </PropertyGroup>
+                                          </Project>
+                                          """);
 
-        File.WriteAllText(csprojPath, """
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-  </PropertyGroup>
-</Project>
-""");
+            File.WriteAllText(codePath, """
+                                        namespace Sample;
 
-        File.WriteAllText(codePath, """
-namespace Sample;
+                                        public class Foo
+                                        {
+                                        }
+                                        """);
 
-public class Foo
-{
-}
-""");
-
-        File.WriteAllText(slnPath, $@"Microsoft Visual Studio Solution File, Format Version 12.00
+            File.WriteAllText(slnPath, $@"Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
@@ -70,21 +70,22 @@ Global
 EndGlobal
 ");
 
-        try
-        {
-            var workspace = await loader.LoadAsync(
-                tempRoot,
-                new[] { new SolutionReference("./Sample.sln", "solution-1") },
-                CancellationToken.None);
+            try
+            {
+                var workspace = await loader.LoadAsync(
+                    tempRoot,
+                    new[] { new SolutionReference("./Sample.sln", "solution-1") },
+                    CancellationToken.None);
 
-            var solution = Assert.Single(workspace.Solutions.Values);
-            Assert.Single(solution.Projects);
-            Assert.Contains(solution.Namespaces, ns => ns == "Sample");
-            Assert.Contains(solution.NamedTypes, type => type.Name == "Foo");
-        }
-        finally
-        {
-            Directory.Delete(tempRoot, true);
+                var solution = Assert.Single(workspace.Solutions.Values);
+                Assert.Single(solution.Projects);
+                Assert.Contains(solution.Namespaces, ns => ns == "Sample");
+                Assert.Contains(solution.NamedTypes, type => type.Name == "Foo");
+            }
+            finally
+            {
+                Directory.Delete(tempRoot, true);
+            }
         }
     }
 }

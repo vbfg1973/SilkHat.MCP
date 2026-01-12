@@ -1,12 +1,7 @@
-@using Fluxor
-@using Fluxor.Blazor.Web.Components
-@using MudBlazor
-@using Microsoft.AspNetCore.Components.Web
-@using SilkHat.Ui.Components.Ide
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
 @using SilkHat.Ui.State.Ide.Models
-@inherits FluxorComponent
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeTabsState> TabsState
 @inject IState<IdeSymbolsState> SymbolsState
@@ -18,7 +13,7 @@
 @if (TabsView?.OpenFiles.Count > 0)
 {
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
-        <IdeCommitCard />
+        <IdeCommitCard/>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
             <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="CloseAllTabs">Close all tabs</MudButton>
         </MudStack>
@@ -40,7 +35,7 @@
                             <MudIconButton Icon="@Icons.Material.Filled.Close"
                                            Size="Size.Small"
                                            Color="Color.Default"
-                                           OnClick="@(async (MouseEventArgs _) => await CloseTabAsync(tabIndex))" />
+                                           OnClick="@(async (MouseEventArgs _) => await CloseTabAsync(tabIndex))"/>
                         </span>
                     </div>
                 </TabContent>
@@ -48,14 +43,17 @@
                     <div class="ide-tab-body" style="height: 100%;">
                         <div class="ide-file-tooling" style="height: 100%;">
                             <MudPaper Elevation="0" Class="pa-3 ide-file-panel">
-                                <div class="ide-file-scroll @(TabsView.ActiveTabIndex == tabIndex ? "active" : string.Empty)">
+                                <div
+                                    class="ide-file-scroll @(TabsView.ActiveTabIndex == tabIndex ? "active" : string.Empty)">
                                     <div class="ide-file-content">
                                         @foreach (var line in file.RenderLines)
                                         {
-                                            <div class="ide-file-line @(line.Decoration == IdeLineDecoration.Highlight ? "ide-line-highlight" : string.Empty)"
-                                                 style="@GetLineStyle(line)">
+                                            <div
+                                                class="ide-file-line @(line.Decoration == IdeLineDecoration.Highlight ? "ide-line-highlight" : string.Empty)"
+                                                style="@GetLineStyle(line)">
                                                 <span class="ide-file-line-number">@GetLineNumber(line)</span>
-                                                <span class="ide-file-line-text" style="white-space: pre;">@line.Text</span>
+                                                <span class="ide-file-line-text"
+                                                      style="white-space: pre;">@line.Text</span>
                                             </div>
                                         }
                                     </div>
@@ -63,7 +61,7 @@
                             </MudPaper>
                             @if (SelectedToolboxView != IdeToolboxView.None)
                             {
-                                <IdeToolbox />
+                                <IdeToolbox/>
                             }
                         </div>
                     </div>
@@ -75,6 +73,7 @@
 
 @code {
     private IDialogReference? _symbolDialog;
+
     private IdeTabsViewState? TabsView
     {
         get
@@ -139,7 +138,6 @@
 
         Dispatcher.Dispatch(new CloseAllTabsAction(SelectedSolutionId));
     }
-
 
     private void OnActiveTabChanged(int index)
     {
@@ -243,4 +241,5 @@
             // ignore
         }
     }
+
 }

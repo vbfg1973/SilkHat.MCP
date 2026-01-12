@@ -1,6 +1,6 @@
-﻿namespace SilkHat.Git.Core;
-
-public class Class1
+﻿namespace SilkHat.Git.Core
 {
-
+    public class Class1
+    {
+    }
 }

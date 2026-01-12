@@ -1,6 +1,3 @@
-@using MudBlazor
-@using SilkHat.Ui.Models
-
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="2">
@@ -12,7 +9,8 @@
                     <MudSelectItem T="CodeTreeAnnotationKind?" Value="@metric">@metric</MudSelectItem>
                 }
             </MudSelect>
-            <MudSelect T="CodeTreeFilterOperator?" Label="Operator" Dense="true" @bind-Value="_operator" Disabled="@(_metric is null)">
+            <MudSelect T="CodeTreeFilterOperator?" Label="Operator" Dense="true" @bind-Value="_operator"
+                       Disabled="@(_metric is null)">
                 <MudSelectItem T="CodeTreeFilterOperator?" Value="@(null)">None</MudSelectItem>
                 @foreach (var op in Enum.GetValues<CodeTreeFilterOperator>())
                 {
@@ -23,7 +21,7 @@
                              Label="Threshold"
                              Min="0"
                              @bind-Value="_threshold"
-                             Disabled="@(_metric is null)" />
+                             Disabled="@(_metric is null)"/>
         </MudStack>
     </DialogContent>
     <DialogActions>
@@ -34,17 +32,13 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter]
-    private IMudDialogInstance? Dialog { get; set; }
+    [CascadingParameter] private IMudDialogInstance? Dialog { get; set; }
 
-    [Parameter]
-    public CodeTreeAnnotationKind? Metric { get; set; }
+    [Parameter] public CodeTreeAnnotationKind? Metric { get; set; }
 
-    [Parameter]
-    public CodeTreeFilterOperator? Operator { get; set; }
+    [Parameter] public CodeTreeFilterOperator? Operator { get; set; }
 
-    [Parameter]
-    public int? Threshold { get; set; }
+    [Parameter] public int? Threshold { get; set; }
 
     private CodeTreeAnnotationKind? _metric;
     private CodeTreeFilterOperator? _operator;
@@ -80,4 +74,5 @@
         _threshold = null;
         Dialog?.Close(DialogResult.Ok(new CodeTreeFilterSelection(null, null, null)));
     }
+
 }

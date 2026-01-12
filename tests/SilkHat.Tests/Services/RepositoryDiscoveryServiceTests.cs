@@ -2,134 +2,135 @@ using Microsoft.Extensions.Options;
 using SilkHat.Analysis.Models;
 using SilkHat.Analysis.Services;
 
-namespace SilkHat.Tests.Services;
-
-public sealed class RepositoryDiscoveryServiceTests
+namespace SilkHat.Tests.Services
 {
-    [Fact]
-    public void ListAvailableRepositories_ReturnsDirectoriesWithGitFlag()
+    public sealed class RepositoryDiscoveryServiceTests
     {
-        var root = CreateTempDirectory();
-        try
+        [Fact]
+        public void ListAvailableRepositories_ReturnsDirectoriesWithGitFlag()
         {
-            var gitRepo = Path.Combine(root, "RepoA");
-            Directory.CreateDirectory(Path.Combine(gitRepo, ".git"));
-            var plainRepo = Path.Combine(root, "RepoB");
-            Directory.CreateDirectory(plainRepo);
+            var root = CreateTempDirectory();
+            try
+            {
+                var gitRepo = Path.Combine(root, "RepoA");
+                Directory.CreateDirectory(Path.Combine(gitRepo, ".git"));
+                var plainRepo = Path.Combine(root, "RepoB");
+                Directory.CreateDirectory(plainRepo);
 
-            var service = CreateService(root);
+                var service = CreateService(root);
 
-            var results = service.ListAvailableRepositories();
+                var results = service.ListAvailableRepositories();
 
-            Assert.Equal(2, results.Count);
-            Assert.Contains(results, item => item.Name == "RepoA" && item.IsGitRepository);
-            Assert.Contains(results, item => item.Name == "RepoB" && !item.IsGitRepository);
+                Assert.Equal(2, results.Count);
+                Assert.Contains(results, item => item.Name == "RepoA" && item.IsGitRepository);
+                Assert.Contains(results, item => item.Name == "RepoB" && !item.IsGitRepository);
+            }
+            finally
+            {
+                Directory.Delete(root, true);
+            }
         }
-        finally
+
+        [Fact]
+        public void TryValidateRepositoryPath_ReturnsFalse_WhenOutsideRoot()
         {
-            Directory.Delete(root, true);
-        }
-    }
+            var root = CreateTempDirectory();
+            var other = CreateTempDirectory();
+            try
+            {
+                var service = CreateService(root);
+                var valid = service.TryValidateRepositoryPath(other, out var error);
 
-    [Fact]
-    public void TryValidateRepositoryPath_ReturnsFalse_WhenOutsideRoot()
-    {
-        var root = CreateTempDirectory();
-        var other = CreateTempDirectory();
-        try
+                Assert.False(valid);
+                Assert.NotNull(error);
+            }
+            finally
+            {
+                Directory.Delete(root, true);
+                Directory.Delete(other, true);
+            }
+        }
+
+        [Fact]
+        public void TryValidateRepositoryPath_ReturnsFalse_WhenNotGit()
         {
-            var service = CreateService(root);
-            var valid = service.TryValidateRepositoryPath(other, out var error);
+            var root = CreateTempDirectory();
+            try
+            {
+                var repo = Path.Combine(root, "RepoA");
+                Directory.CreateDirectory(repo);
+                var service = CreateService(root);
 
-            Assert.False(valid);
-            Assert.NotNull(error);
+                var valid = service.TryValidateRepositoryPath(repo, out var error);
+
+                Assert.False(valid);
+                Assert.NotNull(error);
+            }
+            finally
+            {
+                Directory.Delete(root, true);
+            }
         }
-        finally
+
+        [Fact]
+        public void TryValidateRepositoryPath_ReturnsTrue_ForGitRepo()
         {
-            Directory.Delete(root, true);
-            Directory.Delete(other, true);
-        }
-    }
+            var root = CreateTempDirectory();
+            try
+            {
+                var repo = Path.Combine(root, "RepoA");
+                Directory.CreateDirectory(Path.Combine(repo, ".git"));
+                var service = CreateService(root);
 
-    [Fact]
-    public void TryValidateRepositoryPath_ReturnsFalse_WhenNotGit()
-    {
-        var root = CreateTempDirectory();
-        try
+                var valid = service.TryValidateRepositoryPath(repo, out var error);
+
+                Assert.True(valid);
+                Assert.Null(error);
+            }
+            finally
+            {
+                Directory.Delete(root, true);
+            }
+        }
+
+        [Fact]
+        public void ListSolutions_ReturnsRepoRelativePaths()
         {
-            var repo = Path.Combine(root, "RepoA");
-            Directory.CreateDirectory(repo);
-            var service = CreateService(root);
+            var root = CreateTempDirectory();
+            try
+            {
+                var repo = Path.Combine(root, "RepoA");
+                Directory.CreateDirectory(Path.Combine(repo, ".git"));
+                var solutionDir = Path.Combine(repo, "src");
+                Directory.CreateDirectory(solutionDir);
+                var slnPath = Path.Combine(solutionDir, "RepoA.sln");
+                File.WriteAllText(slnPath, "sln");
 
-            var valid = service.TryValidateRepositoryPath(repo, out var error);
+                var service = CreateService(root);
 
-            Assert.False(valid);
-            Assert.NotNull(error);
+                var solutions = service.ListSolutions(repo);
+
+                Assert.Single(solutions);
+                Assert.Equal("./src/RepoA.sln", solutions[0].RelativePath);
+                Assert.False(string.IsNullOrWhiteSpace(solutions[0].SolutionId));
+            }
+            finally
+            {
+                Directory.Delete(root, true);
+            }
         }
-        finally
+
+        private static RepositoryDiscoveryService CreateService(string root)
         {
-            Directory.Delete(root, true);
+            var options = Options.Create(new RepositoryDiscoveryOptions { RepoRoot = root });
+            return new RepositoryDiscoveryService(options);
         }
-    }
 
-    [Fact]
-    public void TryValidateRepositoryPath_ReturnsTrue_ForGitRepo()
-    {
-        var root = CreateTempDirectory();
-        try
+        private static string CreateTempDirectory()
         {
-            var repo = Path.Combine(root, "RepoA");
-            Directory.CreateDirectory(Path.Combine(repo, ".git"));
-            var service = CreateService(root);
-
-            var valid = service.TryValidateRepositoryPath(repo, out var error);
-
-            Assert.True(valid);
-            Assert.Null(error);
+            var path = Path.Combine(Path.GetTempPath(), "silkhat-tests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(path);
+            return path;
         }
-        finally
-        {
-            Directory.Delete(root, true);
-        }
-    }
-
-    [Fact]
-    public void ListSolutions_ReturnsRepoRelativePaths()
-    {
-        var root = CreateTempDirectory();
-        try
-        {
-            var repo = Path.Combine(root, "RepoA");
-            Directory.CreateDirectory(Path.Combine(repo, ".git"));
-            var solutionDir = Path.Combine(repo, "src");
-            Directory.CreateDirectory(solutionDir);
-            var slnPath = Path.Combine(solutionDir, "RepoA.sln");
-            File.WriteAllText(slnPath, "sln");
-
-            var service = CreateService(root);
-
-            var solutions = service.ListSolutions(repo);
-
-            Assert.Single(solutions);
-            Assert.Equal("./src/RepoA.sln", solutions[0].RelativePath);
-            Assert.False(string.IsNullOrWhiteSpace(solutions[0].SolutionId));
-        }
-        finally
-        {
-            Directory.Delete(root, true);
-        }
-    }
-
-    private static RepositoryDiscoveryService CreateService(string root)
-    {
-        var options = Options.Create(new RepositoryDiscoveryOptions { RepoRoot = root });
-        return new RepositoryDiscoveryService(options);
-    }
-
-    private static string CreateTempDirectory()
-    {
-        var path = Path.Combine(Path.GetTempPath(), "silkhat-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(path);
-        return path;
     }
 }

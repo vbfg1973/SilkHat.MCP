@@ -1,26 +1,27 @@
-namespace SilkHat.Ui.State.Ide;
-
-public sealed record IdeSolutionsState
+namespace SilkHat.Ui.State.Ide
 {
-    public IdeSolutionsState()
+    public sealed record IdeSolutionsState
     {
-        Solutions = Array.Empty<IdeSolutionEntry>();
-    }
+        public IdeSolutionsState()
+        {
+            Solutions = Array.Empty<IdeSolutionEntry>();
+        }
 
-    public IdeSolutionsState(
-        bool isLoading,
-        string? error,
-        IReadOnlyList<IdeSolutionEntry> solutions,
-        string? selectedSolutionId)
-    {
-        IsLoading = isLoading;
-        Error = error;
-        Solutions = solutions;
-        SelectedSolutionId = selectedSolutionId;
-    }
+        public IdeSolutionsState(
+            bool isLoading,
+            string? error,
+            IReadOnlyList<IdeSolutionEntry> solutions,
+            string? selectedSolutionId)
+        {
+            IsLoading = isLoading;
+            Error = error;
+            Solutions = solutions;
+            SelectedSolutionId = selectedSolutionId;
+        }
 
-    public bool IsLoading { get; init; }
-    public string? Error { get; init; }
-    public IReadOnlyList<IdeSolutionEntry> Solutions { get; init; }
-    public string? SelectedSolutionId { get; init; }
+        public bool IsLoading { get; init; }
+        public string? Error { get; init; }
+        public IReadOnlyList<IdeSolutionEntry> Solutions { get; init; }
+        public string? SelectedSolutionId { get; init; }
+    }
 }

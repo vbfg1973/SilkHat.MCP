@@ -1,27 +1,28 @@
 using SilkHat.Api.Models;
 using SilkHat.Api.Validation;
 
-namespace SilkHat.Api.Tests.Validation;
-
-public sealed class CodeFileQueryValidatorTests
+namespace SilkHat.Api.Tests.Validation
 {
-    [Fact]
-    public void Validate_AllowsNonEmptyPath()
+    public sealed class CodeFileQueryValidatorTests
     {
-        var validator = new CodeFileQueryValidator();
+        [Fact]
+        public void Validate_AllowsNonEmptyPath()
+        {
+            var validator = new CodeFileQueryValidator();
 
-        var result = validator.Validate(new CodeFileQuery { Path = "Repo/Program.cs" });
+            var result = validator.Validate(new CodeFileQuery { Path = "Repo/Program.cs" });
 
-        Assert.True(result.IsValid);
-    }
+            Assert.True(result.IsValid);
+        }
 
-    [Fact]
-    public void Validate_RejectsEmptyPath()
-    {
-        var validator = new CodeFileQueryValidator();
+        [Fact]
+        public void Validate_RejectsEmptyPath()
+        {
+            var validator = new CodeFileQueryValidator();
 
-        var result = validator.Validate(new CodeFileQuery { Path = " " });
+            var result = validator.Validate(new CodeFileQuery { Path = " " });
 
-        Assert.False(result.IsValid);
+            Assert.False(result.IsValid);
+        }
     }
 }

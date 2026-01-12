@@ -4,53 +4,55 @@ using SilkHat.Api.Extensions;
 using SilkHat.Api.Models;
 using SilkHat.Core.Dtos;
 
-namespace SilkHat.Api.Controllers;
-
-[Route("api/repositories/available")]
-public sealed class RepositoryDiscoveryController : ApiControllerBase
+namespace SilkHat.Api.Controllers
 {
-    private readonly IRepositoryDiscoveryService _discovery;
-
-    public RepositoryDiscoveryController(IRepositoryDiscoveryService discovery)
+    [Route("api/repositories/available")]
+    public sealed class RepositoryDiscoveryController : ApiControllerBase
     {
-        _discovery = discovery;
-    }
+        private readonly IRepositoryDiscoveryService _discovery;
 
-    [HttpGet]
-    public ActionResult<PagedResult<AvailableRepositoryDto>> GetAvailable([FromQuery] PagingQuery pagingQuery)
-    {
-        try
+        public RepositoryDiscoveryController(IRepositoryDiscoveryService discovery)
         {
-            var paging = pagingQuery.ResolvePaging();
-            var results = _discovery.ListAvailableRepositories();
-            return Ok(results.ToPagedResult(paging));
-        }
-        catch (InvalidOperationException ex)
-        {
-            return ProblemWithCategory(StatusCodes.Status500InternalServerError, "Configuration Error", ex.Message, "Configuration");
-        }
-    }
-
-    [HttpGet("solutions")]
-    public ActionResult<PagedResult<AvailableRepositorySolutionDto>> GetSolutions(
-        [FromQuery] string path,
-        [FromQuery] PagingQuery pagingQuery)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", "Path is required.", "Validation");
+            _discovery = discovery;
         }
 
-        var decodedPath = path.Contains('%') ? Uri.UnescapeDataString(path) : path;
-        try
+        [HttpGet]
+        public ActionResult<PagedResult<AvailableRepositoryDto>> GetAvailable([FromQuery] PagingQuery pagingQuery)
         {
-            var paging = pagingQuery.ResolvePaging();
-            var results = _discovery.ListSolutions(decodedPath);
-            return Ok(results.ToPagedResult(paging));
+            try
+            {
+                var paging = pagingQuery.ResolvePaging();
+                var results = _discovery.ListAvailableRepositories();
+                return Ok(results.ToPagedResult(paging));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ProblemWithCategory(StatusCodes.Status500InternalServerError, "Configuration Error", ex.Message,
+                    "Configuration");
+            }
         }
-        catch (InvalidOperationException ex)
+
+        [HttpGet("solutions")]
+        public ActionResult<PagedResult<AvailableRepositorySolutionDto>> GetSolutions(
+            [FromQuery] string path,
+            [FromQuery] PagingQuery pagingQuery)
         {
-            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", ex.Message, "Validation");
+            if (string.IsNullOrWhiteSpace(path))
+                return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", "Path is required.",
+                    "Validation");
+
+            var decodedPath = path.Contains('%') ? Uri.UnescapeDataString(path) : path;
+            try
+            {
+                var paging = pagingQuery.ResolvePaging();
+                var results = _discovery.ListSolutions(decodedPath);
+                return Ok(results.ToPagedResult(paging));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ProblemWithCategory(StatusCodes.Status400BadRequest, "Validation Failed", ex.Message,
+                    "Validation");
+            }
         }
     }
 }

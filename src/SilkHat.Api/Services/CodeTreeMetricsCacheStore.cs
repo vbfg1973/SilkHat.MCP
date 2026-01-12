@@ -1,64 +1,61 @@
 using System.Collections.Concurrent;
 using SilkHat.Code.Core.Dtos;
 
-namespace SilkHat.Api.Services;
-
-public interface ICodeTreeMetricsCacheStore
+namespace SilkHat.Api.Services
 {
-    bool TryGet(
-        Guid configId,
-        string solutionId,
-        CodeTreeAnnotationKind kind,
-        out CodeTreeMetricValues? metrics);
-
-    void Set(
-        Guid configId,
-        string solutionId,
-        CodeTreeAnnotationKind kind,
-        CodeTreeMetricValues metrics);
-
-    void Clear(Guid configId);
-}
-
-public sealed class CodeTreeMetricsCacheStore : ICodeTreeMetricsCacheStore
-{
-    private readonly ConcurrentDictionary<CacheKey, CodeTreeMetricValues> _cache = new();
-
-    public bool TryGet(
-        Guid configId,
-        string solutionId,
-        CodeTreeAnnotationKind kind,
-        out CodeTreeMetricValues? metrics)
+    public interface ICodeTreeMetricsCacheStore
     {
-        if (_cache.TryGetValue(new CacheKey(configId, solutionId, kind), out var stored))
-        {
-            metrics = stored;
-            return true;
-        }
+        bool TryGet(
+            Guid configId,
+            string solutionId,
+            CodeTreeAnnotationKind kind,
+            out CodeTreeMetricValues? metrics);
 
-        metrics = null;
-        return false;
+        void Set(
+            Guid configId,
+            string solutionId,
+            CodeTreeAnnotationKind kind,
+            CodeTreeMetricValues metrics);
+
+        void Clear(Guid configId);
     }
 
-    public void Set(
-        Guid configId,
-        string solutionId,
-        CodeTreeAnnotationKind kind,
-        CodeTreeMetricValues metrics)
+    public sealed class CodeTreeMetricsCacheStore : ICodeTreeMetricsCacheStore
     {
-        _cache[new CacheKey(configId, solutionId, kind)] = metrics;
-    }
+        private readonly ConcurrentDictionary<CacheKey, CodeTreeMetricValues> _cache = new();
 
-    public void Clear(Guid configId)
-    {
-        foreach (var key in _cache.Keys)
+        public bool TryGet(
+            Guid configId,
+            string solutionId,
+            CodeTreeAnnotationKind kind,
+            out CodeTreeMetricValues? metrics)
         {
-            if (key.ConfigId == configId)
+            if (_cache.TryGetValue(new CacheKey(configId, solutionId, kind), out var stored))
             {
-                _cache.TryRemove(key, out _);
+                metrics = stored;
+                return true;
             }
-        }
-    }
 
-    private readonly record struct CacheKey(Guid ConfigId, string SolutionId, CodeTreeAnnotationKind Kind);
+            metrics = null;
+            return false;
+        }
+
+        public void Set(
+            Guid configId,
+            string solutionId,
+            CodeTreeAnnotationKind kind,
+            CodeTreeMetricValues metrics)
+        {
+            _cache[new CacheKey(configId, solutionId, kind)] = metrics;
+        }
+
+        public void Clear(Guid configId)
+        {
+            foreach (var key in _cache.Keys)
+                if (key.ConfigId == configId)
+                    _cache.TryRemove(key, out _);
+        }
+
+        private readonly record struct CacheKey(Guid ConfigId, string SolutionId, CodeTreeAnnotationKind Kind);
+    }
 }

@@ -1,6 +1,7 @@
-namespace SilkHat.Code.Core.Dtos;
-
-public sealed record CodeFileContentDto(
-    string RepositoryPath,
-    string DisplayPath,
-    string Content);
+namespace SilkHat.Code.Core.Dtos
+{
+    public sealed record CodeFileContentDto(
+        string RepositoryPath,
+        string DisplayPath,
+        string Content);
+}
