@@ -1,58 +1,58 @@
 using Microsoft.AspNetCore.Mvc;
+using SilkHat.Analysis.Abstractions;
 using SilkHat.Api.Extensions;
 using SilkHat.Api.Models;
-using SilkHat.Analysis.Abstractions;
+using SilkHat.Core.Dtos;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Git.Core.Dtos;
-using SilkHat.Core.Dtos;
 
-namespace SilkHat.Api.Controllers;
-
-[Route("api/repositories/{id:guid}/git/tree")]
-public sealed class GitTreeController : ApiControllerBase
+namespace SilkHat.Api.Controllers
 {
-    private readonly ILoadedRepositoryStore _store;
-    private readonly IGitCli _gitCli;
-
-    public GitTreeController(ILoadedRepositoryStore store, IGitCli gitCli)
+    [Route("api/repositories/{id:guid}/git/tree")]
+    public sealed class GitTreeController : ApiControllerBase
     {
-        _store = store;
-        _gitCli = gitCli;
-    }
+        private readonly IGitCli _gitCli;
+        private readonly ILoadedRepositoryStore _store;
 
-    [HttpGet]
-    public async Task<ActionResult<PagedResult<GitTreeEntryDto>>> GetTree(
-        Guid id,
-        [FromQuery] string? name,
-        [FromQuery] GitTreeEntryType? type,
-        [FromQuery] DateTimeOffset? changedAfter,
-        [FromQuery] string? author,
-        [FromQuery] PagingQuery pagingQuery,
-        CancellationToken cancellationToken)
-    {
-        var repo = _store.Get(id);
-        if (repo is null)
+        public GitTreeController(ILoadedRepositoryStore store, IGitCli gitCli)
         {
-            return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository is not loaded.", "Git");
+            _store = store;
+            _gitCli = gitCli;
         }
 
-        try
+        [HttpGet]
+        public async Task<ActionResult<PagedResult<GitTreeEntryDto>>> GetTree(
+            Guid id,
+            [FromQuery] string? name,
+            [FromQuery] GitTreeEntryType? type,
+            [FromQuery] DateTimeOffset? changedAfter,
+            [FromQuery] string? author,
+            [FromQuery] PagingQuery pagingQuery,
+            CancellationToken cancellationToken)
         {
-            var paging = pagingQuery.ResolvePaging();
-            var entries = await _gitCli.ListTreeAsync(
-                id,
-                repo.RootPath,
-                name,
-                type,
-                changedAfter,
-                author,
-                cancellationToken);
+            var repo = _store.Get(id);
+            if (repo is null)
+                return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded",
+                    "Repository is not loaded.", "Git");
 
-            return Ok(entries.ToPagedResult(paging));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return ProblemWithCategory(StatusCodes.Status500InternalServerError, "Git Error", ex.Message, "Git");
+            try
+            {
+                var paging = pagingQuery.ResolvePaging();
+                var entries = await _gitCli.ListTreeAsync(
+                    id,
+                    repo.RootPath,
+                    name,
+                    type,
+                    changedAfter,
+                    author,
+                    cancellationToken);
+
+                return Ok(entries.ToPagedResult(paging));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return ProblemWithCategory(StatusCodes.Status500InternalServerError, "Git Error", ex.Message, "Git");
+            }
         }
     }
 }

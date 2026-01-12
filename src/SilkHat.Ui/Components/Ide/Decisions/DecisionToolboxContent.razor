@@ -1,5 +1,3 @@
-@using MudBlazor
-@using SilkHat.Ui.Models
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
 @inject IState<IdeSolutionsState> SolutionsState
@@ -14,30 +12,33 @@ else
 {
     <div class="d-flex flex-column gap-2">
         <div class="d-flex flex-row flex-wrap gap-2 align-center">
-            <MudSelect T="DecisionTypeModel?" Dense="true" Label="Type" Value="@CurrentView.FilterType" ValueChanged="OnFilterChanged">
+            <MudSelect T="DecisionTypeModel?" Dense="true" Label="Type" Value="@CurrentView.FilterType"
+                       ValueChanged="OnFilterChanged">
                 <MudSelectItem T="DecisionTypeModel?" Value="@(null)">All</MudSelectItem>
-                <MudSelectItem T="DecisionTypeModel?" Value="@DecisionTypeModel.ResolveInterface">ResolveInterface</MudSelectItem>
+                <MudSelectItem T="DecisionTypeModel?" Value="@DecisionTypeModel.ResolveInterface">ResolveInterface
+                </MudSelectItem>
             </MudSelect>
-            <MudSelect T="DecisionSortOption" Dense="true" Label="Sort" Value="@CurrentView.SortOption" ValueChanged="OnSortChanged">
+            <MudSelect T="DecisionSortOption" Dense="true" Label="Sort" Value="@CurrentView.SortOption"
+                       ValueChanged="OnSortChanged">
                 <MudSelectItem Value="@DecisionSortOption.Age">Age</MudSelectItem>
                 <MudSelectItem Value="@DecisionSortOption.Type">Type</MudSelectItem>
             </MudSelect>
             <MudSwitch T="bool"
                        @bind-Value="SortDescending"
                        Color="Color.Primary"
-                       Label="Desc" />
+                       Label="Desc"/>
         </div>
 
         <MudTabs Rounded="true">
             <MudTabPanel Text="Pending">
                 <PendingDecisionsPanel SolutionId="@(SelectedSolutionId!)"
                                        ViewState="@CurrentView"
-                                       OnDiscover="@Discover" />
+                                       OnDiscover="@Discover"/>
             </MudTabPanel>
             <MudTabPanel Text="Resolved">
                 <ResolvedDecisionsPanel SolutionId="@(SelectedSolutionId!)"
                                         ViewState="@CurrentView"
-                                        OnActiveFilterChanged="@OnActiveFilterChanged" />
+                                        OnActiveFilterChanged="@OnActiveFilterChanged"/>
             </MudTabPanel>
         </MudTabs>
     </div>
@@ -183,4 +184,5 @@ else
         Dispatcher.Dispatch(new DiscoverDecisionsAction(SelectedSolutionId, CurrentView.FilterType));
         return Task.CompletedTask;
     }
+
 }

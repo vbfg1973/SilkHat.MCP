@@ -1,88 +1,82 @@
 using System.Collections.Concurrent;
 using SilkHat.Code.Analysis.Abstractions;
-using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
 using SilkHat.Git.Analysis.Abstractions;
 
-namespace SilkHat.Api.Services;
-
-public interface ICodeTreeMetricsPrecomputeService
+namespace SilkHat.Api.Services
 {
-    Task StartPrecomputeAsync(Guid configId, CancellationToken cancellationToken);
-    void Clear(Guid configId);
-}
-
-public sealed class CodeTreeMetricsPrecomputeService : ICodeTreeMetricsPrecomputeService
-{
-    private readonly ICodeWorkspaceStore _codeWorkspaceStore;
-    private readonly ICodeTreeMetricsService _metricsService;
-    private readonly ICodeTreeMetricsCacheStore _cacheStore;
-    private readonly IComplexityMetricsAggregator _complexityAggregator;
-    private readonly IGitMetricsAggregator _gitMetricsAggregator;
-    private readonly ILogger<CodeTreeMetricsPrecomputeService> _logger;
-    private readonly ConcurrentDictionary<Guid, Task> _running = new();
-
-    public CodeTreeMetricsPrecomputeService(
-        ICodeWorkspaceStore codeWorkspaceStore,
-        ICodeTreeMetricsService metricsService,
-        ICodeTreeMetricsCacheStore cacheStore,
-        IComplexityMetricsAggregator complexityAggregator,
-        IGitMetricsAggregator gitMetricsAggregator,
-        ILogger<CodeTreeMetricsPrecomputeService> logger)
+    public interface ICodeTreeMetricsPrecomputeService
     {
-        _codeWorkspaceStore = codeWorkspaceStore;
-        _metricsService = metricsService;
-        _cacheStore = cacheStore;
-        _complexityAggregator = complexityAggregator;
-        _gitMetricsAggregator = gitMetricsAggregator;
-        _logger = logger;
+        Task StartPrecomputeAsync(Guid configId, CancellationToken cancellationToken);
+        void Clear(Guid configId);
     }
 
-    public Task StartPrecomputeAsync(Guid configId, CancellationToken cancellationToken)
+    public sealed class CodeTreeMetricsPrecomputeService : ICodeTreeMetricsPrecomputeService
     {
-        var task = _running.GetOrAdd(configId, _ => Task.Run(() => RunAsync(configId), CancellationToken.None));
-        return task.IsCompleted ? Task.CompletedTask : task;
-    }
+        private readonly ICodeTreeMetricsCacheStore _cacheStore;
+        private readonly ICodeWorkspaceStore _codeWorkspaceStore;
+        private readonly IComplexityMetricsAggregator _complexityAggregator;
+        private readonly IGitMetricsAggregator _gitMetricsAggregator;
+        private readonly ILogger<CodeTreeMetricsPrecomputeService> _logger;
+        private readonly ICodeTreeMetricsService _metricsService;
+        private readonly ConcurrentDictionary<Guid, Task> _running = new();
 
-    public void Clear(Guid configId)
-    {
-        _cacheStore.Clear(configId);
-        _complexityAggregator.Invalidate(configId);
-        _gitMetricsAggregator.Invalidate(configId);
-        _running.TryRemove(configId, out _);
-    }
-
-    private async Task RunAsync(Guid configId)
-    {
-        try
+        public CodeTreeMetricsPrecomputeService(
+            ICodeWorkspaceStore codeWorkspaceStore,
+            ICodeTreeMetricsService metricsService,
+            ICodeTreeMetricsCacheStore cacheStore,
+            IComplexityMetricsAggregator complexityAggregator,
+            IGitMetricsAggregator gitMetricsAggregator,
+            ILogger<CodeTreeMetricsPrecomputeService> logger)
         {
-            var workspace = _codeWorkspaceStore.Get(configId);
-            if (workspace is null)
-            {
-                return;
-            }
-
-            var solutions = workspace.Solutions.Values.ToList();
-            var kinds = Enum.GetValues<CodeTreeAnnotationKind>();
-
-            var tasks = new List<Task>(solutions.Count * kinds.Length);
-            foreach (var solution in solutions)
-            {
-                foreach (var kind in kinds)
-                {
-                    tasks.Add(_metricsService.GetMetricsAsync(configId, workspace, solution, kind, CancellationToken.None));
-                }
-            }
-
-            await Task.WhenAll(tasks);
+            _codeWorkspaceStore = codeWorkspaceStore;
+            _metricsService = metricsService;
+            _cacheStore = cacheStore;
+            _complexityAggregator = complexityAggregator;
+            _gitMetricsAggregator = gitMetricsAggregator;
+            _logger = logger;
         }
-        catch (Exception ex)
+
+        public Task StartPrecomputeAsync(Guid configId, CancellationToken cancellationToken)
         {
-            _logger.LogError(ex, "Failed to precompute code tree metrics for {ConfigId}.", configId);
+            var task = _running.GetOrAdd(configId, _ => Task.Run(() => RunAsync(configId), CancellationToken.None));
+            return task.IsCompleted ? Task.CompletedTask : task;
         }
-        finally
+
+        public void Clear(Guid configId)
         {
+            _cacheStore.Clear(configId);
+            _complexityAggregator.Invalidate(configId);
+            _gitMetricsAggregator.Invalidate(configId);
             _running.TryRemove(configId, out _);
+        }
+
+        private async Task RunAsync(Guid configId)
+        {
+            try
+            {
+                var workspace = _codeWorkspaceStore.Get(configId);
+                if (workspace is null) return;
+
+                var solutions = workspace.Solutions.Values.ToList();
+                var kinds = Enum.GetValues<CodeTreeAnnotationKind>();
+
+                var tasks = new List<Task>(solutions.Count * kinds.Length);
+                foreach (var solution in solutions)
+                foreach (var kind in kinds)
+                    tasks.Add(_metricsService.GetMetricsAsync(configId, workspace, solution, kind,
+                        CancellationToken.None));
+
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to precompute code tree metrics for {ConfigId}.", configId);
+            }
+            finally
+            {
+                _running.TryRemove(configId, out _);
+            }
         }
     }
 }

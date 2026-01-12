@@ -1,8 +1,9 @@
 using SilkHat.Code.Analysis.Models;
 
-namespace SilkHat.Code.Analysis.Abstractions;
-
-public interface IMethodCallStackMermaidService
+namespace SilkHat.Code.Analysis.Abstractions
 {
-    string BuildDiagram(IReadOnlyList<MethodCallStackNode> nodes);
+    public interface IMethodCallStackMermaidService
+    {
+        string BuildDiagram(IReadOnlyList<MethodCallStackNode> nodes);
+    }
 }

@@ -1,10 +1,6 @@
-@using Fluxor
-@using MudBlazor
-@using System.Linq
+@using SilkHat.Ui.Components.Dialogs
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
-@using SilkHat.Ui.State.Ide.Models
-@using SilkHat.Ui.Components.Dialogs
 @inherits Fluxor.Blazor.Web.Components.FluxorComponent
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeTabsState> TabsState
@@ -85,10 +81,10 @@
         </MudMenu>
         <MudMenu Dense="true" Label="Toolbox" ActivationEvent="MouseEvent.LeftClick">
             <MudMenuItem OnClick="@(() => SelectToolboxView(IdeToolboxView.Decisions))" Disabled="@IsTabsDisabled">
-                <MudIcon Icon="@GetToolboxIcon(IdeToolboxView.Decisions)" Size="Size.Small" Class="me-2" />
+                <MudIcon Icon="@GetToolboxIcon(IdeToolboxView.Decisions)" Size="Size.Small" Class="me-2"/>
                 Decisions
             </MudMenuItem>
-            <MudDivider />
+            <MudDivider/>
             <MudMenuItem OnClick="ClearToolboxSelection" Disabled="@IsTabsDisabled">
                 Clear Selection
             </MudMenuItem>
@@ -101,6 +97,7 @@
     private IDialogReference? _statusDialog;
 
     private string? SelectedSolutionId => SolutionsState.Value.SelectedSolutionId;
+
     private Guid? SelectedRepositoryId =>
         SolutionsState.Value.SelectedSolutionId is null
             ? null
@@ -160,7 +157,7 @@
     protected override void OnAfterRender(bool firstRender)
     {
         if (SymbolsState.Value.Views.TryGetValue(SelectedSolutionId ?? string.Empty, out var view)
-            && view.IsOpen != true
+            && !view.IsOpen
             && _symbolDialog is not null)
         {
             _symbolDialog.Close();
@@ -192,7 +189,7 @@
             {
                 var status = await Api.GetIndexStatusAsync(entry.ConfigId, solutionId);
                 if (status.Any(s => string.Equals(s.State, "Running", StringComparison.OrdinalIgnoreCase)
-                                 || string.Equals(s.State, "Pending", StringComparison.OrdinalIgnoreCase)))
+                                    || string.Equals(s.State, "Pending", StringComparison.OrdinalIgnoreCase)))
                 {
                     await OpenStatusDialogInternal(entry.ConfigId, solutionId);
                 }
@@ -224,7 +221,7 @@
         }
 
         if (SymbolsState.Value.Views.TryGetValue(SelectedSolutionId, out var view)
-            && view.IsOpen == true)
+            && view.IsOpen)
         {
             return;
         }
@@ -273,10 +270,7 @@
             new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Medium, FullWidth = true });
 
         var dialogRef = _statusDialog;
-        _ = dialogRef.Result.ContinueWith(_ => InvokeAsync(() =>
-        {
-            _statusDialog = null;
-        }));
+        _ = dialogRef.Result.ContinueWith(_ => InvokeAsync(() => { _statusDialog = null; }));
     }
 
     private void SelectToolboxView(IdeToolboxView view)
@@ -305,4 +299,5 @@
             ? Icons.Material.Filled.Check
             : Icons.Material.Filled.CheckBoxOutlineBlank;
     }
+
 }

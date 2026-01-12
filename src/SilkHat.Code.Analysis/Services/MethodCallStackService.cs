@@ -3,416 +3,353 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
 
-namespace SilkHat.Code.Analysis.Services;
-
-public sealed class MethodCallStackService : IMethodCallStackService
+namespace SilkHat.Code.Analysis.Services
 {
-    private readonly IMethodImplementationDecisionService _decisionService;
-
-    public MethodCallStackService(IMethodImplementationDecisionService decisionService)
+    public sealed class MethodCallStackService : IMethodCallStackService
     {
-        _decisionService = decisionService;
-    }
+        private readonly IMethodImplementationDecisionService _decisionService;
 
-    public async Task<MethodCallStackResult> BuildCallStackAsync(
-        CodeRepositoryWorkspace workspace,
-        CodeSolutionWorkspace solution,
-        Guid repositoryConfigId,
-        string? documentationId,
-        string methodSymbolKey,
-        int? maxDepth,
-        bool includeExternalCalls,
-        CancellationToken cancellationToken)
-    {
-        if (workspace is null)
+        public MethodCallStackService(IMethodImplementationDecisionService decisionService)
         {
-            throw new ArgumentNullException(nameof(workspace));
+            _decisionService = decisionService;
         }
 
-        if (solution is null)
+        public async Task<MethodCallStackResult> BuildCallStackAsync(
+            CodeRepositoryWorkspace workspace,
+            CodeSolutionWorkspace solution,
+            Guid repositoryConfigId,
+            string? documentationId,
+            string methodSymbolKey,
+            int? maxDepth,
+            bool includeExternalCalls,
+            CancellationToken cancellationToken)
         {
-            throw new ArgumentNullException(nameof(solution));
-        }
+            if (workspace is null) throw new ArgumentNullException(nameof(workspace));
 
-        if (string.IsNullOrWhiteSpace(documentationId)
-            && string.IsNullOrWhiteSpace(methodSymbolKey))
-        {
-            return new MethodCallStackResult(Array.Empty<MethodCallStackNode>(), true, "DocumentationId or SymbolKey is required.");
-        }
+            if (solution is null) throw new ArgumentNullException(nameof(solution));
 
-        if (!TryResolveMethodSymbol(solution, documentationId, methodSymbolKey, out var rootMethod, out var rootCompilation))
-        {
-            return new MethodCallStackResult(Array.Empty<MethodCallStackNode>(), true, "Method symbol not found.");
-        }
+            if (string.IsNullOrWhiteSpace(documentationId)
+                && string.IsNullOrWhiteSpace(methodSymbolKey))
+                return new MethodCallStackResult(Array.Empty<MethodCallStackNode>(), true,
+                    "DocumentationId or SymbolKey is required.");
 
-        var nodes = new List<MethodCallStackNode>();
-        var path = new HashSet<string>(StringComparer.Ordinal);
-        var rootIdentifier = DocumentationIdUtility.GetDocumentationId(rootMethod)
-            ?? SymbolKeyUtility.GetSymbolKeyString(rootMethod, rootCompilation);
-        path.Add(rootIdentifier);
+            if (!TryResolveMethodSymbol(solution, documentationId, methodSymbolKey, out var rootMethod,
+                    out var rootCompilation))
+                return new MethodCallStackResult(Array.Empty<MethodCallStackNode>(), true, "Method symbol not found.");
 
-        await TraverseMethodAsync(
-            workspace,
-            solution,
-            repositoryConfigId,
-            rootMethod,
-            rootCompilation,
-            null,
-            0,
-            nodes,
-            path,
-            maxDepth,
-            includeExternalCalls,
-            cancellationToken);
-
-        return new MethodCallStackResult(nodes, false, null);
-    }
-
-    private async Task TraverseMethodAsync(
-        CodeRepositoryWorkspace workspace,
-        CodeSolutionWorkspace solution,
-        Guid repositoryConfigId,
-        IMethodSymbol method,
-        Compilation compilation,
-        string? parentNodeId,
-        int depth,
-        List<MethodCallStackNode> nodes,
-        HashSet<string> path,
-        int? maxDepth,
-        bool includeExternalCalls,
-        CancellationToken cancellationToken)
-    {
-        if (maxDepth.HasValue && depth > maxDepth.Value)
-        {
-            return;
-        }
-
-        var syntaxRef = method.DeclaringSyntaxReferences.FirstOrDefault();
-        if (syntaxRef is null)
-        {
-            return;
-        }
-
-        var syntaxNode = syntaxRef.GetSyntax(cancellationToken);
-        var semanticModel = compilation.GetSemanticModel(syntaxNode.SyntaxTree, ignoreAccessibility: true);
-        var callNodes = GetCallNodes(syntaxNode)
-            .OrderBy(node => node.SpanStart)
-            .ToList();
-
-        var callerInfo = MethodDescriptor.FromSymbol(method);
-        var callIndex = 0;
-
-        foreach (var callNode in callNodes)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var targetMethod = ResolveCallTarget(semanticModel, callNode);
-            if (targetMethod is null)
-            {
-                continue;
-            }
-
-            if (!includeExternalCalls && !IsInCodebase(workspace, targetMethod))
-            {
-                continue;
-            }
-
-            var isInterfaceTarget = targetMethod.ContainingType.TypeKind == TypeKind.Interface;
-            MethodImplementationResolution? resolution = null;
-            var resolvedMethod = targetMethod;
-
-            if (isInterfaceTarget)
-            {
-                resolution = await _decisionService.ResolveAsync(
-                    workspace,
-                    solution,
-                    repositoryConfigId,
-                    solution.SolutionId,
-                    targetMethod,
-                    false,
-                    cancellationToken);
-
-                if (resolution.Implementation is not null)
-                {
-                    resolvedMethod = resolution.Implementation;
-                }
-            }
-
-            var targetInfo = MethodDescriptor.FromSymbol(resolvedMethod);
-            var interfaceTypeName = isInterfaceTarget ? targetMethod.ContainingType.ToDisplayString() : null;
-            var interfaceTypeDocId = isInterfaceTarget
-                ? DocumentationIdUtility.GetDocumentationId(targetMethod.ContainingType)
-                : null;
-            var interfaceMethodDocId = isInterfaceTarget
-                ? DocumentationIdUtility.GetDocumentationId(targetMethod)
-                : null;
-            var resolvedTypeName = isInterfaceTarget && resolvedMethod.ContainingType is not null
-                ? resolvedMethod.ContainingType.ToDisplayString()
-                : null;
-            var resolvedTypeDocId = DocumentationIdUtility.GetDocumentationId(resolvedMethod.ContainingType);
-            var resolvedMethodDocId = DocumentationIdUtility.GetDocumentationId(resolvedMethod);
-
-            var fullyQualifiedName = BuildFullyQualifiedMethodName(targetInfo);
-            var nodeId = $"{depth}_{fullyQualifiedName}_{callIndex}";
-            var callSite = BuildCallSite(workspace.RootPath, callNode);
-
-            nodes.Add(new MethodCallStackNode(
-                nodeId,
-                depth,
-                callIndex,
-                callerInfo.Namespace,
-                callerInfo.TypeName,
-                callerInfo.MethodName,
-                callerInfo.ParameterTypes,
-                BuildFullyQualifiedMethodName(callerInfo),
-                targetInfo.Namespace,
-                targetInfo.TypeName,
-                targetInfo.MethodName,
-                targetInfo.ParameterTypes,
-                fullyQualifiedName,
-                parentNodeId,
-                callSite,
-                resolution?.Decision,
-                isInterfaceTarget,
-                interfaceTypeName,
-                interfaceTypeDocId,
-                interfaceMethodDocId,
-                resolvedTypeName,
-                resolvedTypeDocId,
-                resolvedMethodDocId,
-                resolution?.DecisionRequired ?? false,
-                resolution?.CandidateTypeNames ?? Array.Empty<string>(),
-                resolution?.CandidateMethodDocumentationIds ?? Array.Empty<string?>()));
-
-            callIndex++;
-
-            if ((resolution?.DecisionRequired ?? false) && resolution?.Implementation is null)
-            {
-                continue;
-            }
-
-            if (!includeExternalCalls && !IsInCodebase(workspace, resolvedMethod))
-            {
-                continue;
-            }
-
-            var nextCompilation = GetCompilationForSymbol(solution, resolvedMethod) ?? compilation;
-            var nextIdentifier = DocumentationIdUtility.GetDocumentationId(resolvedMethod)
-                ?? SymbolKeyUtility.GetSymbolKeyString(resolvedMethod, nextCompilation);
-            if (!path.Add(nextIdentifier))
-            {
-                continue;
-            }
+            var nodes = new List<MethodCallStackNode>();
+            var path = new HashSet<string>(StringComparer.Ordinal);
+            var rootIdentifier = DocumentationIdUtility.GetDocumentationId(rootMethod)
+                                 ?? SymbolKeyUtility.GetSymbolKeyString(rootMethod, rootCompilation);
+            path.Add(rootIdentifier);
 
             await TraverseMethodAsync(
                 workspace,
                 solution,
                 repositoryConfigId,
-                resolvedMethod,
-                nextCompilation,
-                nodeId,
-                depth + 1,
+                rootMethod,
+                rootCompilation,
+                null,
+                0,
                 nodes,
                 path,
                 maxDepth,
                 includeExternalCalls,
                 cancellationToken);
 
-            path.Remove(nextIdentifier);
-        }
-    }
-
-    private static IEnumerable<SyntaxNode> GetCallNodes(SyntaxNode root)
-    {
-        return root.DescendantNodes()
-            .Where(node => node is InvocationExpressionSyntax or ObjectCreationExpressionSyntax);
-    }
-
-    private static IMethodSymbol? ResolveCallTarget(SemanticModel semanticModel, SyntaxNode callNode)
-    {
-        var symbolInfo = semanticModel.GetSymbolInfo(callNode);
-        var symbol = symbolInfo.Symbol ?? symbolInfo.CandidateSymbols.FirstOrDefault();
-        if (symbol is IMethodSymbol method)
-        {
-            return method;
+            return new MethodCallStackResult(nodes, false, null);
         }
 
-        if (symbol is IPropertySymbol property && property.GetMethod is not null)
+        private async Task TraverseMethodAsync(
+            CodeRepositoryWorkspace workspace,
+            CodeSolutionWorkspace solution,
+            Guid repositoryConfigId,
+            IMethodSymbol method,
+            Compilation compilation,
+            string? parentNodeId,
+            int depth,
+            List<MethodCallStackNode> nodes,
+            HashSet<string> path,
+            int? maxDepth,
+            bool includeExternalCalls,
+            CancellationToken cancellationToken)
         {
-            return property.GetMethod;
-        }
+            if (maxDepth.HasValue && depth > maxDepth.Value) return;
 
-        return null;
-    }
+            var syntaxRef = method.DeclaringSyntaxReferences.FirstOrDefault();
+            if (syntaxRef is null) return;
 
-    private static MethodCallSite BuildCallSite(string rootPath, SyntaxNode callNode)
-    {
-        var tree = callNode.SyntaxTree;
-        var lineSpan = tree.GetLineSpan(callNode.Span);
-        var relativePath = SolutionIdentity.NormalizeRelativePath(rootPath, tree.FilePath);
+            var syntaxNode = syntaxRef.GetSyntax(cancellationToken);
+            var semanticModel = compilation.GetSemanticModel(syntaxNode.SyntaxTree, true);
+            var callNodes = GetCallNodes(syntaxNode)
+                .OrderBy(node => node.SpanStart)
+                .ToList();
 
-        return new MethodCallSite(
-            relativePath,
-            callNode.Span.Start,
-            callNode.Span.Length,
-            lineSpan.StartLinePosition.Line + 1,
-            lineSpan.StartLinePosition.Character + 1,
-            lineSpan.EndLinePosition.Line + 1,
-            lineSpan.EndLinePosition.Character + 1);
-    }
+            var callerInfo = MethodDescriptor.FromSymbol(method);
+            var callIndex = 0;
 
-    private static bool TryResolveMethodSymbol(
-        CodeSolutionWorkspace solution,
-        string? documentationId,
-        string methodSymbolKey,
-        out IMethodSymbol methodSymbol,
-        out Compilation compilation)
-    {
-        if (!string.IsNullOrWhiteSpace(documentationId))
-        {
-            var docResolved = DocumentationIdUtility.FindMethodByDocumentationId(solution, documentationId);
-            if (docResolved is not null)
+            foreach (var callNode in callNodes)
             {
-                var docCompilation = GetCompilationForSymbol(solution, docResolved);
-                if (docCompilation is not null)
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var targetMethod = ResolveCallTarget(semanticModel, callNode);
+                if (targetMethod is null) continue;
+
+                if (!includeExternalCalls && !IsInCodebase(workspace, targetMethod)) continue;
+
+                var isInterfaceTarget = targetMethod.ContainingType.TypeKind == TypeKind.Interface;
+                MethodImplementationResolution? resolution = null;
+                var resolvedMethod = targetMethod;
+
+                if (isInterfaceTarget)
                 {
-                    methodSymbol = docResolved;
-                    compilation = docCompilation;
-                    return true;
+                    resolution = await _decisionService.ResolveAsync(
+                        workspace,
+                        solution,
+                        repositoryConfigId,
+                        solution.SolutionId,
+                        targetMethod,
+                        false,
+                        cancellationToken);
+
+                    if (resolution.Implementation is not null) resolvedMethod = resolution.Implementation;
                 }
+
+                var targetInfo = MethodDescriptor.FromSymbol(resolvedMethod);
+                var interfaceTypeName = isInterfaceTarget ? targetMethod.ContainingType.ToDisplayString() : null;
+                var interfaceTypeDocId = isInterfaceTarget
+                    ? DocumentationIdUtility.GetDocumentationId(targetMethod.ContainingType)
+                    : null;
+                var interfaceMethodDocId = isInterfaceTarget
+                    ? DocumentationIdUtility.GetDocumentationId(targetMethod)
+                    : null;
+                var resolvedTypeName = isInterfaceTarget && resolvedMethod.ContainingType is not null
+                    ? resolvedMethod.ContainingType.ToDisplayString()
+                    : null;
+                var resolvedTypeDocId = DocumentationIdUtility.GetDocumentationId(resolvedMethod.ContainingType);
+                var resolvedMethodDocId = DocumentationIdUtility.GetDocumentationId(resolvedMethod);
+
+                var fullyQualifiedName = BuildFullyQualifiedMethodName(targetInfo);
+                var nodeId = $"{depth}_{fullyQualifiedName}_{callIndex}";
+                var callSite = BuildCallSite(workspace.RootPath, callNode);
+
+                nodes.Add(new MethodCallStackNode(
+                    nodeId,
+                    depth,
+                    callIndex,
+                    callerInfo.Namespace,
+                    callerInfo.TypeName,
+                    callerInfo.MethodName,
+                    callerInfo.ParameterTypes,
+                    BuildFullyQualifiedMethodName(callerInfo),
+                    targetInfo.Namespace,
+                    targetInfo.TypeName,
+                    targetInfo.MethodName,
+                    targetInfo.ParameterTypes,
+                    fullyQualifiedName,
+                    parentNodeId,
+                    callSite,
+                    resolution?.Decision,
+                    isInterfaceTarget,
+                    interfaceTypeName,
+                    interfaceTypeDocId,
+                    interfaceMethodDocId,
+                    resolvedTypeName,
+                    resolvedTypeDocId,
+                    resolvedMethodDocId,
+                    resolution?.DecisionRequired ?? false,
+                    resolution?.CandidateTypeNames ?? Array.Empty<string>(),
+                    resolution?.CandidateMethodDocumentationIds ?? Array.Empty<string?>()));
+
+                callIndex++;
+
+                if ((resolution?.DecisionRequired ?? false) && resolution?.Implementation is null) continue;
+
+                if (!includeExternalCalls && !IsInCodebase(workspace, resolvedMethod)) continue;
+
+                var nextCompilation = GetCompilationForSymbol(solution, resolvedMethod) ?? compilation;
+                var nextIdentifier = DocumentationIdUtility.GetDocumentationId(resolvedMethod)
+                                     ?? SymbolKeyUtility.GetSymbolKeyString(resolvedMethod, nextCompilation);
+                if (!path.Add(nextIdentifier)) continue;
+
+                await TraverseMethodAsync(
+                    workspace,
+                    solution,
+                    repositoryConfigId,
+                    resolvedMethod,
+                    nextCompilation,
+                    nodeId,
+                    depth + 1,
+                    nodes,
+                    path,
+                    maxDepth,
+                    includeExternalCalls,
+                    cancellationToken);
+
+                path.Remove(nextIdentifier);
             }
         }
 
-        if (string.IsNullOrWhiteSpace(methodSymbolKey))
+        private static IEnumerable<SyntaxNode> GetCallNodes(SyntaxNode root)
         {
+            return root.DescendantNodes()
+                .Where(node => node is InvocationExpressionSyntax or ObjectCreationExpressionSyntax);
+        }
+
+        private static IMethodSymbol? ResolveCallTarget(SemanticModel semanticModel, SyntaxNode callNode)
+        {
+            var symbolInfo = semanticModel.GetSymbolInfo(callNode);
+            var symbol = symbolInfo.Symbol ?? symbolInfo.CandidateSymbols.FirstOrDefault();
+            if (symbol is IMethodSymbol method) return method;
+
+            if (symbol is IPropertySymbol property && property.GetMethod is not null) return property.GetMethod;
+
+            return null;
+        }
+
+        private static MethodCallSite BuildCallSite(string rootPath, SyntaxNode callNode)
+        {
+            var tree = callNode.SyntaxTree;
+            var lineSpan = tree.GetLineSpan(callNode.Span);
+            var relativePath = SolutionIdentity.NormalizeRelativePath(rootPath, tree.FilePath);
+
+            return new MethodCallSite(
+                relativePath,
+                callNode.Span.Start,
+                callNode.Span.Length,
+                lineSpan.StartLinePosition.Line + 1,
+                lineSpan.StartLinePosition.Character + 1,
+                lineSpan.EndLinePosition.Line + 1,
+                lineSpan.EndLinePosition.Character + 1);
+        }
+
+        private static bool TryResolveMethodSymbol(
+            CodeSolutionWorkspace solution,
+            string? documentationId,
+            string methodSymbolKey,
+            out IMethodSymbol methodSymbol,
+            out Compilation compilation)
+        {
+            if (!string.IsNullOrWhiteSpace(documentationId))
+            {
+                var docResolved = DocumentationIdUtility.FindMethodByDocumentationId(solution, documentationId);
+                if (docResolved is not null)
+                {
+                    var docCompilation = GetCompilationForSymbol(solution, docResolved);
+                    if (docCompilation is not null)
+                    {
+                        methodSymbol = docResolved;
+                        compilation = docCompilation;
+                        return true;
+                    }
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(methodSymbolKey))
+            {
+                methodSymbol = null!;
+                compilation = null!;
+                return false;
+            }
+
+            foreach (var compilationEntry in solution.Compilations)
+            {
+                var candidateCompilation = compilationEntry.Value;
+                var resolved = SymbolKeyUtility.ResolveSymbol(methodSymbolKey, candidateCompilation);
+                if (resolved is IMethodSymbol method)
+                {
+                    methodSymbol = method;
+                    compilation = candidateCompilation;
+                    return true;
+                }
+
+                foreach (var candidateMethod in EnumerateMethods(candidateCompilation.GlobalNamespace))
+                {
+                    var candidateKey = SymbolKeyUtility.GetSymbolKeyString(candidateMethod, candidateCompilation);
+                    if (string.Equals(candidateKey, methodSymbolKey, StringComparison.Ordinal))
+                    {
+                        methodSymbol = candidateMethod;
+                        compilation = candidateCompilation;
+                        return true;
+                    }
+                }
+            }
+
             methodSymbol = null!;
             compilation = null!;
             return false;
         }
 
-        foreach (var compilationEntry in solution.Compilations)
+        private static IEnumerable<IMethodSymbol> EnumerateMethods(INamespaceSymbol root)
         {
-            var candidateCompilation = compilationEntry.Value;
-            var resolved = SymbolKeyUtility.ResolveSymbol(methodSymbolKey, candidateCompilation);
-            if (resolved is IMethodSymbol method)
-            {
-                methodSymbol = method;
-                compilation = candidateCompilation;
-                return true;
-            }
-
-            foreach (var candidateMethod in EnumerateMethods(candidateCompilation.GlobalNamespace))
-            {
-                var candidateKey = SymbolKeyUtility.GetSymbolKeyString(candidateMethod, candidateCompilation);
-                if (string.Equals(candidateKey, methodSymbolKey, StringComparison.Ordinal))
-                {
-                    methodSymbol = candidateMethod;
-                    compilation = candidateCompilation;
-                    return true;
-                }
-            }
+            foreach (var member in root.GetMembers())
+                if (member is INamespaceSymbol ns)
+                    foreach (var nested in EnumerateMethods(ns))
+                        yield return nested;
+                else if (member is INamedTypeSymbol type)
+                    foreach (var method in EnumerateMethods(type))
+                        yield return method;
         }
 
-        methodSymbol = null!;
-        compilation = null!;
-        return false;
-    }
-
-    private static IEnumerable<IMethodSymbol> EnumerateMethods(INamespaceSymbol root)
-    {
-        foreach (var member in root.GetMembers())
+        private static IEnumerable<IMethodSymbol> EnumerateMethods(INamedTypeSymbol type)
         {
-            if (member is INamespaceSymbol ns)
-            {
-                foreach (var nested in EnumerateMethods(ns))
-                {
-                    yield return nested;
-                }
-            }
-            else if (member is INamedTypeSymbol type)
-            {
-                foreach (var method in EnumerateMethods(type))
-                {
-                    yield return method;
-                }
-            }
-        }
-    }
+            foreach (var method in type.GetMembers().OfType<IMethodSymbol>()) yield return method;
 
-    private static IEnumerable<IMethodSymbol> EnumerateMethods(INamedTypeSymbol type)
-    {
-        foreach (var method in type.GetMembers().OfType<IMethodSymbol>())
-        {
-            yield return method;
-        }
-
-        foreach (var nestedType in type.GetTypeMembers())
-        {
+            foreach (var nestedType in type.GetTypeMembers())
             foreach (var nestedMethod in EnumerateMethods(nestedType))
-            {
                 yield return nestedMethod;
-            }
-        }
-    }
-
-    private static Compilation? GetCompilationForSymbol(CodeSolutionWorkspace solution, IMethodSymbol method)
-    {
-        var assemblyName = method.ContainingAssembly?.Name;
-        if (string.IsNullOrWhiteSpace(assemblyName))
-        {
-            return null;
         }
 
-        return solution.Compilations.Values.FirstOrDefault(compilation =>
-            string.Equals(compilation.AssemblyName, assemblyName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string BuildFullyQualifiedMethodName(MethodDescriptor descriptor)
-    {
-        var parameterList = descriptor.ParameterTypes.Count == 0
-            ? "none"
-            : string.Join(",", descriptor.ParameterTypes);
-
-        return $"{descriptor.Namespace}.{descriptor.TypeName}.{descriptor.MethodName}.{parameterList}";
-    }
-
-    private static bool IsInCodebase(CodeRepositoryWorkspace workspace, IMethodSymbol method)
-    {
-        foreach (var location in method.Locations)
+        private static Compilation? GetCompilationForSymbol(CodeSolutionWorkspace solution, IMethodSymbol method)
         {
-            if (!location.IsInSource || location.SourceTree?.FilePath is not { Length: > 0 } filePath)
+            var assemblyName = method.ContainingAssembly?.Name;
+            if (string.IsNullOrWhiteSpace(assemblyName)) return null;
+
+            return solution.Compilations.Values.FirstOrDefault(compilation =>
+                string.Equals(compilation.AssemblyName, assemblyName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string BuildFullyQualifiedMethodName(MethodDescriptor descriptor)
+        {
+            var parameterList = descriptor.ParameterTypes.Count == 0
+                ? "none"
+                : string.Join(",", descriptor.ParameterTypes);
+
+            return $"{descriptor.Namespace}.{descriptor.TypeName}.{descriptor.MethodName}.{parameterList}";
+        }
+
+        private static bool IsInCodebase(CodeRepositoryWorkspace workspace, IMethodSymbol method)
+        {
+            foreach (var location in method.Locations)
             {
-                continue;
+                if (!location.IsInSource || location.SourceTree?.FilePath is not { Length: > 0 } filePath) continue;
+
+                if (filePath.StartsWith(workspace.RootPath, StringComparison.OrdinalIgnoreCase)) return true;
             }
 
-            if (filePath.StartsWith(workspace.RootPath, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
+            return false;
         }
 
-        return false;
-    }
-
-    private sealed record MethodDescriptor(
-        string Namespace,
-        string TypeName,
-        string MethodName,
-        IReadOnlyList<string> ParameterTypes)
-    {
-        public static MethodDescriptor FromSymbol(IMethodSymbol method)
+        private sealed record MethodDescriptor(
+            string Namespace,
+            string TypeName,
+            string MethodName,
+            IReadOnlyList<string> ParameterTypes)
         {
-            var namespaceName = method.ContainingNamespace?.ToDisplayString() ?? string.Empty;
-            var typeName = method.ContainingType?.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
-                ?? string.Empty;
-            var methodName = method.MethodKind == MethodKind.Constructor
-                ? method.ContainingType?.Name ?? method.Name
-                : method.Name;
-            var parameterTypes = method.Parameters
-                .Select(parameter => parameter.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat))
-                .ToList();
+            public static MethodDescriptor FromSymbol(IMethodSymbol method)
+            {
+                var namespaceName = method.ContainingNamespace?.ToDisplayString() ?? string.Empty;
+                var typeName = method.ContainingType?.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
+                               ?? string.Empty;
+                var methodName = method.MethodKind == MethodKind.Constructor
+                    ? method.ContainingType?.Name ?? method.Name
+                    : method.Name;
+                var parameterTypes = method.Parameters
+                    .Select(parameter => parameter.Type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat))
+                    .ToList();
 
-            return new MethodDescriptor(namespaceName, typeName, methodName, parameterTypes);
+                return new MethodDescriptor(namespaceName, typeName, methodName, parameterTypes);
+            }
         }
     }
 }

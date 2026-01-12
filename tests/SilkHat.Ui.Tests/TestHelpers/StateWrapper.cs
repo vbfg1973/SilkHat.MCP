@@ -1,19 +1,20 @@
 using Fluxor;
 
-namespace SilkHat.Ui.Tests.TestHelpers;
-
-public sealed class StateWrapper<T> : IState<T>
+namespace SilkHat.Ui.Tests.TestHelpers
 {
-    public StateWrapper(T value)
+    public sealed class StateWrapper<T> : IState<T>
     {
-        Value = value;
-    }
+        public StateWrapper(T value)
+        {
+            Value = value;
+        }
 
-    public T Value { get; }
+        public T Value { get; }
 
-    public event EventHandler? StateChanged
-    {
-        add { }
-        remove { }
+        public event EventHandler? StateChanged
+        {
+            add { }
+            remove { }
+        }
     }
 }

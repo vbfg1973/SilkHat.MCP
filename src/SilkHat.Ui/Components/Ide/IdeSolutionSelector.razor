@@ -1,8 +1,6 @@
-@using Fluxor
-@using Fluxor.Blazor.Web.Components
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
-@inherits FluxorComponent
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IDispatcher Dispatcher
 
@@ -23,6 +21,7 @@
 }
 
 @code {
+
     private void OnSolutionChanged(string? solutionId)
     {
         if (string.IsNullOrWhiteSpace(solutionId))
@@ -32,4 +31,5 @@
 
         Dispatcher.Dispatch(new SelectSolutionAction(solutionId));
     }
+
 }

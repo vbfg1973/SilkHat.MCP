@@ -1,6 +1,3 @@
-@using MudBlazor
-@using SilkHat.Ui.Models
-
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="2">
@@ -22,11 +19,9 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter]
-    private IMudDialogInstance? Dialog { get; set; }
+    [CascadingParameter] private IMudDialogInstance? Dialog { get; set; }
 
-    [Parameter]
-    public CodeTreeAnnotationKind? AnnotationKind { get; set; }
+    [Parameter] public CodeTreeAnnotationKind? AnnotationKind { get; set; }
 
     private CodeTreeAnnotationKind? _selected;
 
@@ -50,4 +45,5 @@
         _selected = null;
         Dialog?.Close(DialogResult.Ok(new CodeTreeAnnotationSelection(null)));
     }
+
 }

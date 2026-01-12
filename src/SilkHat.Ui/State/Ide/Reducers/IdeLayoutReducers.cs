@@ -1,29 +1,30 @@
 using Fluxor;
 using SilkHat.Ui.State.Ide.Actions;
 
-namespace SilkHat.Ui.State.Ide.Reducers;
-
-public static class IdeLayoutReducers
+namespace SilkHat.Ui.State.Ide.Reducers
 {
-    [ReducerMethod]
-    public static IdeLayoutState ReduceSetView(IdeLayoutState state, SetIdeMainViewAction action)
+    public static class IdeLayoutReducers
     {
-        var views = new Dictionary<string, IdeLayoutViewState>(state.Views, StringComparer.OrdinalIgnoreCase);
-        var current = views.TryGetValue(action.SolutionId, out var view)
-            ? view
-            : IdeLayoutViewState.Default;
-        views[action.SolutionId] = current with { ActiveView = action.View };
-        return new IdeLayoutState(views);
-    }
+        [ReducerMethod]
+        public static IdeLayoutState ReduceSetView(IdeLayoutState state, SetIdeMainViewAction action)
+        {
+            var views = new Dictionary<string, IdeLayoutViewState>(state.Views, StringComparer.OrdinalIgnoreCase);
+            var current = views.TryGetValue(action.SolutionId, out var view)
+                ? view
+                : IdeLayoutViewState.Default;
+            views[action.SolutionId] = current with { ActiveView = action.View };
+            return new IdeLayoutState(views);
+        }
 
-    [ReducerMethod]
-    public static IdeLayoutState ReduceToolboxView(IdeLayoutState state, SetToolboxViewAction action)
-    {
-        var views = new Dictionary<string, IdeLayoutViewState>(state.Views, StringComparer.OrdinalIgnoreCase);
-        var current = views.TryGetValue(action.SolutionId, out var view)
-            ? view
-            : IdeLayoutViewState.Default;
-        views[action.SolutionId] = current with { ToolboxView = action.View };
-        return new IdeLayoutState(views);
+        [ReducerMethod]
+        public static IdeLayoutState ReduceToolboxView(IdeLayoutState state, SetToolboxViewAction action)
+        {
+            var views = new Dictionary<string, IdeLayoutViewState>(state.Views, StringComparer.OrdinalIgnoreCase);
+            var current = views.TryGetValue(action.SolutionId, out var view)
+                ? view
+                : IdeLayoutViewState.Default;
+            views[action.SolutionId] = current with { ToolboxView = action.View };
+            return new IdeLayoutState(views);
+        }
     }
 }

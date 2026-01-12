@@ -1,44 +1,39 @@
 using SilkHat.Code.Analysis.Models;
 
-namespace SilkHat.Code.Analysis.Services;
-
-public sealed class SolutionIdentityResolver
+namespace SilkHat.Code.Analysis.Services
 {
-    private readonly SolutionParser _parser = new();
-
-    public string ResolveFromParsedSolution(string rootPath, ParsedSolution solution)
+    public sealed class SolutionIdentityResolver
     {
-        return SolutionIdentity.Create(rootPath, solution.SolutionPath, solution.SolutionGuid);
-    }
+        private readonly SolutionParser _parser = new();
 
-    public string ResolveFromRelativePath(string rootPath, string relativePath)
-    {
-        var fullPath = ResolveSolutionPath(rootPath, relativePath);
-        Guid? solutionGuid = null;
-
-        if (File.Exists(fullPath))
+        public string ResolveFromParsedSolution(string rootPath, ParsedSolution solution)
         {
-            var parsed = _parser.Parse(fullPath);
-            solutionGuid = parsed.SolutionGuid;
-            fullPath = parsed.SolutionPath;
+            return SolutionIdentity.Create(rootPath, solution.SolutionPath, solution.SolutionGuid);
         }
 
-        return SolutionIdentity.Create(rootPath, fullPath, solutionGuid);
-    }
-
-    public static string ResolveSolutionPath(string rootPath, string solutionPath)
-    {
-        if (Path.IsPathRooted(solutionPath))
+        public string ResolveFromRelativePath(string rootPath, string relativePath)
         {
-            return Path.GetFullPath(solutionPath);
+            var fullPath = ResolveSolutionPath(rootPath, relativePath);
+            Guid? solutionGuid = null;
+
+            if (File.Exists(fullPath))
+            {
+                var parsed = _parser.Parse(fullPath);
+                solutionGuid = parsed.SolutionGuid;
+                fullPath = parsed.SolutionPath;
+            }
+
+            return SolutionIdentity.Create(rootPath, fullPath, solutionGuid);
         }
 
-        var relative = solutionPath.Trim().Replace('\\', '/').TrimStart('/');
-        if (relative.StartsWith("./", StringComparison.Ordinal))
+        public static string ResolveSolutionPath(string rootPath, string solutionPath)
         {
-            relative = relative[2..];
-        }
+            if (Path.IsPathRooted(solutionPath)) return Path.GetFullPath(solutionPath);
 
-        return Path.GetFullPath(Path.Combine(rootPath, relative));
+            var relative = solutionPath.Trim().Replace('\\', '/').TrimStart('/');
+            if (relative.StartsWith("./", StringComparison.Ordinal)) relative = relative[2..];
+
+            return Path.GetFullPath(Path.Combine(rootPath, relative));
+        }
     }
 }

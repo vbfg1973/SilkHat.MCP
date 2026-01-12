@@ -1,11 +1,12 @@
 using SilkHat.Code.Analysis.Models;
 
-namespace SilkHat.Code.Analysis.Abstractions;
-
-public interface ICodeWorkspaceLoader
+namespace SilkHat.Code.Analysis.Abstractions
 {
-    Task<CodeRepositoryWorkspace> LoadAsync(
-        string rootPath,
-        IReadOnlyList<SolutionReference> solutions,
-        CancellationToken cancellationToken);
+    public interface ICodeWorkspaceLoader
+    {
+        Task<CodeRepositoryWorkspace> LoadAsync(
+            string rootPath,
+            IReadOnlyList<SolutionReference> solutions,
+            CancellationToken cancellationToken);
+    }
 }

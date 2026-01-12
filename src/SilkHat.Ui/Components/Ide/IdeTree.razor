@@ -1,11 +1,6 @@
-@using Fluxor
-@using Fluxor.Blazor.Web.Components
-@using Microsoft.AspNetCore.Components.Web
-@using MudBlazor
-@using SilkHat.Ui.Models
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
-@inherits FluxorComponent
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeTreeState> TreeState
 @inject IState<IdeTreeSettingsState> TreeSettingsState
@@ -23,60 +18,62 @@
             <MudIconButton Icon="@Icons.Material.Filled.Label"
                            Color="Color.Default"
                            Size="Size.Small"
-                           OnClick="OpenAnnotationDialog" />
+                           OnClick="OpenAnnotationDialog"/>
         </MudTooltip>
         <MudTooltip Text="Filter" Placement="Placement.Bottom">
             <MudIconButton Icon="@Icons.Material.Filled.FilterAlt"
                            Color="Color.Default"
                            Size="Size.Small"
-                           OnClick="OpenFilterDialog" />
+                           OnClick="OpenFilterDialog"/>
         </MudTooltip>
         <MudTooltip Text="Toggle Annotations/Filters" Placement="Placement.Bottom">
-            <MudIconButton Icon="@(TreeSettingsState.Value.IsEnabled ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
-                           Color="Color.Default"
-                           Size="Size.Small"
-                           OnClick="ToggleDecorations" />
+            <MudIconButton
+                Icon="@(TreeSettingsState.Value.IsEnabled ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                Color="Color.Default"
+                Size="Size.Small"
+                OnClick="ToggleDecorations"/>
         </MudTooltip>
     </div>
 
-<div class="ide-tree-scroll">
-    <MudTreeView T="CodeTreeEntryModel"
-                 @key="TreeRenderKey"
-                 Class="ide-tree-viewer"
-                 Style="font-size: 9px;"
-                 Dense="true"
-                 ServerData="LoadTreeChildrenAsync"
-                 Items="CurrentTree?.Items">
-    <ItemTemplate>
-        <MudTreeViewItem T="CodeTreeEntryModel"
-                         Value="@context.Value"
-                         Text="@context.Text"
-                         Items="@context.Children"
-                         ItemsChanged="@(new Action<IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>>>(items => OnItemsLoaded(context, items)))"
-                         @bind-Expanded="context.Expanded"
-                         CanExpand="@context.Expandable"
-                         Icon="@context.Icon"
-                         LoadingIconColor="Color.Info"
-                         Style="font-size: 9px;"
-                         OnClick="@(async (MouseEventArgs _) => await OnTreeEntrySelected(context.Value))">
-                <BodyContent Context="item">
-                    <div class="ide-tree-item">
-                        <span>@item.Value?.Name</span>
-                        @if (item.Value?.AnnotationKind is not null && item.Value.AnnotationValue is not null)
-                        {
-                            <MudBadge Content="@item.Value.AnnotationValue"
-                                      Color="Color.Info"
-                                      Class="ide-tree-badge" />
-                        }
-                    </div>
-                </BodyContent>
-            </MudTreeViewItem>
-    </ItemTemplate>
-</MudTreeView>
-</div>
+    <div class="ide-tree-scroll">
+        <MudTreeView T="CodeTreeEntryModel"
+                     @key="TreeRenderKey"
+                     Class="ide-tree-viewer"
+                     Style="font-size: 9px;"
+                     Dense="true"
+                     ServerData="LoadTreeChildrenAsync"
+                     Items="CurrentTree?.Items">
+            <ItemTemplate>
+                <MudTreeViewItem T="CodeTreeEntryModel"
+                                 Value="@context.Value"
+                                 Text="@context.Text"
+                                 Items="@context.Children"
+                                 ItemsChanged="@(new Action<IReadOnlyCollection<TreeItemData<CodeTreeEntryModel>>>(items => OnItemsLoaded(context, items)))"
+                                 @bind-Expanded="context.Expanded"
+                                 CanExpand="@context.Expandable"
+                                 Icon="@context.Icon"
+                                 LoadingIconColor="Color.Info"
+                                 Style="font-size: 9px;"
+                                 OnClick="@(async (MouseEventArgs _) => await OnTreeEntrySelected(context.Value))">
+                    <BodyContent Context="item">
+                        <div class="ide-tree-item">
+                            <span>@item.Value?.Name</span>
+                            @if (item.Value?.AnnotationKind is not null && item.Value.AnnotationValue is not null)
+                            {
+                                <MudBadge Content="@($"{item.Value.AnnotationValue}")"
+                                          Color="Color.Info"
+                                          Class="ide-tree-badge"/>
+                            }
+                        </div>
+                    </BodyContent>
+                </MudTreeViewItem>
+            </ItemTemplate>
+        </MudTreeView>
+    </div>
 </div>
 
 @code {
+
     private IdeTreeViewState? CurrentTree => SelectedSolutionId is null
         ? null
         : TreeState.Value.Trees.TryGetValue(SelectedSolutionId, out var tree)
@@ -225,4 +222,5 @@
     {
         Dispatcher.Dispatch(new SetTreeDecorationsEnabledAction(!TreeSettingsState.Value.IsEnabled));
     }
+
 }

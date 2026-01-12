@@ -1,6 +1,7 @@
-namespace SilkHat.Api.Models;
-
-public sealed class CodeFileQuery
+namespace SilkHat.Api.Models
 {
-    public string? Path { get; init; }
+    public sealed class CodeFileQuery
+    {
+        public string? Path { get; init; }
+    }
 }

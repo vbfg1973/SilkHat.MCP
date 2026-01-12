@@ -1,176 +1,155 @@
 using Microsoft.Extensions.Options;
-using System.Linq;
 using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Models;
 using SilkHat.Code.Analysis.Services;
 using SilkHat.Core.Dtos;
 
-namespace SilkHat.Analysis.Services;
-
-public sealed class RepositoryDiscoveryService : IRepositoryDiscoveryService
+namespace SilkHat.Analysis.Services
 {
-    private readonly string? _repoRoot;
-    private readonly SolutionIdentityResolver _solutionIdentityResolver = new();
-
-    public RepositoryDiscoveryService(IOptions<RepositoryDiscoveryOptions> options)
+    public sealed class RepositoryDiscoveryService : IRepositoryDiscoveryService
     {
-        _repoRoot = NormalizeRoot(options.Value.RepoRoot);
-    }
+        private readonly SolutionIdentityResolver _solutionIdentityResolver = new();
 
-    public bool IsConfigured => !string.IsNullOrWhiteSpace(_repoRoot);
-
-    public string? RepositoryRoot => _repoRoot;
-
-    public IReadOnlyList<AvailableRepositoryDto> ListAvailableRepositories()
-    {
-        EnsureConfigured();
-
-        if (!Directory.Exists(_repoRoot!))
+        public RepositoryDiscoveryService(IOptions<RepositoryDiscoveryOptions> options)
         {
-            throw new InvalidOperationException($"Repository root '{_repoRoot}' does not exist.");
+            RepositoryRoot = NormalizeRoot(options.Value.RepoRoot);
         }
 
-        var results = new List<AvailableRepositoryDto>();
-        foreach (var directory in Directory.EnumerateDirectories(_repoRoot!))
+        public bool IsConfigured => !string.IsNullOrWhiteSpace(RepositoryRoot);
+
+        public string? RepositoryRoot { get; }
+
+        public IReadOnlyList<AvailableRepositoryDto> ListAvailableRepositories()
         {
-            var name = Path.GetFileName(directory);
-            var relative = Path.GetRelativePath(_repoRoot!, directory);
-            results.Add(new AvailableRepositoryDto(
-                name,
-                relative.Replace('\\', '/'),
-                directory,
-                IsGitRepository(directory)));
-        }
+            EnsureConfigured();
 
-        return results
-            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
+            if (!Directory.Exists(RepositoryRoot!))
+                throw new InvalidOperationException($"Repository root '{RepositoryRoot}' does not exist.");
 
-    public IReadOnlyList<AvailableRepositorySolutionDto> ListSolutions(string rootPath)
-    {
-        EnsureConfigured();
-
-        var fullPath = NormalizeRoot(rootPath);
-        if (string.IsNullOrWhiteSpace(fullPath))
-        {
-            throw new InvalidOperationException("RootPath is invalid.");
-        }
-
-        if (!Directory.Exists(fullPath))
-        {
-            throw new InvalidOperationException("RootPath does not exist.");
-        }
-
-        if (!IsUnderRoot(fullPath, _repoRoot!))
-        {
-            throw new InvalidOperationException("RootPath must be under the configured repository root.");
-        }
-
-        if (!IsGitRepository(fullPath))
-        {
-            throw new InvalidOperationException("RootPath is not a git repository.");
-        }
-
-        var solutions = Directory.EnumerateFiles(fullPath, "*.sln", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .Select(path =>
+            var results = new List<AvailableRepositoryDto>();
+            foreach (var directory in Directory.EnumerateDirectories(RepositoryRoot!))
             {
-                var relativePath = NormalizeRelativePath(fullPath, path);
-                var solutionId = _solutionIdentityResolver.ResolveFromRelativePath(fullPath, relativePath);
-                return new AvailableRepositorySolutionDto(relativePath, solutionId);
-            })
-            .ToList();
+                var name = Path.GetFileName(directory);
+                var relative = Path.GetRelativePath(RepositoryRoot!, directory);
+                results.Add(new AvailableRepositoryDto(
+                    name,
+                    relative.Replace('\\', '/'),
+                    directory,
+                    IsGitRepository(directory)));
+            }
 
-        return solutions;
-    }
-
-    public bool TryValidateRepositoryPath(string rootPath, out string? error)
-    {
-        error = null;
-
-        if (!IsConfigured)
-        {
-            error = "Repository discovery is not configured. Set REPO_ROOT.";
-            return false;
+            return results
+                .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
-        if (string.IsNullOrWhiteSpace(rootPath))
+        public IReadOnlyList<AvailableRepositorySolutionDto> ListSolutions(string rootPath)
         {
-            error = "RootPath is required.";
-            return false;
+            EnsureConfigured();
+
+            var fullPath = NormalizeRoot(rootPath);
+            if (string.IsNullOrWhiteSpace(fullPath)) throw new InvalidOperationException("RootPath is invalid.");
+
+            if (!Directory.Exists(fullPath)) throw new InvalidOperationException("RootPath does not exist.");
+
+            if (!IsUnderRoot(fullPath, RepositoryRoot!))
+                throw new InvalidOperationException("RootPath must be under the configured repository root.");
+
+            if (!IsGitRepository(fullPath)) throw new InvalidOperationException("RootPath is not a git repository.");
+
+            var solutions = Directory.EnumerateFiles(fullPath, "*.sln", SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .Select(path =>
+                {
+                    var relativePath = NormalizeRelativePath(fullPath, path);
+                    var solutionId = _solutionIdentityResolver.ResolveFromRelativePath(fullPath, relativePath);
+                    return new AvailableRepositorySolutionDto(relativePath, solutionId);
+                })
+                .ToList();
+
+            return solutions;
         }
 
-        var fullPath = NormalizeRoot(rootPath);
-        if (string.IsNullOrWhiteSpace(fullPath))
+        public bool TryValidateRepositoryPath(string rootPath, out string? error)
         {
-            error = "RootPath is invalid.";
-            return false;
+            error = null;
+
+            if (!IsConfigured)
+            {
+                error = "Repository discovery is not configured. Set REPO_ROOT.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(rootPath))
+            {
+                error = "RootPath is required.";
+                return false;
+            }
+
+            var fullPath = NormalizeRoot(rootPath);
+            if (string.IsNullOrWhiteSpace(fullPath))
+            {
+                error = "RootPath is invalid.";
+                return false;
+            }
+
+            if (!Directory.Exists(fullPath))
+            {
+                error = "RootPath does not exist.";
+                return false;
+            }
+
+            if (!IsUnderRoot(fullPath, RepositoryRoot!))
+            {
+                error = "RootPath must be under the configured repository root.";
+                return false;
+            }
+
+            if (!IsGitRepository(fullPath))
+            {
+                error = "RootPath is not a git repository.";
+                return false;
+            }
+
+            return true;
         }
 
-        if (!Directory.Exists(fullPath))
+        private void EnsureConfigured()
         {
-            error = "RootPath does not exist.";
-            return false;
+            if (!IsConfigured)
+                throw new InvalidOperationException("Repository discovery is not configured. Set REPO_ROOT.");
         }
 
-        if (!IsUnderRoot(fullPath, _repoRoot!))
+        private static string? NormalizeRoot(string? path)
         {
-            error = "RootPath must be under the configured repository root.";
-            return false;
+            if (string.IsNullOrWhiteSpace(path)) return null;
+
+            return Path.GetFullPath(path.Trim());
         }
 
-        if (!IsGitRepository(fullPath))
+        private static string NormalizeRelativePath(string rootPath, string fullPath)
         {
-            error = "RootPath is not a git repository.";
-            return false;
+            var relative = Path.GetRelativePath(rootPath, fullPath);
+            relative = relative.Replace('\\', '/');
+            if (!relative.StartsWith(".", StringComparison.Ordinal)) relative = "./" + relative;
+
+            return relative;
         }
 
-        return true;
-    }
-
-    private void EnsureConfigured()
-    {
-        if (!IsConfigured)
+        private static bool IsUnderRoot(string candidate, string root)
         {
-            throw new InvalidOperationException("Repository discovery is not configured. Set REPO_ROOT.");
-        }
-    }
-
-    private static string? NormalizeRoot(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return null;
+            var rootWithSeparator = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                                    + Path.DirectorySeparatorChar;
+            return candidate.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(candidate,
+                       root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+                       StringComparison.OrdinalIgnoreCase);
         }
 
-        return Path.GetFullPath(path.Trim());
-    }
-
-    private static string NormalizeRelativePath(string rootPath, string fullPath)
-    {
-        var relative = Path.GetRelativePath(rootPath, fullPath);
-        relative = relative.Replace('\\', '/');
-        if (!relative.StartsWith(".", StringComparison.Ordinal))
+        private static bool IsGitRepository(string path)
         {
-            relative = "./" + relative;
+            var gitDir = Path.Combine(path, ".git");
+            return Directory.Exists(gitDir) || File.Exists(gitDir);
         }
-
-        return relative;
-    }
-
-    private static bool IsUnderRoot(string candidate, string root)
-    {
-        var rootWithSeparator = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            + Path.DirectorySeparatorChar;
-        return candidate.StartsWith(rootWithSeparator, StringComparison.OrdinalIgnoreCase)
-               || string.Equals(candidate, root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
-                   StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsGitRepository(string path)
-    {
-        var gitDir = Path.Combine(path, ".git");
-        return Directory.Exists(gitDir) || File.Exists(gitDir);
     }
 }

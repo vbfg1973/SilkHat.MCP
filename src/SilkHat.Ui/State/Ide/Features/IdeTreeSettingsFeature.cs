@@ -1,10 +1,17 @@
 using Fluxor;
 
-namespace SilkHat.Ui.State.Ide.Features;
-
-public sealed class IdeTreeSettingsFeature : Feature<IdeTreeSettingsState>
+namespace SilkHat.Ui.State.Ide.Features
 {
-    public override string GetName() => "IdeTreeSettings";
+    public sealed class IdeTreeSettingsFeature : Feature<IdeTreeSettingsState>
+    {
+        public override string GetName()
+        {
+            return "IdeTreeSettings";
+        }
 
-    protected override IdeTreeSettingsState GetInitialState() => IdeTreeSettingsState.Default;
+        protected override IdeTreeSettingsState GetInitialState()
+        {
+            return IdeTreeSettingsState.Default;
+        }
+    }
 }

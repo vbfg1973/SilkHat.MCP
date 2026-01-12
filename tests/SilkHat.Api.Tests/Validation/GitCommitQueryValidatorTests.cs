@@ -2,47 +2,49 @@ using SilkHat.Api.Models;
 using SilkHat.Api.Validation;
 using SilkHat.Core.Dtos;
 
-namespace SilkHat.Api.Tests.Validation;
-
-public sealed class GitCommitQueryValidatorTests
+namespace SilkHat.Api.Tests.Validation
 {
-    [Fact]
-    public void Validate_AllowsNulls()
+    public sealed class GitCommitQueryValidatorTests
     {
-        var validator = new GitCommitQueryValidator();
+        [Fact]
+        public void Validate_AllowsNulls()
+        {
+            var validator = new GitCommitQueryValidator();
 
-        var result = validator.Validate(new GitCommitQuery());
+            var result = validator.Validate(new GitCommitQuery());
 
-        Assert.True(result.IsValid);
-    }
+            Assert.True(result.IsValid);
+        }
 
-    [Fact]
-    public void Validate_RejectsEmptySha()
-    {
-        var validator = new GitCommitQueryValidator();
+        [Fact]
+        public void Validate_RejectsEmptySha()
+        {
+            var validator = new GitCommitQueryValidator();
 
-        var result = validator.Validate(new GitCommitQuery { Sha = " " });
+            var result = validator.Validate(new GitCommitQuery { Sha = " " });
 
-        Assert.False(result.IsValid);
-    }
+            Assert.False(result.IsValid);
+        }
 
-    [Fact]
-    public void Validate_RejectsEmptyPath()
-    {
-        var validator = new GitCommitQueryValidator();
+        [Fact]
+        public void Validate_RejectsEmptyPath()
+        {
+            var validator = new GitCommitQueryValidator();
 
-        var result = validator.Validate(new GitCommitQuery { Path = "" });
+            var result = validator.Validate(new GitCommitQuery { Path = "" });
 
-        Assert.False(result.IsValid);
-    }
+            Assert.False(result.IsValid);
+        }
 
-    [Fact]
-    public void Validate_RejectsInvalidPaging()
-    {
-        var validator = new GitCommitQueryValidator();
+        [Fact]
+        public void Validate_RejectsInvalidPaging()
+        {
+            var validator = new GitCommitQueryValidator();
 
-        var result = validator.Validate(new GitCommitQuery { PageNumber = 0, PageSize = PagingDefaults.MaxPageSize + 1 });
+            var result = validator.Validate(new GitCommitQuery
+                { PageNumber = 0, PageSize = PagingDefaults.MaxPageSize + 1 });
 
-        Assert.False(result.IsValid);
+            Assert.False(result.IsValid);
+        }
     }
 }

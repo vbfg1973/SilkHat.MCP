@@ -1,8 +1,9 @@
 using SilkHat.Code.Core.Dtos;
 
-namespace SilkHat.Code.Analysis.Abstractions;
-
-public interface IComplexityStrategyFactory
+namespace SilkHat.Code.Analysis.Abstractions
 {
-    IComplexityStrategy GetStrategy(ComplexityMeasureType measureType);
+    public interface IComplexityStrategyFactory
+    {
+        IComplexityStrategy GetStrategy(ComplexityMeasureType measureType);
+    }
 }

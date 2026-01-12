@@ -1,12 +1,10 @@
-@using Fluxor
-@using SilkHat.Ui.Components.Ide.Decisions
 @using SilkHat.Ui.State.Ide
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeLayoutState> LayoutState
 
 @if (SelectedToolboxView == IdeToolboxView.Decisions)
 {
-    <DecisionToolbox />
+    <DecisionToolbox/>
 }
 
 @code {
@@ -26,4 +24,5 @@
                 : IdeLayoutViewState.Default.ToolboxView;
         }
     }
+
 }

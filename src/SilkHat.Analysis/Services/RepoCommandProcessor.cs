@@ -3,49 +3,49 @@ using SilkHat.Analysis.Abstractions;
 using SilkHat.Analysis.Models;
 using SilkHat.Core.Dtos;
 
-namespace SilkHat.Analysis.Services;
-
-public sealed class RepoCommandProcessor : IRepoCommandProcessor
+namespace SilkHat.Analysis.Services
 {
-    public IAsyncEnumerable<RepoEventDto> ExecuteAsync(IRepoCommand command, RepoCommandContext context, CancellationToken cancellationToken)
+    public sealed class RepoCommandProcessor : IRepoCommandProcessor
     {
-        var channel = Channel.CreateUnbounded<RepoEventDto>();
-
-        _ = Task.Run(async () =>
+        public IAsyncEnumerable<RepoEventDto> ExecuteAsync(IRepoCommand command, RepoCommandContext context,
+            CancellationToken cancellationToken)
         {
-            await using var _ = cancellationToken.Register(() => channel.Writer.TryComplete());
-            try
+            var channel = Channel.CreateUnbounded<RepoEventDto>();
+
+            _ = Task.Run(async () =>
             {
-                var semaphore = context.Store.GetLock(context.ConfigId);
-                await semaphore.WaitAsync(cancellationToken);
+                await using var _ = cancellationToken.Register(() => channel.Writer.TryComplete());
                 try
                 {
-                    await foreach (var evt in command.ExecuteAsync(context, cancellationToken))
+                    var semaphore = context.Store.GetLock(context.ConfigId);
+                    await semaphore.WaitAsync(cancellationToken);
+                    try
                     {
-                        await channel.Writer.WriteAsync(evt, cancellationToken);
+                        await foreach (var evt in command.ExecuteAsync(context, cancellationToken))
+                            await channel.Writer.WriteAsync(evt, cancellationToken);
                     }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+
+                    channel.Writer.TryComplete();
                 }
-                finally
+                catch (Exception ex)
                 {
-                    semaphore.Release();
+                    channel.Writer.TryWrite(new RepoEventDto(
+                        RepoEventKind.Failed,
+                        null,
+                        ex.Message,
+                        null,
+                        null,
+                        new RepoEventErrorDto(ex.Message, ex.ToString()),
+                        null));
+                    channel.Writer.TryComplete(ex);
                 }
+            }, cancellationToken);
 
-                channel.Writer.TryComplete();
-            }
-            catch (Exception ex)
-            {
-                channel.Writer.TryWrite(new RepoEventDto(
-                    RepoEventKind.Failed,
-                    null,
-                    ex.Message,
-                    null,
-                    null,
-                    new RepoEventErrorDto(ex.Message, ex.ToString()),
-                    null));
-                channel.Writer.TryComplete(ex);
-            }
-        }, cancellationToken);
-
-        return channel.Reader.ReadAllAsync(cancellationToken);
+            return channel.Reader.ReadAllAsync(cancellationToken);
+        }
     }
 }

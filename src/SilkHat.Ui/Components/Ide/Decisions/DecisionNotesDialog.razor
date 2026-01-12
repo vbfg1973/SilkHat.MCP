@@ -1,7 +1,4 @@
-@using MudBlazor
-@using SilkHat.Ui.Models
 @using SilkHat.Ui.State.Ide.Actions
-
 @inject IDispatcher Dispatcher
 
 <MudDialog>
@@ -10,7 +7,7 @@
                       Label="Notes"
                       Lines="5"
                       Variant="Variant.Outlined"
-                      @bind-Value="_notes" />
+                      @bind-Value="_notes"/>
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="Save" Color="Color.Primary">Save</MudButton>
@@ -42,4 +39,5 @@
     {
         Dialog.Cancel();
     }
+
 }

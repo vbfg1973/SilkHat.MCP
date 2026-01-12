@@ -1,21 +1,22 @@
-namespace SilkHat.Code.Core.Dtos;
-
-public enum ComplexityMeasureType
+namespace SilkHat.Code.Core.Dtos
 {
-    Cognitive = 1,
-    Cyclomatic = 2,
-    Indentation = 3
-}
+    public enum ComplexityMeasureType
+    {
+        Cognitive = 1,
+        Cyclomatic = 2,
+        Indentation = 3
+    }
 
-public enum ComplexityTargetKind
-{
-    Method = 1,
-    NamedType = 2
-}
+    public enum ComplexityTargetKind
+    {
+        Method = 1,
+        NamedType = 2
+    }
 
-public sealed record ComplexityResultDto(
-    string DocumentationId,
-    ComplexityMeasureType MeasureType,
-    ComplexityTargetKind TargetKind,
-    NamedTypeKind? TargetTypeKind,
-    int Value);
+    public sealed record ComplexityResultDto(
+        string DocumentationId,
+        ComplexityMeasureType MeasureType,
+        ComplexityTargetKind TargetKind,
+        NamedTypeKind? TargetTypeKind,
+        int Value);
+}

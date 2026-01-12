@@ -1,24 +1,22 @@
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Core.Dtos;
 
-namespace SilkHat.Code.Analysis.Services.Complexity;
-
-public sealed class ComplexityStrategyFactory : IComplexityStrategyFactory
+namespace SilkHat.Code.Analysis.Services.Complexity
 {
-    private readonly IReadOnlyDictionary<ComplexityMeasureType, IComplexityStrategy> _strategies;
-
-    public ComplexityStrategyFactory(IEnumerable<IComplexityStrategy> strategies)
+    public sealed class ComplexityStrategyFactory : IComplexityStrategyFactory
     {
-        _strategies = strategies.ToDictionary(strategy => strategy.MeasureType);
-    }
+        private readonly IReadOnlyDictionary<ComplexityMeasureType, IComplexityStrategy> _strategies;
 
-    public IComplexityStrategy GetStrategy(ComplexityMeasureType measureType)
-    {
-        if (_strategies.TryGetValue(measureType, out var strategy))
+        public ComplexityStrategyFactory(IEnumerable<IComplexityStrategy> strategies)
         {
-            return strategy;
+            _strategies = strategies.ToDictionary(strategy => strategy.MeasureType);
         }
 
-        throw new InvalidOperationException($"No complexity strategy registered for {measureType}.");
+        public IComplexityStrategy GetStrategy(ComplexityMeasureType measureType)
+        {
+            if (_strategies.TryGetValue(measureType, out var strategy)) return strategy;
+
+            throw new InvalidOperationException($"No complexity strategy registered for {measureType}.");
+        }
     }
 }

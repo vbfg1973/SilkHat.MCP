@@ -1,11 +1,12 @@
-namespace SilkHat.Git.Analysis.Abstractions;
-
-public interface IGitCommandRunner
+namespace SilkHat.Git.Analysis.Abstractions
 {
-    Task<GitCommandResult> ExecuteAsync(string repoRoot, string[] args, CancellationToken cancellationToken);
-}
+    public interface IGitCommandRunner
+    {
+        Task<GitCommandResult> ExecuteAsync(string repoRoot, string[] args, CancellationToken cancellationToken);
+    }
 
-public sealed record GitCommandResult(
-    int ExitCode,
-    string StandardOutput,
-    string StandardError);
+    public sealed record GitCommandResult(
+        int ExitCode,
+        string StandardOutput,
+        string StandardError);
+}

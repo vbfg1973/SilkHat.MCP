@@ -1,23 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.8.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.8.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
-    <PackageReference Include="QuikGraph" Version="2.0.0" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.8.0"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.8.0"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0"/>
+        <PackageReference Include="QuikGraph" Version="2.0.0"/>
+    </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\SilkHat.Core\SilkHat.Core.csproj" />
-    <ProjectReference Include="..\SilkHat.Code.Core\SilkHat.Code.Core.csproj" />
-    <ProjectReference Include="..\SilkHat.Git.Analysis\SilkHat.Git.Analysis.csproj" />
-  </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\SilkHat.Core\SilkHat.Core.csproj"/>
+        <ProjectReference Include="..\SilkHat.Code.Core\SilkHat.Code.Core.csproj"/>
+        <ProjectReference Include="..\SilkHat.Git.Analysis\SilkHat.Git.Analysis.csproj"/>
+    </ItemGroup>
 
 </Project>

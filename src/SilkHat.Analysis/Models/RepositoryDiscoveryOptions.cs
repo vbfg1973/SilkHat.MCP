@@ -1,6 +1,7 @@
-namespace SilkHat.Analysis.Models;
-
-public sealed class RepositoryDiscoveryOptions
+namespace SilkHat.Analysis.Models
 {
-    public string? RepoRoot { get; set; }
+    public sealed class RepositoryDiscoveryOptions
+    {
+        public string? RepoRoot { get; set; }
+    }
 }

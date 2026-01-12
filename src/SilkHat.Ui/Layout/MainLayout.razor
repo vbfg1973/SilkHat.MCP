@@ -1,24 +1,24 @@
 ﻿@inherits LayoutComponentBase
 @inject ThemeService ThemeService
 
-<MudThemeProvider @bind-IsDarkMode="_isDarkMode" />
-<MudDialogProvider />
-<MudSnackbarProvider />
-<MudPopoverProvider />
+<MudThemeProvider @bind-IsDarkMode="_isDarkMode"/>
+<MudDialogProvider/>
+<MudSnackbarProvider/>
+<MudPopoverProvider/>
 <MudLayout>
     <MudAppBar Elevation="1">
         <MudIconButton Icon="@(_drawerOpen ? Icons.Material.Filled.MenuOpen : Icons.Material.Filled.Menu)"
                        Color="Color.Inherit"
-                       OnClick="ToggleDrawer" />
+                       OnClick="ToggleDrawer"/>
         <MudText Typo="Typo.h6">SilkHat</MudText>
-        <MudSpacer />
+        <MudSpacer/>
         <MudSwitch T="bool"
                    @bind-Value="_isDarkMode"
                    @bind-Value:after="PersistDarkModeAsync"
-                   Color="Color.Secondary" />
+                   Color="Color.Secondary"/>
     </MudAppBar>
     <MudDrawer Open="@_drawerOpen" Elevation="1" ClipMode="DrawerClipMode.Always">
-        <NavMenu />
+        <NavMenu/>
     </MudDrawer>
     <MudMainContent>
         <MudContainer MaxWidth="MaxWidth.False" Class="mt-6 px-0">
@@ -44,9 +44,9 @@
         StateHasChanged();
     }
 
-
     private void ToggleDrawer()
     {
         _drawerOpen = !_drawerOpen;
     }
+
 }

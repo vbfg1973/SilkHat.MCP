@@ -6,128 +6,111 @@ using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
 using SilkHat.Core.Dtos;
 
-namespace SilkHat.Api.Controllers;
-
-[Route("api/repositories/{id:guid}/code/solutions/{solutionId}/named-types")]
-public sealed class CodeNamedTypesController : ApiControllerBase
+namespace SilkHat.Api.Controllers
 {
-    private readonly ICodeWorkspaceStore _codeStore;
-    private readonly ITypeComplexityService _typeComplexityService;
-
-    public CodeNamedTypesController(ICodeWorkspaceStore codeStore, ITypeComplexityService typeComplexityService)
+    [Route("api/repositories/{id:guid}/code/solutions/{solutionId}/named-types")]
+    public sealed class CodeNamedTypesController : ApiControllerBase
     {
-        _codeStore = codeStore;
-        _typeComplexityService = typeComplexityService;
-    }
+        private readonly ICodeWorkspaceStore _codeStore;
+        private readonly ITypeComplexityService _typeComplexityService;
 
-    [HttpGet]
-    public ActionResult<PagedResult<NamedTypeDto>> GetNamedTypes(
-        Guid id,
-        string solutionId,
-        [FromQuery] string? pathPrefix,
-        [FromQuery] string? namespacePrefix,
-        [FromQuery] string? nameContains,
-        [FromQuery] NamedTypeKind? kind,
-        [FromQuery] bool? definedOnly,
-        [FromQuery] PagingQuery pagingQuery)
-    {
-        var workspace = _codeStore.Get(id);
-        if (workspace is null)
+        public CodeNamedTypesController(ICodeWorkspaceStore codeStore, ITypeComplexityService typeComplexityService)
         {
-            return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
+            _codeStore = codeStore;
+            _typeComplexityService = typeComplexityService;
         }
 
-        var solution = workspace.TryGetSolution(solutionId);
-        if (solution is null)
+        [HttpGet]
+        public ActionResult<PagedResult<NamedTypeDto>> GetNamedTypes(
+            Guid id,
+            string solutionId,
+            [FromQuery] string? pathPrefix,
+            [FromQuery] string? namespacePrefix,
+            [FromQuery] string? nameContains,
+            [FromQuery] NamedTypeKind? kind,
+            [FromQuery] bool? definedOnly,
+            [FromQuery] PagingQuery pagingQuery)
         {
-            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+            var workspace = _codeStore.Get(id);
+            if (workspace is null)
+                return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded",
+                    "Repository code workspace is not loaded.", "Code");
+
+            var solution = workspace.TryGetSolution(solutionId);
+            if (solution is null)
+                return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+
+            var paging = pagingQuery.ResolvePaging();
+            IEnumerable<NamedTypeDto> query = solution.NamedTypes;
+
+            if (!string.IsNullOrWhiteSpace(pathPrefix))
+                query = query.Where(type =>
+                    type.FilePath?.StartsWith(pathPrefix, StringComparison.OrdinalIgnoreCase) == true);
+
+            if (!string.IsNullOrWhiteSpace(namespacePrefix))
+                query = query.Where(type =>
+                    type.Namespace.StartsWith(namespacePrefix, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrWhiteSpace(nameContains))
+                query = query.Where(type => type.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
+
+            if (kind.HasValue) query = query.Where(type => type.Kind == kind.Value);
+
+            if (definedOnly == true) query = query.Where(type => !type.IsExternal);
+
+            var result = query
+                .OrderBy(type => type.Namespace, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(type => type.Name, StringComparer.OrdinalIgnoreCase)
+                .ToPagedResult(paging);
+
+            return Ok(result);
         }
 
-        var paging = pagingQuery.ResolvePaging();
-        IEnumerable<NamedTypeDto> query = solution.NamedTypes;
-
-        if (!string.IsNullOrWhiteSpace(pathPrefix))
+        [HttpGet("complexity")]
+        public async Task<ActionResult<ComplexityResultDto>> GetNamedTypeComplexity(
+            Guid id,
+            string solutionId,
+            [FromQuery] string? docId,
+            [FromQuery] ComplexityMeasureType? measure,
+            CancellationToken cancellationToken)
         {
-            query = query.Where(type => type.FilePath?.StartsWith(pathPrefix, StringComparison.OrdinalIgnoreCase) == true);
+            if (string.IsNullOrWhiteSpace(docId))
+                return ProblemWithCategory(StatusCodes.Status400BadRequest, "Invalid Request", "docId is required.",
+                    "Code");
+
+            if (!measure.HasValue)
+                return ProblemWithCategory(StatusCodes.Status400BadRequest, "Invalid Request", "measure is required.",
+                    "Code");
+
+            var workspace = _codeStore.Get(id);
+            if (workspace is null)
+                return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded",
+                    "Repository code workspace is not loaded.", "Code");
+
+            var solution = workspace.TryGetSolution(solutionId);
+            if (solution is null)
+                return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
+
+            var result = await _typeComplexityService.GetTypeComplexityAsync(
+                solution,
+                docId,
+                measure.Value,
+                cancellationToken);
+
+            return result.Status switch
+            {
+                TypeComplexityStatus.InterfaceNotSupported => ProblemWithCategory(
+                    StatusCodes.Status400BadRequest,
+                    "Invalid Request",
+                    "Only concrete types are supported.",
+                    "Code"),
+                TypeComplexityStatus.NotFound => ProblemWithCategory(
+                    StatusCodes.Status404NotFound,
+                    "Not Found",
+                    "Named type not found.",
+                    "Code"),
+                _ => Ok(result.Result)
+            };
         }
-
-        if (!string.IsNullOrWhiteSpace(namespacePrefix))
-        {
-            query = query.Where(type => type.Namespace.StartsWith(namespacePrefix, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (!string.IsNullOrWhiteSpace(nameContains))
-        {
-            query = query.Where(type => type.Name.Contains(nameContains, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (kind.HasValue)
-        {
-            query = query.Where(type => type.Kind == kind.Value);
-        }
-
-        if (definedOnly == true)
-        {
-            query = query.Where(type => !type.IsExternal);
-        }
-
-        var result = query
-            .OrderBy(type => type.Namespace, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(type => type.Name, StringComparer.OrdinalIgnoreCase)
-            .ToPagedResult(paging);
-
-        return Ok(result);
-    }
-
-    [HttpGet("complexity")]
-    public async Task<ActionResult<ComplexityResultDto>> GetNamedTypeComplexity(
-        Guid id,
-        string solutionId,
-        [FromQuery] string? docId,
-        [FromQuery] ComplexityMeasureType? measure,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(docId))
-        {
-            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Invalid Request", "docId is required.", "Code");
-        }
-
-        if (!measure.HasValue)
-        {
-            return ProblemWithCategory(StatusCodes.Status400BadRequest, "Invalid Request", "measure is required.", "Code");
-        }
-
-        var workspace = _codeStore.Get(id);
-        if (workspace is null)
-        {
-            return ProblemWithCategory(StatusCodes.Status409Conflict, "Repository Not Loaded", "Repository code workspace is not loaded.", "Code");
-        }
-
-        var solution = workspace.TryGetSolution(solutionId);
-        if (solution is null)
-        {
-            return ProblemWithCategory(StatusCodes.Status404NotFound, "Not Found", "Solution not found.", "Code");
-        }
-
-        var result = await _typeComplexityService.GetTypeComplexityAsync(
-            solution,
-            docId,
-            measure.Value,
-            cancellationToken);
-
-        return result.Status switch
-        {
-            TypeComplexityStatus.InterfaceNotSupported => ProblemWithCategory(
-                StatusCodes.Status400BadRequest,
-                "Invalid Request",
-                "Only concrete types are supported.",
-                "Code"),
-            TypeComplexityStatus.NotFound => ProblemWithCategory(
-                StatusCodes.Status404NotFound,
-                "Not Found",
-                "Named type not found.",
-                "Code"),
-            _ => Ok(result.Result)
-        };
     }
 }

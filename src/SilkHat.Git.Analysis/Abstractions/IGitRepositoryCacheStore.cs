@@ -1,9 +1,10 @@
 using SilkHat.Git.Analysis.Models;
 
-namespace SilkHat.Git.Analysis.Abstractions;
-
-public interface IGitRepositoryCacheStore
+namespace SilkHat.Git.Analysis.Abstractions
 {
-    GitRepositoryCache GetOrCreate(Guid configId);
-    bool Remove(Guid configId);
+    public interface IGitRepositoryCacheStore
+    {
+        GitRepositoryCache GetOrCreate(Guid configId);
+        bool Remove(Guid configId);
+    }
 }

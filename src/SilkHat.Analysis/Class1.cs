@@ -1,6 +1,6 @@
-﻿namespace SilkHat.Analysis;
-
-public class Class1
+﻿namespace SilkHat.Analysis
 {
-
+    public class Class1
+    {
+    }
 }

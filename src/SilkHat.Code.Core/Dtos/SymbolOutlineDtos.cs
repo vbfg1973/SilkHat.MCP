@@ -1,10 +1,11 @@
-namespace SilkHat.Code.Core.Dtos;
-
-public sealed record SymbolOutlineNodeDto(
-    string SymbolKey,
-    string? DocumentationId,
-    string Name,
-    string SymbolKind,
-    string RealType,
-    CodeLocationDto? Location,
-    IReadOnlyList<SymbolOutlineNodeDto> Children);
+namespace SilkHat.Code.Core.Dtos
+{
+    public sealed record SymbolOutlineNodeDto(
+        string SymbolKey,
+        string? DocumentationId,
+        string Name,
+        string SymbolKind,
+        string RealType,
+        CodeLocationDto? Location,
+        IReadOnlyList<SymbolOutlineNodeDto> Children);
+}

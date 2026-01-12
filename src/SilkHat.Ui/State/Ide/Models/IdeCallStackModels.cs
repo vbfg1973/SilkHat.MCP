@@ -1,8 +1,9 @@
-namespace SilkHat.Ui.State.Ide.Models;
-
-public enum IdeCallStackShadingMode
+namespace SilkHat.Ui.State.Ide.Models
 {
-    None = 0,
-    CognitiveComplexity = 1,
-    CyclomaticComplexity = 2
+    public enum IdeCallStackShadingMode
+    {
+        None = 0,
+        CognitiveComplexity = 1,
+        CyclomaticComplexity = 2
+    }
 }

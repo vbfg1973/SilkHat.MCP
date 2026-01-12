@@ -1,9 +1,7 @@
-@using Fluxor
-@using Fluxor.Blazor.Web.Components
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
 @using SilkHat.Ui.State.Ide.Models
-@inherits FluxorComponent
+@inherits Fluxor.Blazor.Web.Components.FluxorComponent
 @inject IState<IdeSolutionsState> SolutionsState
 @inject IState<IdeTabsState> TabsState
 @inject IDispatcher Dispatcher
@@ -28,11 +26,12 @@
         <MudCheckBox T="bool"
                      Label="Show diff"
                      @bind-Value="ActiveShowDiff"
-                     Disabled="@(ActiveTab is null)" />
+                     Disabled="@(ActiveTab is null)"/>
     </MudCardContent>
 </MudCard>
 
 @code {
+
     private IdeOpenFileTab? ActiveTab
     {
         get
@@ -82,4 +81,5 @@
         var utc = timestamp.Value.UtcDateTime;
         return utc.ToString("yyyy-MM-dd HH:mm:ss");
     }
+
 }

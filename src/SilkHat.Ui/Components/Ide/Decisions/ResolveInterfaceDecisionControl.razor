@@ -1,7 +1,4 @@
-@using MudBlazor
-@using SilkHat.Ui.Models
 @using SilkHat.Ui.State.Ide.Actions
-
 @inject IDispatcher Dispatcher
 
 <MudText Typo="Typo.body2">Select implementation</MudText>
@@ -37,8 +34,8 @@
     protected override void OnParametersSet()
     {
         _selectedKey = Payload.SelectedMethodDocId
-            ?? Payload.SelectedTypeDocId
-            ?? string.Empty;
+                       ?? Payload.SelectedTypeDocId
+                       ?? string.Empty;
     }
 
     private string GetKey(ResolveInterfaceDecisionCandidateModel candidate)
@@ -74,4 +71,5 @@
 
         Dispatcher.Dispatch(new ResolveDecisionAction(SolutionId, request));
     }
+
 }

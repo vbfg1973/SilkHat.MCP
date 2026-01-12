@@ -1,15 +1,13 @@
 @using System.Text.Json
-@using MudBlazor
-@using SilkHat.Ui.Models
 @using SilkHat.Ui.State.Ide
 @using SilkHat.Ui.State.Ide.Actions
-
 @inject IDispatcher Dispatcher
 @inject IDialogService DialogService
 
 <div class="d-flex flex-row justify-space-between align-center mb-2">
     <MudText Typo="Typo.subtitle2">Resolved Decisions</MudText>
-    <MudSelect T="bool?" Dense="true" Label="Active" Value="@ViewState.ResolvedActiveFilter" ValueChanged="OnActiveChanged">
+    <MudSelect T="bool?" Dense="true" Label="Active" Value="@ViewState.ResolvedActiveFilter"
+               ValueChanged="OnActiveChanged">
         <MudSelectItem T="bool?" Value="@(null)">All</MudSelectItem>
         <MudSelectItem T="bool?" Value="true">Active</MudSelectItem>
         <MudSelectItem T="bool?" Value="false">Inactive</MudSelectItem>
@@ -18,7 +16,7 @@
 
 @if (ViewState.IsLoadingResolved)
 {
-    <MudProgressLinear Indeterminate="true" />
+    <MudProgressLinear Indeterminate="true"/>
 }
 else if (ViewState.Resolved.Count == 0)
 {
@@ -55,7 +53,7 @@ else
                                    Value="@decision.IsActive"
                                    ValueChanged="value => ToggleActive(decision, value)"
                                    Color="Color.Primary"
-                                   Label="Active" />
+                                   Label="Active"/>
                         <MudButton Variant="Variant.Text" OnClick="() => OpenNotes(decision)">Notes</MudButton>
                         <MudButton Variant="Variant.Text" OnClick="() => Validate(decision)">Validate</MudButton>
                     </div>
@@ -117,4 +115,5 @@ else
         var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true };
         await DialogService.ShowAsync<DecisionNotesDialog>("Decision Notes", parameters, options);
     }
+
 }

@@ -1,13 +1,17 @@
 using Fluxor;
 
-namespace SilkHat.Ui.State.Ide.Features;
-
-public sealed class IdeSolutionsFeature : Feature<IdeSolutionsState>
+namespace SilkHat.Ui.State.Ide.Features
 {
-    public override string GetName() => "IdeSolutions";
-
-    protected override IdeSolutionsState GetInitialState()
+    public sealed class IdeSolutionsFeature : Feature<IdeSolutionsState>
     {
-        return new IdeSolutionsState();
+        public override string GetName()
+        {
+            return "IdeSolutions";
+        }
+
+        protected override IdeSolutionsState GetInitialState()
+        {
+            return new IdeSolutionsState();
+        }
     }
 }

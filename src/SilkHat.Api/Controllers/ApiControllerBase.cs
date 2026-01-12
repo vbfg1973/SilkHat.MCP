@@ -1,26 +1,27 @@
 using Microsoft.AspNetCore.Mvc;
 
-namespace SilkHat.Api.Controllers;
-
-[ApiController]
-public abstract class ApiControllerBase : ControllerBase
+namespace SilkHat.Api.Controllers
 {
-    protected ObjectResult ProblemWithCategory(int statusCode, string title, string detail, string category)
+    [ApiController]
+    public abstract class ApiControllerBase : ControllerBase
     {
-        var correlationId = HttpContext.Items.TryGetValue("CorrelationId", out var value)
-            ? value?.ToString()
-            : null;
-
-        var problem = new ProblemDetails
+        protected ObjectResult ProblemWithCategory(int statusCode, string title, string detail, string category)
         {
-            Status = statusCode,
-            Title = title,
-            Detail = detail
-        };
+            var correlationId = HttpContext.Items.TryGetValue("CorrelationId", out var value)
+                ? value?.ToString()
+                : null;
 
-        problem.Extensions["correlationId"] = correlationId;
-        problem.Extensions["category"] = category;
+            var problem = new ProblemDetails
+            {
+                Status = statusCode,
+                Title = title,
+                Detail = detail
+            };
 
-        return StatusCode(statusCode, problem);
+            problem.Extensions["correlationId"] = correlationId;
+            problem.Extensions["category"] = category;
+
+            return StatusCode(statusCode, problem);
+        }
     }
 }

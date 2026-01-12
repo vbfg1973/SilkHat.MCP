@@ -1,9 +1,11 @@
 using SilkHat.Analysis.Models;
 using SilkHat.Core.Dtos;
 
-namespace SilkHat.Analysis.Abstractions;
-
-public interface IRepoCommandProcessor
+namespace SilkHat.Analysis.Abstractions
 {
-    IAsyncEnumerable<RepoEventDto> ExecuteAsync(IRepoCommand command, RepoCommandContext context, CancellationToken cancellationToken);
+    public interface IRepoCommandProcessor
+    {
+        IAsyncEnumerable<RepoEventDto> ExecuteAsync(IRepoCommand command, RepoCommandContext context,
+            CancellationToken cancellationToken);
+    }
 }

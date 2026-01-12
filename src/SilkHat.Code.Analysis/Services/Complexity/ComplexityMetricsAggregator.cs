@@ -1,187 +1,174 @@
 using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Text;
 using SilkHat.Code.Analysis.Abstractions;
 using SilkHat.Code.Analysis.Models;
 using SilkHat.Code.Core.Dtos;
 
-namespace SilkHat.Code.Analysis.Services.Complexity;
-
-public sealed class ComplexityMetricsAggregator : IComplexityMetricsAggregator
+namespace SilkHat.Code.Analysis.Services.Complexity
 {
-    private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
-    private readonly IComplexityStrategyFactory _strategyFactory;
-    private readonly ConcurrentDictionary<string, Lazy<Task<FileComplexityMetrics>>> _cache = new();
-
-    public ComplexityMetricsAggregator(IComplexityStrategyFactory strategyFactory)
+    public sealed class ComplexityMetricsAggregator : IComplexityMetricsAggregator
     {
-        _strategyFactory = strategyFactory;
-    }
+        private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
+        private readonly ConcurrentDictionary<string, Lazy<Task<FileComplexityMetrics>>> _cache = new();
+        private readonly IComplexityStrategyFactory _strategyFactory;
 
-    public Task<FileComplexityMetrics> GetMetricsAsync(
-        Guid configId,
-        CodeRepositoryWorkspace workspace,
-        CodeSolutionWorkspace solution,
-        CancellationToken cancellationToken)
-    {
-        if (workspace is null)
+        public ComplexityMetricsAggregator(IComplexityStrategyFactory strategyFactory)
         {
-            throw new ArgumentNullException(nameof(workspace));
+            _strategyFactory = strategyFactory;
         }
 
-        if (solution is null)
+        public Task<FileComplexityMetrics> GetMetricsAsync(
+            Guid configId,
+            CodeRepositoryWorkspace workspace,
+            CodeSolutionWorkspace solution,
+            CancellationToken cancellationToken)
         {
-            throw new ArgumentNullException(nameof(solution));
+            if (workspace is null) throw new ArgumentNullException(nameof(workspace));
+
+            if (solution is null) throw new ArgumentNullException(nameof(solution));
+
+            var key = BuildKey(configId, solution.SolutionId);
+            var lazy = _cache.GetOrAdd(
+                key,
+                _ => new Lazy<Task<FileComplexityMetrics>>(() =>
+                    BuildMetricsAsync(workspace, solution, cancellationToken)));
+
+            return lazy.Value;
         }
 
-        var key = BuildKey(configId, solution.SolutionId);
-        var lazy = _cache.GetOrAdd(
-            key,
-            _ => new Lazy<Task<FileComplexityMetrics>>(
-                () => BuildMetricsAsync(workspace, solution, cancellationToken)));
-
-        return lazy.Value;
-    }
-
-    public void Invalidate(Guid configId)
-    {
-        var prefix = configId.ToString("N") + ":";
-        foreach (var key in _cache.Keys)
+        public void Invalidate(Guid configId)
         {
-            if (key.StartsWith(prefix, StringComparison.Ordinal))
+            var prefix = configId.ToString("N") + ":";
+            foreach (var key in _cache.Keys)
+                if (key.StartsWith(prefix, StringComparison.Ordinal))
+                    _cache.TryRemove(key, out _);
+        }
+
+        private async Task<FileComplexityMetrics> BuildMetricsAsync(
+            CodeRepositoryWorkspace workspace,
+            CodeSolutionWorkspace solution,
+            CancellationToken cancellationToken)
+        {
+            var cognitive = new ConcurrentDictionary<string, int>(PathComparer);
+            var cyclomatic = new ConcurrentDictionary<string, int>(PathComparer);
+            var indentation = new ConcurrentDictionary<string, int>(PathComparer);
+            var types = new Dictionary<ComplexityMeasureType, ConcurrentDictionary<string, int>>
             {
-                _cache.TryRemove(key, out _);
-            }
-        }
-    }
+                [ComplexityMeasureType.Cognitive] = new(StringComparer.OrdinalIgnoreCase),
+                [ComplexityMeasureType.Cyclomatic] = new(StringComparer.OrdinalIgnoreCase),
+                [ComplexityMeasureType.Indentation] = new(StringComparer.OrdinalIgnoreCase)
+            };
+            var methods = new Dictionary<ComplexityMeasureType, ConcurrentDictionary<string, int>>
+            {
+                [ComplexityMeasureType.Cognitive] = new(StringComparer.OrdinalIgnoreCase),
+                [ComplexityMeasureType.Cyclomatic] = new(StringComparer.OrdinalIgnoreCase),
+                [ComplexityMeasureType.Indentation] = new(StringComparer.OrdinalIgnoreCase)
+            };
 
-    private async Task<FileComplexityMetrics> BuildMetricsAsync(
-        CodeRepositoryWorkspace workspace,
-        CodeSolutionWorkspace solution,
-        CancellationToken cancellationToken)
-    {
-        var cognitive = new ConcurrentDictionary<string, int>(PathComparer);
-        var cyclomatic = new ConcurrentDictionary<string, int>(PathComparer);
-        var indentation = new ConcurrentDictionary<string, int>(PathComparer);
-        var types = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var methods = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var strategies = new Dictionary<ComplexityMeasureType, IComplexityStrategy>
+            {
+                [ComplexityMeasureType.Cognitive] = _strategyFactory.GetStrategy(ComplexityMeasureType.Cognitive),
+                [ComplexityMeasureType.Cyclomatic] = _strategyFactory.GetStrategy(ComplexityMeasureType.Cyclomatic),
+                [ComplexityMeasureType.Indentation] = _strategyFactory.GetStrategy(ComplexityMeasureType.Indentation)
+            };
 
-        var strategies = new Dictionary<ComplexityMeasureType, IComplexityStrategy>
-        {
-            [ComplexityMeasureType.Cognitive] = _strategyFactory.GetStrategy(ComplexityMeasureType.Cognitive),
-            [ComplexityMeasureType.Cyclomatic] = _strategyFactory.GetStrategy(ComplexityMeasureType.Cyclomatic),
-            [ComplexityMeasureType.Indentation] = _strategyFactory.GetStrategy(ComplexityMeasureType.Indentation)
-        };
-
-        var treeToCompilation = new Dictionary<SyntaxTree, Compilation>();
-        foreach (var compilation in solution.Compilations.Values)
-        {
+            var treeToCompilation = new Dictionary<SyntaxTree, Compilation>();
+            foreach (var compilation in solution.Compilations.Values)
             foreach (var tree in compilation.SyntaxTrees)
-            {
                 if (!treeToCompilation.ContainsKey(tree))
-                {
                     treeToCompilation[tree] = compilation;
-                }
-            }
-        }
 
-        var syntaxTrees = treeToCompilation.Keys
-            .Where(tree => !string.IsNullOrWhiteSpace(tree.FilePath))
-            .ToList();
+            var syntaxTrees = treeToCompilation.Keys
+                .Where(tree => !string.IsNullOrWhiteSpace(tree.FilePath))
+                .ToList();
 
-        await Parallel.ForEachAsync(
-            syntaxTrees,
-            cancellationToken,
-            async (tree, ct) =>
-            {
-                if (!treeToCompilation.TryGetValue(tree, out var compilation))
+            await Parallel.ForEachAsync(
+                syntaxTrees,
+                cancellationToken,
+                async (tree, ct) =>
                 {
-                    return;
-                }
+                    if (!treeToCompilation.TryGetValue(tree, out var compilation)) return;
 
-                var semanticModel = compilation.GetSemanticModel(tree);
-                var sourceText = await tree.GetTextAsync(ct);
-                var relativePath = SolutionIdentity.NormalizeRelativePath(workspace.RootPath, tree.FilePath);
+                    var semanticModel = compilation.GetSemanticModel(tree);
+                    var sourceText = await tree.GetTextAsync(ct);
+                    var relativePath = SolutionIdentity.NormalizeRelativePath(workspace.RootPath, tree.FilePath);
 
-                var methodNodes = tree.GetRoot(ct)
-                    .DescendantNodes()
-                    .OfType<BaseMethodDeclarationSyntax>()
-                    .ToList();
+                    var methodNodes = tree.GetRoot(ct)
+                        .DescendantNodes()
+                        .OfType<BaseMethodDeclarationSyntax>()
+                        .ToList();
 
-                foreach (var method in methodNodes)
-                {
-                    var methodSymbol = semanticModel.GetDeclaredSymbol(method, ct);
-                    var typeDocId = methodSymbol?.ContainingType is not null
-                        ? DocumentationIdUtility.GetDocumentationId(methodSymbol.ContainingType)
-                        : null;
-                    var methodDocId = methodSymbol is not null
-                        ? DocumentationIdUtility.GetDocumentationId(methodSymbol)
-                        : null;
-
-                    foreach (var (measure, strategy) in strategies)
+                    foreach (var method in methodNodes)
                     {
-                        var value = strategy.Compute(method, semanticModel, sourceText);
-                        AddValue(measure, relativePath, value, cognitive, cyclomatic, indentation);
-                        if (!string.IsNullOrWhiteSpace(typeDocId))
-                        {
-                            AddByDocId(measure, typeDocId!, value, types, methods, isMethod: false);
-                        }
+                        var methodSymbol = semanticModel.GetDeclaredSymbol(method, ct);
+                        var typeDocId = methodSymbol?.ContainingType is not null
+                            ? DocumentationIdUtility.GetDocumentationId(methodSymbol.ContainingType)
+                            : null;
+                        var methodDocId = methodSymbol is not null
+                            ? DocumentationIdUtility.GetDocumentationId(methodSymbol)
+                            : null;
 
-                        if (!string.IsNullOrWhiteSpace(methodDocId))
+                        foreach (var (measure, strategy) in strategies)
                         {
-                            AddByDocId(measure, methodDocId!, value, types, methods, isMethod: true);
+                            var value = strategy.Compute(method, semanticModel, sourceText);
+                            AddValue(measure, relativePath, value, cognitive, cyclomatic, indentation);
+                            if (!string.IsNullOrWhiteSpace(typeDocId))
+                                AddByDocId(measure, typeDocId!, value, types, methods, false);
+
+                            if (!string.IsNullOrWhiteSpace(methodDocId))
+                                AddByDocId(measure, methodDocId!, value, types, methods, true);
                         }
                     }
-                }
-            });
+                });
 
-        return new FileComplexityMetrics(cognitive, cyclomatic, indentation, types, methods);
-    }
+            var typeSnapshot = new Dictionary<ComplexityMeasureType, IReadOnlyDictionary<string, int>>(types.Count);
+            foreach (var kvp in types) typeSnapshot[kvp.Key] = kvp.Value;
 
-    private static void AddValue(
-        ComplexityMeasureType measure,
-        string path,
-        int value,
-        ConcurrentDictionary<string, int> cognitive,
-        ConcurrentDictionary<string, int> cyclomatic,
-        ConcurrentDictionary<string, int> indentation)
-    {
-        if (value == 0)
-        {
-            return;
+            var methodSnapshot = new Dictionary<ComplexityMeasureType, IReadOnlyDictionary<string, int>>(methods.Count);
+            foreach (var kvp in methods) methodSnapshot[kvp.Key] = kvp.Value;
+
+            return new FileComplexityMetrics(cognitive, cyclomatic, indentation, typeSnapshot, methodSnapshot);
         }
 
-        var target = measure switch
+        private static void AddValue(
+            ComplexityMeasureType measure,
+            string path,
+            int value,
+            ConcurrentDictionary<string, int> cognitive,
+            ConcurrentDictionary<string, int> cyclomatic,
+            ConcurrentDictionary<string, int> indentation)
         {
-            ComplexityMeasureType.Cognitive => cognitive,
-            ComplexityMeasureType.Cyclomatic => cyclomatic,
-            ComplexityMeasureType.Indentation => indentation,
-            _ => cognitive
-        };
+            if (value == 0) return;
 
-        target.AddOrUpdate(path, value, (_, existing) => existing + value);
-    }
+            var target = measure switch
+            {
+                ComplexityMeasureType.Cognitive => cognitive,
+                ComplexityMeasureType.Cyclomatic => cyclomatic,
+                ComplexityMeasureType.Indentation => indentation,
+                _ => cognitive
+            };
 
-    private static void AddByDocId(
-        ComplexityMeasureType measure,
-        string docId,
-        int value,
-        ConcurrentDictionary<string, int> types,
-        ConcurrentDictionary<string, int> methods,
-        bool isMethod)
-    {
-        if (value == 0 || string.IsNullOrWhiteSpace(docId))
-        {
-            return;
+            target.AddOrUpdate(path, value, (_, existing) => existing + value);
         }
 
-        var target = isMethod ? methods : types;
-        target.AddOrUpdate(docId, value, (_, existing) => existing + value);
-    }
+        private static void AddByDocId(
+            ComplexityMeasureType measure,
+            string docId,
+            int value,
+            IReadOnlyDictionary<ComplexityMeasureType, ConcurrentDictionary<string, int>> types,
+            IReadOnlyDictionary<ComplexityMeasureType, ConcurrentDictionary<string, int>> methods,
+            bool isMethod)
+        {
+            if (value == 0 || string.IsNullOrWhiteSpace(docId)) return;
 
-    private static string BuildKey(Guid configId, string solutionId)
-    {
-        return $"{configId:N}:{solutionId}";
+            var target = isMethod ? methods[measure] : types[measure];
+            target.AddOrUpdate(docId, value, (_, existing) => existing + value);
+        }
+
+        private static string BuildKey(Guid configId, string solutionId)
+        {
+            return $"{configId:N}:{solutionId}";
+        }
     }
 }

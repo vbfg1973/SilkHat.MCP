@@ -1,14 +1,10 @@
-@using SilkHat.Ui.Components
-@using SilkHat.Ui.Models
-@using SilkHat.Ui.Services
 @inherits VisualizationComponentBase
 @inject VisualizationThemeService VisualizationThemeService
 
 <div class="ide-d3-viewer" id="@ContainerId"></div>
 
 @code {
-    [Parameter]
-    public string? Label { get; set; }
+    [Parameter] public string? Label { get; set; }
 
     private string? _lastLabel;
     private string? _lastPaletteKey;
@@ -42,4 +38,5 @@
         _lastPaletteKey = null;
         return JSRuntime.InvokeVoidAsync("silkhatD3.clear", ContainerId).AsTask();
     }
+
 }

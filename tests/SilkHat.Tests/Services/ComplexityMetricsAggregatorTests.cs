@@ -1,72 +1,51 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Text;
-using SilkHat.Code.Analysis.Abstractions;
-using SilkHat.Code.Analysis.Models;
-using SilkHat.Code.Analysis.Services.Complexity;
+using SilkHat.Code.Core.Dtos;
+using SilkHat.Tests.Fixtures;
 
-namespace SilkHat.Tests.Services;
-
-public sealed class ComplexityMetricsAggregatorTests
+namespace SilkHat.Tests.Services
 {
-    [Fact]
-    public async Task GetMetricsAsync_ComputesFileComplexity()
+    [CollectionDefinition("SampleCodeCollection")]
+    public sealed class SampleCodeCollection : ICollectionFixture<SampleCodeFixture>
     {
-        var rootPath = "/repo";
-        var filePath = "/repo/Sample.cs";
-        var source = """
-            namespace Sample;
-            public class Foo
-            {
-                public void DoWork()
-                {
-                    if (true)
-                    {
-                    }
-                }
-            }
-            """;
+    }
 
-        var workspace = new AdhocWorkspace();
-        var project = workspace.AddProject("Sample", LanguageNames.CSharp)
-            .WithCompilationOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-        project = project.AddDocument("Sample.cs", SourceText.From(source), filePath: filePath).Project;
-        var compilation = await project.GetCompilationAsync();
-        Assert.NotNull(compilation);
+    [Collection("SampleCodeCollection")]
+    public sealed class ComplexityMetricsAggregatorTests
+    {
+        private readonly SampleCodeFixture _fixture;
 
-        var solutionWorkspace = new CodeSolutionWorkspace(
-            "solution-1",
-            "Sample",
-            "/repo/Sample.sln",
-            "./Sample.sln",
-            new Dictionary<string, ProjectIndex>(),
-            new List<SilkHat.Code.Core.Dtos.CodeTreeEntryDto>(),
-            new Dictionary<string, IReadOnlyList<SilkHat.Code.Core.Dtos.CodeTreeEntryDto>>(StringComparer.OrdinalIgnoreCase),
-            new List<string>(),
-            new List<SilkHat.Code.Core.Dtos.NamedTypeDto>(),
-            new Dictionary<string, SilkHat.Code.Core.Dtos.NamedTypeDto>(),
-            new Dictionary<string, SilkHat.Code.Core.Dtos.NamedTypeDto>(),
-            new Dictionary<string, Compilation> { ["sample"] = compilation! });
-
-        var repositoryWorkspace = new CodeRepositoryWorkspace(rootPath, new Dictionary<string, CodeSolutionWorkspace>
+        public ComplexityMetricsAggregatorTests(SampleCodeFixture fixture)
         {
-            [solutionWorkspace.SolutionId] = solutionWorkspace
-        });
+            _fixture = fixture;
+        }
 
-        var strategies = new IComplexityStrategy[]
+        [Fact]
+        public async Task GetMetricsAsync_ComputesFileComplexity()
         {
-            new CognitiveComplexityStrategy(),
-            new CyclomaticComplexityStrategy(),
-            new IndentationComplexityStrategy()
-        };
-        var factory = new ComplexityStrategyFactory(strategies);
-        var aggregator = new ComplexityMetricsAggregator(factory);
+            var metrics = await _fixture.GetCachedMetricsAsync();
 
-        var metrics = await aggregator.GetMetricsAsync(Guid.NewGuid(), repositoryWorkspace, solutionWorkspace, CancellationToken.None);
+            Assert.True(metrics.Cognitive["./Sample.cs"] > 0);
+            Assert.True(metrics.Cyclomatic["./Sample.cs"] > 0);
+            Assert.True(metrics.Indentation["./Sample.cs"] > 0);
+            Assert.NotEmpty(metrics.GetMethods(ComplexityMeasureType.Cognitive));
+        }
 
-        Assert.True(metrics.Cognitive["./Sample.cs"] > 0);
-        Assert.True(metrics.Cyclomatic["./Sample.cs"] > 0);
-        Assert.True(metrics.Indentation["./Sample.cs"] > 0);
-        Assert.NotEmpty(metrics.MethodsByDocId);
+        [Fact]
+        public async Task GetMetricsAsync_DoesNotMixMeasuresAcrossBuckets()
+        {
+            var metrics = await _fixture.GetCachedMetricsAsync();
+
+            // For the type, cognitive/cyclomatic/indentation buckets should all be present and independent
+            var typeDocId = metrics.GetTypes(ComplexityMeasureType.Cognitive).Keys.First();
+
+            var cognitiveForType = metrics.GetTypes(ComplexityMeasureType.Cognitive)[typeDocId];
+            var cyclomaticForType = metrics.GetTypes(ComplexityMeasureType.Cyclomatic)[typeDocId];
+            var indentationForType = metrics.GetTypes(ComplexityMeasureType.Indentation)[typeDocId];
+
+            Assert.True(cognitiveForType >= 0);
+            Assert.True(cyclomaticForType >= 0);
+            Assert.True(indentationForType >= 0);
+
+            Assert.NotEqual(cognitiveForType, cyclomaticForType); // branchy method should bump cyclomatic differently
+        }
     }
 }

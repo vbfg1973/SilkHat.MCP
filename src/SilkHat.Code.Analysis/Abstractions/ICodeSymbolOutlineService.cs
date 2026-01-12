@@ -1,12 +1,13 @@
 using SilkHat.Code.Analysis.Models;
 
-namespace SilkHat.Code.Analysis.Abstractions;
-
-public interface ICodeSymbolOutlineService
+namespace SilkHat.Code.Analysis.Abstractions
 {
-    Task<CodeFileSymbolsResult> GetFileSymbolsAsync(
-        CodeRepositoryWorkspace workspace,
-        CodeSolutionWorkspace solution,
-        string repositoryPath,
-        CancellationToken cancellationToken);
+    public interface ICodeSymbolOutlineService
+    {
+        Task<CodeFileSymbolsResult> GetFileSymbolsAsync(
+            CodeRepositoryWorkspace workspace,
+            CodeSolutionWorkspace solution,
+            string repositoryPath,
+            CancellationToken cancellationToken);
+    }
 }

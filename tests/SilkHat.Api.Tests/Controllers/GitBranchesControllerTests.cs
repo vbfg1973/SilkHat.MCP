@@ -8,71 +8,74 @@ using SilkHat.Api.Tests.TestHelpers;
 using SilkHat.Git.Analysis.Abstractions;
 using SilkHat.Git.Core.Dtos;
 
-namespace SilkHat.Api.Tests.Controllers;
-
-public sealed class GitBranchesControllerTests
+namespace SilkHat.Api.Tests.Controllers
 {
-    [Fact]
-    public async Task GetCurrent_ReturnsProblem_WhenRepositoryNotLoaded()
+    public sealed class GitBranchesControllerTests
     {
-        var store = new Mock<ILoadedRepositoryStore>();
-        store.Setup(s => s.Get(It.IsAny<Guid>())).Returns((LoadedRepository?)null);
-        var gitCli = new Mock<IGitCli>();
-        var controller = new GitBranchesController(store.Object, gitCli.Object)
+        [Fact]
+        public async Task GetCurrent_ReturnsProblem_WhenRepositoryNotLoaded()
         {
-            ControllerContext = ControllerTestFactory.CreateContext()
-        };
+            var store = new Mock<ILoadedRepositoryStore>();
+            store.Setup(s => s.Get(It.IsAny<Guid>())).Returns((LoadedRepository?)null);
+            var gitCli = new Mock<IGitCli>();
+            var controller = new GitBranchesController(store.Object, gitCli.Object)
+            {
+                ControllerContext = ControllerTestFactory.CreateContext()
+            };
 
-        var result = await controller.GetCurrent(Guid.NewGuid(), CancellationToken.None);
+            var result = await controller.GetCurrent(Guid.NewGuid(), CancellationToken.None);
 
-        var problem = Assert.IsType<ObjectResult>(result.Result);
-        Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
-        gitCli.Verify(c => c.GetCurrentBranchAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-    }
+            var problem = Assert.IsType<ObjectResult>(result.Result);
+            Assert.Equal(StatusCodes.Status409Conflict, problem.StatusCode);
+            gitCli.Verify(
+                c => c.GetCurrentBranchAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+                Times.Never);
+        }
 
-    [Fact]
-    public async Task GetCurrent_ReturnsBranchName()
-    {
-        var configId = Guid.NewGuid();
-        var store = new Mock<ILoadedRepositoryStore>();
-        store.Setup(s => s.Get(configId)).Returns(new LoadedRepository(configId, "/repo", DateTimeOffset.UtcNow));
-        var gitCli = new Mock<IGitCli>();
-        gitCli.Setup(c => c.GetCurrentBranchAsync(configId, "/repo", It.IsAny<CancellationToken>()))
-            .ReturnsAsync("feature/demo");
-
-        var controller = new GitBranchesController(store.Object, gitCli.Object)
+        [Fact]
+        public async Task GetCurrent_ReturnsBranchName()
         {
-            ControllerContext = ControllerTestFactory.CreateContext()
-        };
+            var configId = Guid.NewGuid();
+            var store = new Mock<ILoadedRepositoryStore>();
+            store.Setup(s => s.Get(configId)).Returns(new LoadedRepository(configId, "/repo", DateTimeOffset.UtcNow));
+            var gitCli = new Mock<IGitCli>();
+            gitCli.Setup(c => c.GetCurrentBranchAsync(configId, "/repo", It.IsAny<CancellationToken>()))
+                .ReturnsAsync("feature/demo");
 
-        var result = await controller.GetCurrent(configId, CancellationToken.None);
+            var controller = new GitBranchesController(store.Object, gitCli.Object)
+            {
+                ControllerContext = ControllerTestFactory.CreateContext()
+            };
 
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        Assert.Equal("feature/demo", ok.Value);
-    }
+            var result = await controller.GetCurrent(configId, CancellationToken.None);
 
-    [Fact]
-    public async Task GetLocalBranches_ReturnsBranchList()
-    {
-        var configId = Guid.NewGuid();
-        var store = new Mock<ILoadedRepositoryStore>();
-        store.Setup(s => s.Get(configId)).Returns(new LoadedRepository(configId, "/repo", DateTimeOffset.UtcNow));
-        var gitCli = new Mock<IGitCli>();
-        gitCli.Setup(c => c.GetCurrentBranchAsync(configId, "/repo", It.IsAny<CancellationToken>()))
-            .ReturnsAsync("develop");
-        gitCli.Setup(c => c.ListLocalBranchesAsync(configId, "/repo", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<string> { "develop", "feature/demo" });
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal("feature/demo", ok.Value);
+        }
 
-        var controller = new GitBranchesController(store.Object, gitCli.Object)
+        [Fact]
+        public async Task GetLocalBranches_ReturnsBranchList()
         {
-            ControllerContext = ControllerTestFactory.CreateContext()
-        };
+            var configId = Guid.NewGuid();
+            var store = new Mock<ILoadedRepositoryStore>();
+            store.Setup(s => s.Get(configId)).Returns(new LoadedRepository(configId, "/repo", DateTimeOffset.UtcNow));
+            var gitCli = new Mock<IGitCli>();
+            gitCli.Setup(c => c.GetCurrentBranchAsync(configId, "/repo", It.IsAny<CancellationToken>()))
+                .ReturnsAsync("develop");
+            gitCli.Setup(c => c.ListLocalBranchesAsync(configId, "/repo", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<string> { "develop", "feature/demo" });
 
-        var result = await controller.GetLocalBranches(configId, CancellationToken.None);
+            var controller = new GitBranchesController(store.Object, gitCli.Object)
+            {
+                ControllerContext = ControllerTestFactory.CreateContext()
+            };
 
-        var ok = Assert.IsType<OkObjectResult>(result.Result);
-        var dto = Assert.IsType<GitBranchListDto>(ok.Value);
-        Assert.Equal("develop", dto.CurrentBranch);
-        Assert.Equal(2, dto.LocalBranches.Count);
+            var result = await controller.GetLocalBranches(configId, CancellationToken.None);
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var dto = Assert.IsType<GitBranchListDto>(ok.Value);
+            Assert.Equal("develop", dto.CurrentBranch);
+            Assert.Equal(2, dto.LocalBranches.Count);
+        }
     }
 }

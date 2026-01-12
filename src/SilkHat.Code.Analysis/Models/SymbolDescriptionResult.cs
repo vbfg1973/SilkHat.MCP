@@ -1,13 +1,14 @@
-namespace SilkHat.Code.Analysis.Models;
-
-public enum SymbolDescriptionStatus
+namespace SilkHat.Code.Analysis.Models
 {
-    Success,
-    NotFound,
-    Unsupported
-}
+    public enum SymbolDescriptionStatus
+    {
+        Success,
+        NotFound,
+        Unsupported
+    }
 
-public sealed record SymbolDescriptionResult<T>(
-    SymbolDescriptionStatus Status,
-    T? Description,
-    string? Error);
+    public sealed record SymbolDescriptionResult<T>(
+        SymbolDescriptionStatus Status,
+        T? Description,
+        string? Error);
+}

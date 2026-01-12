@@ -1,6 +1,6 @@
-﻿namespace SilkHat.Git.Analysis;
-
-public class Class1
+﻿namespace SilkHat.Git.Analysis
 {
-
+    public class Class1
+    {
+    }
 }

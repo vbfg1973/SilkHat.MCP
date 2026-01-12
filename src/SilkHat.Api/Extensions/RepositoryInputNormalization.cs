@@ -1,25 +1,26 @@
-namespace SilkHat.Api.Extensions;
-
-public static class RepositoryInputNormalization
+namespace SilkHat.Api.Extensions
 {
-    public static bool TryNormalizeRootPath(string rootPath, out string normalizedPath, out string? error)
+    public static class RepositoryInputNormalization
     {
-        try
+        public static bool TryNormalizeRootPath(string rootPath, out string normalizedPath, out string? error)
         {
-            normalizedPath = Path.GetFullPath(rootPath.Trim());
-            error = null;
-            return true;
+            try
+            {
+                normalizedPath = Path.GetFullPath(rootPath.Trim());
+                error = null;
+                return true;
+            }
+            catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                normalizedPath = string.Empty;
+                error = ex.Message;
+                return false;
+            }
         }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
-        {
-            normalizedPath = string.Empty;
-            error = ex.Message;
-            return false;
-        }
-    }
 
-    public static string? NormalizeOptional(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        public static string? NormalizeOptional(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
     }
 }
